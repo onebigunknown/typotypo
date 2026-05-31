@@ -1,0 +1,361 @@
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: Inter, sans-serif;
+    font-size: 13px;
+    color: #222;
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0 0 12px;
+    line-height: 1.4;
+  }
+
+  .section {
+    margin: 16px 0;
+  }
+
+  .section-title {
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    font: inherit;
+  }
+
+  .hint {
+    margin-top: 6px;
+    color: #666;
+    font-size: 12px;
+  }
+
+  .rules {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rule {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+
+  .rule input {
+    margin-top: 2px;
+  }
+
+  .rule-title {
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .rule-description {
+    margin: 0;
+    color: #666;
+  }
+
+  .tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #eee;
+    color: #666;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  button {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  button.primary {
+    background: #18a0fb;
+    border-color: #18a0fb;
+    color: white;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  #result {
+    margin-top: 12px;
+    color: #555;
+  }
+</style>
+
+<h1>Typography Formatter</h1>
+
+<p id="summary">Checking selection…</p>
+
+<div class="section">
+  <div class="section-title">Language</div>
+
+  <select id="languageMode">
+    <option value="auto">Auto-detect</option>
+    <option value="ru">Russian</option>
+    <option value="en">English</option>
+  </select>
+
+  <p class="hint">
+    Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.
+  </p>
+</div>
+
+<div class="section">
+  <div class="section-title">Rules</div>
+
+  <div class="rules">
+    <label class="rule">
+      <input id="ellipsis" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Ellipsis <span class="tag">All languages</span></div>
+        <p class="rule-description">Replaces three dots (...) with a proper ellipsis character (…).</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="extraSpaces" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Extra spaces <span class="tag">All languages</span></div>
+        <p class="rule-description">Replaces multiple spaces with a single space.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="trimTextEdges" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Trim text edges <span class="tag">All languages</span></div>
+        <p class="rule-description">Removes spaces at the beginning and end of a text layer.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="spacesBeforePunctuation" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Spaces before punctuation <span class="tag">All languages</span></div>
+        <p class="rule-description">Removes spaces before punctuation marks like comma, period, colon, question mark, and exclamation mark.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianQuotes" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
+        <p class="rule-description">Replaces straight double quotes ("text") with Russian guillemets («text»).</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianShortWordsNbsp" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian short words <span class="tag">Russian</span></div>
+        <p class="rule-description">Keeps short Russian words together with the next word using a non-breaking space.</p>
+      </div>
+    </label>
+  </div>
+</div>
+
+<div class="actions">
+  <button id="apply" class="primary" disabled>Apply formatting</button>
+  <button id="close">Close</button>
+</div>
+
+<p id="result"></p>
+
+<script>
+  const summary = document.getElementById("summary");
+  const result = document.getElementById("result");
+  const applyButton = document.getElementById("apply");
+  const closeButton = document.getElementById("close");
+
+  const languageModeSelect = document.getElementById("languageMode");
+  const ellipsisCheckbox = document.getElementById("ellipsis");
+  const extraSpacesCheckbox = document.getElementById("extraSpaces");
+  const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
+  const spacesBeforePunctuationCheckbox = document.getElementById("spacesBeforePunctuation");
+  const russianQuotesCheckbox = document.getElementById("russianQuotes");
+  const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
+
+  let hasTextLayers = false;
+  let isLoadingSettings = true;
+
+  function getEnabledRules() {
+    return {
+      ellipsis: ellipsisCheckbox.checked,
+      extraSpaces: extraSpacesCheckbox.checked,
+      trimTextEdges: trimTextEdgesCheckbox.checked,
+      spacesBeforePunctuation: spacesBeforePunctuationCheckbox.checked,
+      russianQuotes: russianQuotesCheckbox.checked,
+      russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
+    };
+  }
+
+  function getSettings() {
+    return {
+      languageMode: languageModeSelect.value,
+      enabledRules: getEnabledRules(),
+    };
+  }
+
+  function applySettingsToUi(settings) {
+    languageModeSelect.value = settings.languageMode;
+
+    ellipsisCheckbox.checked = settings.enabledRules.ellipsis;
+    extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
+    trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
+    spacesBeforePunctuationCheckbox.checked = settings.enabledRules.spacesBeforePunctuation;
+    russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
+    russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
+  }
+
+  function hasEnabledRules() {
+    const enabledRules = getEnabledRules();
+
+    return (
+      enabledRules.ellipsis ||
+      enabledRules.extraSpaces ||
+      enabledRules.trimTextEdges ||
+      enabledRules.spacesBeforePunctuation ||
+      enabledRules.russianQuotes ||
+      enabledRules.russianShortWordsNbsp
+    );
+  }
+
+  function updateApplyButtonState() {
+    applyButton.disabled = isLoadingSettings || !hasTextLayers || !hasEnabledRules();
+  }
+
+  function saveCurrentSettings() {
+    if (isLoadingSettings) {
+      return;
+    }
+
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "save-settings",
+          settings: getSettings(),
+        },
+      },
+      "*"
+    );
+  }
+
+  function handleSettingsChange() {
+    result.textContent = "";
+    updateApplyButtonState();
+    saveCurrentSettings();
+  }
+
+  function formatLanguageStats(languageStats) {
+    return `Detected layers — Russian: ${languageStats.ru}, English: ${languageStats.en}, Unknown: ${languageStats.unknown}.`;
+  }
+
+  window.onmessage = (event) => {
+    const message = event.data.pluginMessage;
+
+    if (!message) {
+      return;
+    }
+
+    if (message.type === "settings-loaded") {
+      applySettingsToUi(message.settings);
+
+      isLoadingSettings = false;
+      updateApplyButtonState();
+    }
+
+    if (message.type === "selection-info") {
+      result.textContent = "";
+
+      if (message.selectedCount === 0) {
+        hasTextLayers = false;
+        summary.textContent = "Nothing selected. Select one or more text layers.";
+        updateApplyButtonState();
+        return;
+      }
+
+      if (message.textNodeCount === 0) {
+        hasTextLayers = false;
+        summary.textContent = `Selected layers: ${message.selectedCount}. Text layers: 0.`;
+        updateApplyButtonState();
+        return;
+      }
+
+      hasTextLayers = true;
+      summary.textContent = `Selected layers: ${message.selectedCount}. Text layers: ${message.textNodeCount}.`;
+      updateApplyButtonState();
+    }
+
+    if (message.type === "apply-result") {
+      result.textContent =
+        `Updated ${message.changedNodeCount} text layer(s). ` +
+        `Replacements: ${message.totalReplacementCount}. ` +
+        `Skipped layers: ${message.skippedNodeCount}. ` +
+        `Rules skipped by language: ${message.skippedRuleCount}. ` +
+        formatLanguageStats(message.languageStats);
+    }
+  };
+
+  languageModeSelect.onchange = handleSettingsChange;
+  ellipsisCheckbox.onchange = handleSettingsChange;
+  extraSpacesCheckbox.onchange = handleSettingsChange;
+  trimTextEdgesCheckbox.onchange = handleSettingsChange;
+  spacesBeforePunctuationCheckbox.onchange = handleSettingsChange;
+  russianQuotesCheckbox.onchange = handleSettingsChange;
+  russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
+
+  applyButton.onclick = () => {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "apply",
+          settings: getSettings(),
+        },
+      },
+      "*"
+    );
+  };
+
+  closeButton.onclick = () => {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "close",
+        },
+      },
+      "*"
+    );
+  };
+</script>
