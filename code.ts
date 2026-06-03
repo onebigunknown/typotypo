@@ -1,12 +1,14 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 580,
+  height: 680,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
 type LanguageMode = "auto" | "ru" | "en";
 
 type EnabledRules = {
+  invisibleCopyArtifacts: boolean;
+  tabs: boolean;
   ellipsis: boolean;
   extraSpaces: boolean;
   trimTextEdges: boolean;
@@ -38,6 +40,8 @@ const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS: ApplySettings = {
   languageMode: "auto",
   enabledRules: {
+    invisibleCopyArtifacts: true,
+    tabs: true,
     ellipsis: true,
     extraSpaces: true,
     trimTextEdges: true,
@@ -69,6 +73,16 @@ function normalizeSettings(value: unknown): ApplySettings {
       : DEFAULT_SETTINGS.languageMode,
 
     enabledRules: {
+      invisibleCopyArtifacts:
+        typeof maybeEnabledRules.invisibleCopyArtifacts === "boolean"
+          ? maybeEnabledRules.invisibleCopyArtifacts
+          : DEFAULT_SETTINGS.enabledRules.invisibleCopyArtifacts,
+
+      tabs:
+        typeof maybeEnabledRules.tabs === "boolean"
+          ? maybeEnabledRules.tabs
+          : DEFAULT_SETTINGS.enabledRules.tabs,
+
       ellipsis:
         typeof maybeEnabledRules.ellipsis === "boolean"
           ? maybeEnabledRules.ellipsis
@@ -194,6 +208,26 @@ function sendSelectionInfo() {
   });
 }
 
+function applyInvisibleCopyArtifactsRule(text: string): RuleResult {
+  const regexp = /[\u00AD\u200B\uFEFF]/g;
+  const matches = text.match(regexp);
+
+  return {
+    formattedText: text.replace(regexp, ""),
+    replacementCount: matches ? matches.length : 0,
+  };
+}
+
+function applyTabsRule(text: string): RuleResult {
+  const regexp = /\t+/g;
+  const matches = text.match(regexp);
+
+  return {
+    formattedText: text.replace(regexp, " "),
+    replacementCount: matches ? matches.length : 0,
+  };
+}
+
 function applyEllipsisRule(text: string): RuleResult {
   const matches = text.match(/\.{3}/g);
 
@@ -261,6 +295,16 @@ function applyRussianShortWordsNbspRule(text: string): RuleResult {
 }
 
 const TYPOGRAPHY_RULES: TypographyRule[] = [
+  {
+    id: "invisibleCopyArtifacts",
+    supportedLanguages: "all",
+    apply: applyInvisibleCopyArtifactsRule,
+  },
+  {
+    id: "tabs",
+    supportedLanguages: "all",
+    apply: applyTabsRule,
+  },
   {
     id: "ellipsis",
     supportedLanguages: "all",

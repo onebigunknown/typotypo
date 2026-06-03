@@ -1,12 +1,14 @@
 "use strict";
 figma.showUI(__html__, {
     width: 420,
-    height: 580,
+    height: 680,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS = {
     languageMode: "auto",
     enabledRules: {
+        invisibleCopyArtifacts: true,
+        tabs: true,
         ellipsis: true,
         extraSpaces: true,
         trimTextEdges: true,
@@ -31,6 +33,12 @@ function normalizeSettings(value) {
             ? maybeSettings.languageMode
             : DEFAULT_SETTINGS.languageMode,
         enabledRules: {
+            invisibleCopyArtifacts: typeof maybeEnabledRules.invisibleCopyArtifacts === "boolean"
+                ? maybeEnabledRules.invisibleCopyArtifacts
+                : DEFAULT_SETTINGS.enabledRules.invisibleCopyArtifacts,
+            tabs: typeof maybeEnabledRules.tabs === "boolean"
+                ? maybeEnabledRules.tabs
+                : DEFAULT_SETTINGS.enabledRules.tabs,
             ellipsis: typeof maybeEnabledRules.ellipsis === "boolean"
                 ? maybeEnabledRules.ellipsis
                 : DEFAULT_SETTINGS.enabledRules.ellipsis,
@@ -124,6 +132,22 @@ function sendSelectionInfo() {
         textNodeCount: selectedTextNodes.length,
     });
 }
+function applyInvisibleCopyArtifactsRule(text) {
+    const regexp = /[\u00AD\u200B\uFEFF]/g;
+    const matches = text.match(regexp);
+    return {
+        formattedText: text.replace(regexp, ""),
+        replacementCount: matches ? matches.length : 0,
+    };
+}
+function applyTabsRule(text) {
+    const regexp = /\t+/g;
+    const matches = text.match(regexp);
+    return {
+        formattedText: text.replace(regexp, " "),
+        replacementCount: matches ? matches.length : 0,
+    };
+}
 function applyEllipsisRule(text) {
     const matches = text.match(/\.{3}/g);
     return {
@@ -173,6 +197,16 @@ function applyRussianShortWordsNbspRule(text) {
     };
 }
 const TYPOGRAPHY_RULES = [
+    {
+        id: "invisibleCopyArtifacts",
+        supportedLanguages: "all",
+        apply: applyInvisibleCopyArtifactsRule,
+    },
+    {
+        id: "tabs",
+        supportedLanguages: "all",
+        apply: applyTabsRule,
+    },
     {
         id: "ellipsis",
         supportedLanguages: "all",

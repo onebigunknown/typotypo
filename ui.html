@@ -137,6 +137,22 @@
 
   <div class="rules">
     <label class="rule">
+      <input id="invisibleCopyArtifacts" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Invisible copy artifacts <span class="tag">All languages</span></div>
+        <p class="rule-description">Removes hidden characters that may appear after copying text from external sources.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="tabs" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Tabs <span class="tag">All languages</span></div>
+        <p class="rule-description">Replaces tab characters with regular spaces.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="ellipsis" type="checkbox" checked />
       <div>
         <div class="rule-title">Ellipsis <span class="tag">All languages</span></div>
@@ -200,6 +216,8 @@
   const closeButton = document.getElementById("close");
 
   const languageModeSelect = document.getElementById("languageMode");
+  const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
+  const tabsCheckbox = document.getElementById("tabs");
   const ellipsisCheckbox = document.getElementById("ellipsis");
   const extraSpacesCheckbox = document.getElementById("extraSpaces");
   const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
@@ -212,6 +230,8 @@
 
   function getEnabledRules() {
     return {
+      invisibleCopyArtifacts: invisibleCopyArtifactsCheckbox.checked,
+      tabs: tabsCheckbox.checked,
       ellipsis: ellipsisCheckbox.checked,
       extraSpaces: extraSpacesCheckbox.checked,
       trimTextEdges: trimTextEdgesCheckbox.checked,
@@ -231,6 +251,8 @@
   function applySettingsToUi(settings) {
     languageModeSelect.value = settings.languageMode;
 
+    invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
+    tabsCheckbox.checked = settings.enabledRules.tabs;
     ellipsisCheckbox.checked = settings.enabledRules.ellipsis;
     extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
     trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
@@ -243,6 +265,8 @@
     const enabledRules = getEnabledRules();
 
     return (
+      enabledRules.invisibleCopyArtifacts ||
+      enabledRules.tabs ||
       enabledRules.ellipsis ||
       enabledRules.extraSpaces ||
       enabledRules.trimTextEdges ||
@@ -329,6 +353,8 @@
   };
 
   languageModeSelect.onchange = handleSettingsChange;
+  invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
+  tabsCheckbox.onchange = handleSettingsChange;
   ellipsisCheckbox.onchange = handleSettingsChange;
   extraSpacesCheckbox.onchange = handleSettingsChange;
   trimTextEdgesCheckbox.onchange = handleSettingsChange;
