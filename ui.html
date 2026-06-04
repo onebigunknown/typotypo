@@ -133,6 +133,19 @@
 </div>
 
 <div class="section">
+  <div class="section-title">Number unit space</div>
+
+  <select id="numberUnitsSpace">
+    <option value="nbsp">Regular non-breaking space</option>
+    <option value="narrowNbsp">Narrow non-breaking space</option>
+  </select>
+
+  <p class="hint">
+    Used for units, currencies, sizes, and similar number pairs.
+  </p>
+</div>
+
+<div class="section">
   <div class="section-title">Rules</div>
 
   <div class="rules">
@@ -185,10 +198,42 @@
     </label>
 
     <label class="rule">
+      <input id="percentSignNoSpace" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Percent sign <span class="tag">All languages</span></div>
+        <p class="rule-description">Removes spaces before the percent sign.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="numberUnitsNbsp" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Number units <span class="tag">All languages</span></div>
+        <p class="rule-description">Keeps numbers together with units, currencies, and sizes using a non-breaking space.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="russianQuotes" type="checkbox" checked />
       <div>
         <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
         <p class="rule-description">Replaces straight double quotes ("text") with Russian guillemets («text»).</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianNumberRangeDash" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian number ranges <span class="tag">Russian</span></div>
+        <p class="rule-description">Uses an en dash without spaces in numeric ranges, for example 2020–2024.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianSentenceDash" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian sentence dash <span class="tag">Russian</span></div>
+        <p class="rule-description">Converts spaced hyphens, minus signs, and short dashes to an em dash with a non-breaking space before it.</p>
       </div>
     </label>
 
@@ -216,13 +261,19 @@
   const closeButton = document.getElementById("close");
 
   const languageModeSelect = document.getElementById("languageMode");
+  const numberUnitsSpaceSelect = document.getElementById("numberUnitsSpace");
+
   const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
   const tabsCheckbox = document.getElementById("tabs");
   const ellipsisCheckbox = document.getElementById("ellipsis");
   const extraSpacesCheckbox = document.getElementById("extraSpaces");
   const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
   const spacesBeforePunctuationCheckbox = document.getElementById("spacesBeforePunctuation");
+  const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
+  const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
   const russianQuotesCheckbox = document.getElementById("russianQuotes");
+  const russianNumberRangeDashCheckbox = document.getElementById("russianNumberRangeDash");
+  const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
   const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
 
   let hasTextLayers = false;
@@ -236,20 +287,32 @@
       extraSpaces: extraSpacesCheckbox.checked,
       trimTextEdges: trimTextEdgesCheckbox.checked,
       spacesBeforePunctuation: spacesBeforePunctuationCheckbox.checked,
+      percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
+      numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
       russianQuotes: russianQuotesCheckbox.checked,
+      russianNumberRangeDash: russianNumberRangeDashCheckbox.checked,
+      russianSentenceDash: russianSentenceDashCheckbox.checked,
       russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
+    };
+  }
+
+  function getOptions() {
+    return {
+      numberUnitsSpace: numberUnitsSpaceSelect.value,
     };
   }
 
   function getSettings() {
     return {
       languageMode: languageModeSelect.value,
+      options: getOptions(),
       enabledRules: getEnabledRules(),
     };
   }
 
   function applySettingsToUi(settings) {
     languageModeSelect.value = settings.languageMode;
+    numberUnitsSpaceSelect.value = settings.options.numberUnitsSpace;
 
     invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
     tabsCheckbox.checked = settings.enabledRules.tabs;
@@ -257,7 +320,11 @@
     extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
     trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
     spacesBeforePunctuationCheckbox.checked = settings.enabledRules.spacesBeforePunctuation;
+    percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
+    numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
     russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
+    russianNumberRangeDashCheckbox.checked = settings.enabledRules.russianNumberRangeDash;
+    russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
     russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
   }
 
@@ -271,7 +338,11 @@
       enabledRules.extraSpaces ||
       enabledRules.trimTextEdges ||
       enabledRules.spacesBeforePunctuation ||
+      enabledRules.percentSignNoSpace ||
+      enabledRules.numberUnitsNbsp ||
       enabledRules.russianQuotes ||
+      enabledRules.russianNumberRangeDash ||
+      enabledRules.russianSentenceDash ||
       enabledRules.russianShortWordsNbsp
     );
   }
@@ -353,13 +424,19 @@
   };
 
   languageModeSelect.onchange = handleSettingsChange;
+  numberUnitsSpaceSelect.onchange = handleSettingsChange;
+
   invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
   tabsCheckbox.onchange = handleSettingsChange;
   ellipsisCheckbox.onchange = handleSettingsChange;
   extraSpacesCheckbox.onchange = handleSettingsChange;
   trimTextEdgesCheckbox.onchange = handleSettingsChange;
   spacesBeforePunctuationCheckbox.onchange = handleSettingsChange;
+  percentSignNoSpaceCheckbox.onchange = handleSettingsChange;
+  numberUnitsNbspCheckbox.onchange = handleSettingsChange;
   russianQuotesCheckbox.onchange = handleSettingsChange;
+  russianNumberRangeDashCheckbox.onchange = handleSettingsChange;
+  russianSentenceDashCheckbox.onchange = handleSettingsChange;
   russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
 
   applyButton.onclick = () => {

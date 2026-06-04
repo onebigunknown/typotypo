@@ -1,10 +1,11 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 680,
+  height: 900,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
 type LanguageMode = "auto" | "ru" | "en";
+type NumberUnitsSpace = "nbsp" | "narrowNbsp";
 
 type EnabledRules = {
   invisibleCopyArtifacts: boolean;
@@ -13,13 +14,22 @@ type EnabledRules = {
   extraSpaces: boolean;
   trimTextEdges: boolean;
   spacesBeforePunctuation: boolean;
+  percentSignNoSpace: boolean;
+  numberUnitsNbsp: boolean;
   russianQuotes: boolean;
+  russianNumberRangeDash: boolean;
+  russianSentenceDash: boolean;
   russianShortWordsNbsp: boolean;
+};
+
+type TypographyOptions = {
+  numberUnitsSpace: NumberUnitsSpace;
 };
 
 type ApplySettings = {
   enabledRules: EnabledRules;
   languageMode: LanguageMode;
+  options: TypographyOptions;
 };
 
 type RuleResult = {
@@ -30,7 +40,7 @@ type RuleResult = {
 type TypographyRule = {
   id: keyof EnabledRules;
   supportedLanguages: "all" | LanguageCode[];
-  apply: (text: string) => RuleResult;
+  apply: (text: string, settings: ApplySettings) => RuleResult;
 };
 
 type LanguageStats = Record<LanguageCode, number>;
@@ -39,6 +49,9 @@ const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 
 const DEFAULT_SETTINGS: ApplySettings = {
   languageMode: "auto",
+  options: {
+    numberUnitsSpace: "nbsp",
+  },
   enabledRules: {
     invisibleCopyArtifacts: true,
     tabs: true,
@@ -46,7 +59,11 @@ const DEFAULT_SETTINGS: ApplySettings = {
     extraSpaces: true,
     trimTextEdges: true,
     spacesBeforePunctuation: true,
+    percentSignNoSpace: true,
+    numberUnitsNbsp: true,
     russianQuotes: true,
+    russianNumberRangeDash: true,
+    russianSentenceDash: true,
     russianShortWordsNbsp: true,
   },
 };
@@ -55,10 +72,19 @@ function isLanguageMode(value: unknown): value is LanguageMode {
   return value === "auto" || value === "ru" || value === "en";
 }
 
+function isNumberUnitsSpace(value: unknown): value is NumberUnitsSpace {
+  return value === "nbsp" || value === "narrowNbsp";
+}
+
 function normalizeSettings(value: unknown): ApplySettings {
   const maybeSettings: Partial<ApplySettings> =
     typeof value === "object" && value !== null
       ? (value as Partial<ApplySettings>)
+      : {};
+
+  const maybeOptions: Partial<TypographyOptions> =
+    typeof maybeSettings.options === "object" && maybeSettings.options !== null
+      ? (maybeSettings.options as Partial<TypographyOptions>)
       : {};
 
   const maybeEnabledRules: Partial<EnabledRules> =
@@ -71,6 +97,12 @@ function normalizeSettings(value: unknown): ApplySettings {
     languageMode: isLanguageMode(maybeSettings.languageMode)
       ? maybeSettings.languageMode
       : DEFAULT_SETTINGS.languageMode,
+
+    options: {
+      numberUnitsSpace: isNumberUnitsSpace(maybeOptions.numberUnitsSpace)
+        ? maybeOptions.numberUnitsSpace
+        : DEFAULT_SETTINGS.options.numberUnitsSpace,
+    },
 
     enabledRules: {
       invisibleCopyArtifacts:
@@ -103,10 +135,30 @@ function normalizeSettings(value: unknown): ApplySettings {
           ? maybeEnabledRules.spacesBeforePunctuation
           : DEFAULT_SETTINGS.enabledRules.spacesBeforePunctuation,
 
+      percentSignNoSpace:
+        typeof maybeEnabledRules.percentSignNoSpace === "boolean"
+          ? maybeEnabledRules.percentSignNoSpace
+          : DEFAULT_SETTINGS.enabledRules.percentSignNoSpace,
+
+      numberUnitsNbsp:
+        typeof maybeEnabledRules.numberUnitsNbsp === "boolean"
+          ? maybeEnabledRules.numberUnitsNbsp
+          : DEFAULT_SETTINGS.enabledRules.numberUnitsNbsp,
+
       russianQuotes:
         typeof maybeEnabledRules.russianQuotes === "boolean"
           ? maybeEnabledRules.russianQuotes
           : DEFAULT_SETTINGS.enabledRules.russianQuotes,
+
+      russianNumberRangeDash:
+        typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
+          ? maybeEnabledRules.russianNumberRangeDash
+          : DEFAULT_SETTINGS.enabledRules.russianNumberRangeDash,
+
+      russianSentenceDash:
+        typeof maybeEnabledRules.russianSentenceDash === "boolean"
+          ? maybeEnabledRules.russianSentenceDash
+          : DEFAULT_SETTINGS.enabledRules.russianSentenceDash,
 
       russianShortWordsNbsp:
         typeof maybeEnabledRules.russianShortWordsNbsp === "boolean"
@@ -208,6 +260,14 @@ function sendSelectionInfo() {
   });
 }
 
+function getNumberUnitsSpace(settings: ApplySettings): string {
+  if (settings.options.numberUnitsSpace === "narrowNbsp") {
+    return "\u202F";
+  }
+
+  return "\u00A0";
+}
+
 function applyInvisibleCopyArtifactsRule(text: string): RuleResult {
   const regexp = /[\u00AD\u200B\uFEFF]/g;
   const matches = text.match(regexp);
@@ -247,7 +307,7 @@ function applyExtraSpacesRule(text: string): RuleResult {
 }
 
 function applyTrimTextEdgesRule(text: string): RuleResult {
-  const regexp = /^[ \t\u00A0]+|[ \t\u00A0]+$/g;
+  const regexp = /^[ \t\u00A0\u202F]+|[ \t\u00A0\u202F]+$/g;
   const matches = text.match(regexp);
 
   return {
@@ -266,12 +326,114 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
   };
 }
 
+function applyPercentSignNoSpaceRule(text: string): RuleResult {
+  const regexp = /(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]+%/g;
+  const matches = text.match(regexp);
+
+  return {
+    formattedText: text.replace(regexp, "$1%"),
+    replacementCount: matches ? matches.length : 0,
+  };
+}
+
+function applyNumberUnitsNbspRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
+  const units =
+    "₽|руб\\.?|рублей|р\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
+
+  const regexp = new RegExp(
+    "(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
+      units +
+      ")(?=$|[ \\t\\n\\r,.;:!?\\)])",
+    "giu"
+  );
+
+  const space = getNumberUnitsSpace(settings);
+  let replacementCount = 0;
+
+  const formattedText = text.replace(regexp, function (match, number, unit) {
+    const normalized = number + space + unit;
+
+    if (match === normalized) {
+      return match;
+    }
+
+    replacementCount += 1;
+    return normalized;
+  });
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
 function applyRussianQuotesRule(text: string): RuleResult {
   const matches = text.match(/"[^"\n]+"/g);
 
   return {
     formattedText: text.replace(/"([^"\n]+)"/g, "«$1»"),
     replacementCount: matches ? matches.length : 0,
+  };
+}
+
+function applyRussianNumberRangeDashRule(text: string): RuleResult {
+  const regexp =
+    /(^|[^\d\-–—−])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d\-–—−])/g;
+
+  let replacementCount = 0;
+
+  const formattedText = text.replace(
+    regexp,
+    function (match, prefix, startNumber, endNumber) {
+      const normalized = prefix + startNumber + "–" + endNumber;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
+function applyRussianSentenceDashRule(text: string): RuleResult {
+  const regexp =
+    /([А-Яа-яЁёA-Za-z0-9»”’")\]\.!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"(\[])/g;
+
+  let replacementCount = 0;
+
+  const formattedText = text.replace(
+    regexp,
+    function (match, leftChar, _leftSpace, _rightSpace, rightChar) {
+      const isNumberRange = /\d/.test(leftChar) && /\d/.test(rightChar);
+
+      if (isNumberRange) {
+        return match;
+      }
+
+      const normalized = leftChar + "\u00A0— " + rightChar;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
   };
 }
 
@@ -326,9 +488,29 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     apply: applySpacesBeforePunctuationRule,
   },
   {
+    id: "percentSignNoSpace",
+    supportedLanguages: "all",
+    apply: applyPercentSignNoSpaceRule,
+  },
+  {
+    id: "numberUnitsNbsp",
+    supportedLanguages: "all",
+    apply: applyNumberUnitsNbspRule,
+  },
+  {
     id: "russianQuotes",
     supportedLanguages: ["ru"],
     apply: applyRussianQuotesRule,
+  },
+  {
+    id: "russianNumberRangeDash",
+    supportedLanguages: ["ru"],
+    apply: applyRussianNumberRangeDashRule,
+  },
+  {
+    id: "russianSentenceDash",
+    supportedLanguages: ["ru"],
+    apply: applyRussianSentenceDashRule,
   },
   {
     id: "russianShortWordsNbsp",
@@ -350,7 +532,7 @@ function isRuleSupportedForLanguage(
 
 function applyRulesToText(
   text: string,
-  enabledRules: EnabledRules,
+  settings: ApplySettings,
   language: LanguageCode
 ): RuleResult & { skippedRuleCount: number } {
   let formattedText = text;
@@ -358,7 +540,7 @@ function applyRulesToText(
   let skippedRuleCount = 0;
 
   for (const rule of TYPOGRAPHY_RULES) {
-    if (!enabledRules[rule.id]) {
+    if (!settings.enabledRules[rule.id]) {
       continue;
     }
 
@@ -367,7 +549,7 @@ function applyRulesToText(
       continue;
     }
 
-    const result = rule.apply(formattedText);
+    const result = rule.apply(formattedText, settings);
 
     formattedText = result.formattedText;
     replacementCount += result.replacementCount;
@@ -424,11 +606,7 @@ async function applyTypographyRules(settings: ApplySettings) {
 
     languageStats[language] += 1;
 
-    const result = applyRulesToText(
-      originalText,
-      settings.enabledRules,
-      language
-    );
+    const result = applyRulesToText(originalText, settings, language);
 
     skippedRuleCount += result.skippedRuleCount;
 

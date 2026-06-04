@@ -1,11 +1,14 @@
 "use strict";
 figma.showUI(__html__, {
     width: 420,
-    height: 680,
+    height: 900,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS = {
     languageMode: "auto",
+    options: {
+        numberUnitsSpace: "nbsp",
+    },
     enabledRules: {
         invisibleCopyArtifacts: true,
         tabs: true,
@@ -13,16 +16,26 @@ const DEFAULT_SETTINGS = {
         extraSpaces: true,
         trimTextEdges: true,
         spacesBeforePunctuation: true,
+        percentSignNoSpace: true,
+        numberUnitsNbsp: true,
         russianQuotes: true,
+        russianNumberRangeDash: true,
+        russianSentenceDash: true,
         russianShortWordsNbsp: true,
     },
 };
 function isLanguageMode(value) {
     return value === "auto" || value === "ru" || value === "en";
 }
+function isNumberUnitsSpace(value) {
+    return value === "nbsp" || value === "narrowNbsp";
+}
 function normalizeSettings(value) {
     const maybeSettings = typeof value === "object" && value !== null
         ? value
+        : {};
+    const maybeOptions = typeof maybeSettings.options === "object" && maybeSettings.options !== null
+        ? maybeSettings.options
         : {};
     const maybeEnabledRules = typeof maybeSettings.enabledRules === "object" &&
         maybeSettings.enabledRules !== null
@@ -32,6 +45,11 @@ function normalizeSettings(value) {
         languageMode: isLanguageMode(maybeSettings.languageMode)
             ? maybeSettings.languageMode
             : DEFAULT_SETTINGS.languageMode,
+        options: {
+            numberUnitsSpace: isNumberUnitsSpace(maybeOptions.numberUnitsSpace)
+                ? maybeOptions.numberUnitsSpace
+                : DEFAULT_SETTINGS.options.numberUnitsSpace,
+        },
         enabledRules: {
             invisibleCopyArtifacts: typeof maybeEnabledRules.invisibleCopyArtifacts === "boolean"
                 ? maybeEnabledRules.invisibleCopyArtifacts
@@ -51,9 +69,21 @@ function normalizeSettings(value) {
             spacesBeforePunctuation: typeof maybeEnabledRules.spacesBeforePunctuation === "boolean"
                 ? maybeEnabledRules.spacesBeforePunctuation
                 : DEFAULT_SETTINGS.enabledRules.spacesBeforePunctuation,
+            percentSignNoSpace: typeof maybeEnabledRules.percentSignNoSpace === "boolean"
+                ? maybeEnabledRules.percentSignNoSpace
+                : DEFAULT_SETTINGS.enabledRules.percentSignNoSpace,
+            numberUnitsNbsp: typeof maybeEnabledRules.numberUnitsNbsp === "boolean"
+                ? maybeEnabledRules.numberUnitsNbsp
+                : DEFAULT_SETTINGS.enabledRules.numberUnitsNbsp,
             russianQuotes: typeof maybeEnabledRules.russianQuotes === "boolean"
                 ? maybeEnabledRules.russianQuotes
                 : DEFAULT_SETTINGS.enabledRules.russianQuotes,
+            russianNumberRangeDash: typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
+                ? maybeEnabledRules.russianNumberRangeDash
+                : DEFAULT_SETTINGS.enabledRules.russianNumberRangeDash,
+            russianSentenceDash: typeof maybeEnabledRules.russianSentenceDash === "boolean"
+                ? maybeEnabledRules.russianSentenceDash
+                : DEFAULT_SETTINGS.enabledRules.russianSentenceDash,
             russianShortWordsNbsp: typeof maybeEnabledRules.russianShortWordsNbsp === "boolean"
                 ? maybeEnabledRules.russianShortWordsNbsp
                 : DEFAULT_SETTINGS.enabledRules.russianShortWordsNbsp,
@@ -132,6 +162,12 @@ function sendSelectionInfo() {
         textNodeCount: selectedTextNodes.length,
     });
 }
+function getNumberUnitsSpace(settings) {
+    if (settings.options.numberUnitsSpace === "narrowNbsp") {
+        return "\u202F";
+    }
+    return "\u00A0";
+}
 function applyInvisibleCopyArtifactsRule(text) {
     const regexp = /[\u00AD\u200B\uFEFF]/g;
     const matches = text.match(regexp);
@@ -163,7 +199,7 @@ function applyExtraSpacesRule(text) {
     };
 }
 function applyTrimTextEdgesRule(text) {
-    const regexp = /^[ \t\u00A0]+|[ \t\u00A0]+$/g;
+    const regexp = /^[ \t\u00A0\u202F]+|[ \t\u00A0\u202F]+$/g;
     const matches = text.match(regexp);
     return {
         formattedText: text.replace(regexp, ""),
@@ -178,11 +214,75 @@ function applySpacesBeforePunctuationRule(text) {
         replacementCount: matches ? matches.length : 0,
     };
 }
+function applyPercentSignNoSpaceRule(text) {
+    const regexp = /(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]+%/g;
+    const matches = text.match(regexp);
+    return {
+        formattedText: text.replace(regexp, "$1%"),
+        replacementCount: matches ? matches.length : 0,
+    };
+}
+function applyNumberUnitsNbspRule(text, settings) {
+    const units = "₽|руб\\.?|рублей|р\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
+    const regexp = new RegExp("(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
+        units +
+        ")(?=$|[ \\t\\n\\r,.;:!?\\)])", "giu");
+    const space = getNumberUnitsSpace(settings);
+    let replacementCount = 0;
+    const formattedText = text.replace(regexp, function (match, number, unit) {
+        const normalized = number + space + unit;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    return {
+        formattedText,
+        replacementCount,
+    };
+}
 function applyRussianQuotesRule(text) {
     const matches = text.match(/"[^"\n]+"/g);
     return {
         formattedText: text.replace(/"([^"\n]+)"/g, "«$1»"),
         replacementCount: matches ? matches.length : 0,
+    };
+}
+function applyRussianNumberRangeDashRule(text) {
+    const regexp = /(^|[^\d\-–—−])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d\-–—−])/g;
+    let replacementCount = 0;
+    const formattedText = text.replace(regexp, function (match, prefix, startNumber, endNumber) {
+        const normalized = prefix + startNumber + "–" + endNumber;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    return {
+        formattedText,
+        replacementCount,
+    };
+}
+function applyRussianSentenceDashRule(text) {
+    const regexp = /([А-Яа-яЁёA-Za-z0-9»”’")\]\.!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"(\[])/g;
+    let replacementCount = 0;
+    const formattedText = text.replace(regexp, function (match, leftChar, _leftSpace, _rightSpace, rightChar) {
+        const isNumberRange = /\d/.test(leftChar) && /\d/.test(rightChar);
+        if (isNumberRange) {
+            return match;
+        }
+        const normalized = leftChar + "\u00A0— " + rightChar;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    return {
+        formattedText,
+        replacementCount,
     };
 }
 function applyRussianShortWordsNbspRule(text) {
@@ -228,9 +328,29 @@ const TYPOGRAPHY_RULES = [
         apply: applySpacesBeforePunctuationRule,
     },
     {
+        id: "percentSignNoSpace",
+        supportedLanguages: "all",
+        apply: applyPercentSignNoSpaceRule,
+    },
+    {
+        id: "numberUnitsNbsp",
+        supportedLanguages: "all",
+        apply: applyNumberUnitsNbspRule,
+    },
+    {
         id: "russianQuotes",
         supportedLanguages: ["ru"],
         apply: applyRussianQuotesRule,
+    },
+    {
+        id: "russianNumberRangeDash",
+        supportedLanguages: ["ru"],
+        apply: applyRussianNumberRangeDashRule,
+    },
+    {
+        id: "russianSentenceDash",
+        supportedLanguages: ["ru"],
+        apply: applyRussianSentenceDashRule,
     },
     {
         id: "russianShortWordsNbsp",
@@ -244,19 +364,19 @@ function isRuleSupportedForLanguage(rule, language) {
     }
     return rule.supportedLanguages.includes(language);
 }
-function applyRulesToText(text, enabledRules, language) {
+function applyRulesToText(text, settings, language) {
     let formattedText = text;
     let replacementCount = 0;
     let skippedRuleCount = 0;
     for (const rule of TYPOGRAPHY_RULES) {
-        if (!enabledRules[rule.id]) {
+        if (!settings.enabledRules[rule.id]) {
             continue;
         }
         if (!isRuleSupportedForLanguage(rule, language)) {
             skippedRuleCount += 1;
             continue;
         }
-        const result = rule.apply(formattedText);
+        const result = rule.apply(formattedText, settings);
         formattedText = result.formattedText;
         replacementCount += result.replacementCount;
     }
@@ -299,7 +419,7 @@ async function applyTypographyRules(settings) {
         const originalText = node.characters;
         const language = resolveLanguage(originalText, settings.languageMode);
         languageStats[language] += 1;
-        const result = applyRulesToText(originalText, settings.enabledRules, language);
+        const result = applyRulesToText(originalText, settings, language);
         skippedRuleCount += result.skippedRuleCount;
         if (result.replacementCount === 0 || result.formattedText === originalText) {
             continue;
