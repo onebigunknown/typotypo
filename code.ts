@@ -1,6 +1,6 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 900,
+  height: 960,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
@@ -16,6 +16,7 @@ type EnabledRules = {
   spacesBeforePunctuation: boolean;
   percentSignNoSpace: boolean;
   numberUnitsNbsp: boolean;
+  specialSymbols: boolean;
   russianQuotes: boolean;
   russianNumberRangeDash: boolean;
   russianSentenceDash: boolean;
@@ -61,6 +62,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     spacesBeforePunctuation: true,
     percentSignNoSpace: true,
     numberUnitsNbsp: true,
+    specialSymbols: true,
     russianQuotes: true,
     russianNumberRangeDash: true,
     russianSentenceDash: true,
@@ -144,6 +146,11 @@ function normalizeSettings(value: unknown): ApplySettings {
         typeof maybeEnabledRules.numberUnitsNbsp === "boolean"
           ? maybeEnabledRules.numberUnitsNbsp
           : DEFAULT_SETTINGS.enabledRules.numberUnitsNbsp,
+
+      specialSymbols:
+        typeof maybeEnabledRules.specialSymbols === "boolean"
+          ? maybeEnabledRules.specialSymbols
+          : DEFAULT_SETTINGS.enabledRules.specialSymbols,
 
       russianQuotes:
         typeof maybeEnabledRules.russianQuotes === "boolean"
@@ -370,6 +377,34 @@ function applyNumberUnitsNbspRule(
   };
 }
 
+function applySpecialSymbolsRule(text: string): RuleResult {
+  let formattedText = text;
+  let replacementCount = 0;
+
+  function replaceAndCount(regexp: RegExp, replacement: string) {
+    formattedText = formattedText.replace(regexp, function (match) {
+      if (match === replacement) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return replacement;
+    });
+  }
+
+  replaceAndCount(/\([cс]\)/giu, "©");
+  replaceAndCount(/\((tm|тм)\)/giu, "™");
+  replaceAndCount(/\([rр]\)/giu, "®");
+  replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
+  replaceAndCount(/<=/g, "≤");
+  replaceAndCount(/>=/g, "≥");
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
 function applyRussianQuotesRule(text: string): RuleResult {
   const matches = text.match(/"[^"\n]+"/g);
 
@@ -496,6 +531,11 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "numberUnitsNbsp",
     supportedLanguages: "all",
     apply: applyNumberUnitsNbspRule,
+  },
+  {
+    id: "specialSymbols",
+    supportedLanguages: "all",
+    apply: applySpecialSymbolsRule,
   },
   {
     id: "russianQuotes",

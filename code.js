@@ -1,7 +1,7 @@
 "use strict";
 figma.showUI(__html__, {
     width: 420,
-    height: 900,
+    height: 960,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS = {
@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
         spacesBeforePunctuation: true,
         percentSignNoSpace: true,
         numberUnitsNbsp: true,
+        specialSymbols: true,
         russianQuotes: true,
         russianNumberRangeDash: true,
         russianSentenceDash: true,
@@ -75,6 +76,9 @@ function normalizeSettings(value) {
             numberUnitsNbsp: typeof maybeEnabledRules.numberUnitsNbsp === "boolean"
                 ? maybeEnabledRules.numberUnitsNbsp
                 : DEFAULT_SETTINGS.enabledRules.numberUnitsNbsp,
+            specialSymbols: typeof maybeEnabledRules.specialSymbols === "boolean"
+                ? maybeEnabledRules.specialSymbols
+                : DEFAULT_SETTINGS.enabledRules.specialSymbols,
             russianQuotes: typeof maybeEnabledRules.russianQuotes === "boolean"
                 ? maybeEnabledRules.russianQuotes
                 : DEFAULT_SETTINGS.enabledRules.russianQuotes,
@@ -242,6 +246,29 @@ function applyNumberUnitsNbspRule(text, settings) {
         replacementCount,
     };
 }
+function applySpecialSymbolsRule(text) {
+    let formattedText = text;
+    let replacementCount = 0;
+    function replaceAndCount(regexp, replacement) {
+        formattedText = formattedText.replace(regexp, function (match) {
+            if (match === replacement) {
+                return match;
+            }
+            replacementCount += 1;
+            return replacement;
+        });
+    }
+    replaceAndCount(/\([cс]\)/giu, "©");
+    replaceAndCount(/\((tm|тм)\)/giu, "™");
+    replaceAndCount(/\([rр]\)/giu, "®");
+    replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
+    replaceAndCount(/<=/g, "≤");
+    replaceAndCount(/>=/g, "≥");
+    return {
+        formattedText,
+        replacementCount,
+    };
+}
 function applyRussianQuotesRule(text) {
     const matches = text.match(/"[^"\n]+"/g);
     return {
@@ -336,6 +363,11 @@ const TYPOGRAPHY_RULES = [
         id: "numberUnitsNbsp",
         supportedLanguages: "all",
         apply: applyNumberUnitsNbspRule,
+    },
+    {
+        id: "specialSymbols",
+        supportedLanguages: "all",
+        apply: applySpecialSymbolsRule,
     },
     {
         id: "russianQuotes",
