@@ -438,7 +438,7 @@ function applyRussianQuotesRule(text: string): RuleResult {
 
 function applyRussianNumberRangeDashRule(text: string): RuleResult {
   const regexp =
-    /(^|[^\d\-–—−])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d\-–—−])/g;
+    /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
 
   let replacementCount = 0;
 
@@ -506,11 +506,12 @@ function applyRussianShortWordsNbspRule(
 
   function replaceAndCount(
     regexp: RegExp,
-    replacer: (...args: any[]) => string
+    replacer: (...args: string[]) => string
   ) {
     formattedText = formattedText.replace(regexp, function (...args) {
-      const match = args[0];
-      const normalized = replacer(...args);
+      const stringArgs = args.map(String);
+      const match = stringArgs[0];
+      const normalized = replacer(...stringArgs);
 
       if (match === normalized) {
         return match;

@@ -290,7 +290,7 @@ function applyRussianQuotesRule(text) {
     };
 }
 function applyRussianNumberRangeDashRule(text) {
-    const regexp = /(^|[^\d\-–—−])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d\-–—−])/g;
+    const regexp = /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
     let replacementCount = 0;
     const formattedText = text.replace(regexp, function (match, prefix, startNumber, endNumber) {
         const normalized = prefix + startNumber + "–" + endNumber;
@@ -332,8 +332,9 @@ function applyRussianShortWordsNbspRule(text, settings) {
     let replacementCount = 0;
     function replaceAndCount(regexp, replacer) {
         formattedText = formattedText.replace(regexp, function (...args) {
-            const match = args[0];
-            const normalized = replacer(...args);
+            const stringArgs = args.map(String);
+            const match = stringArgs[0];
+            const normalized = replacer(...stringArgs);
             if (match === normalized) {
                 return match;
             }
