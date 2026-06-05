@@ -1,11 +1,11 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 960,
+  height: 980,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
 type LanguageMode = "auto" | "ru" | "en";
-type NumberUnitsSpace = "nbsp" | "narrowNbsp";
+type NonBreakingSpaceStyle = "regular" | "narrow";
 
 type EnabledRules = {
   invisibleCopyArtifacts: boolean;
@@ -21,10 +21,11 @@ type EnabledRules = {
   russianNumberRangeDash: boolean;
   russianSentenceDash: boolean;
   russianShortWordsNbsp: boolean;
+  russianInitialsNbsp: boolean;
 };
 
 type TypographyOptions = {
-  numberUnitsSpace: NumberUnitsSpace;
+  nonBreakingSpaceStyle: NonBreakingSpaceStyle;
 };
 
 type ApplySettings = {
@@ -51,7 +52,7 @@ const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS: ApplySettings = {
   languageMode: "auto",
   options: {
-    numberUnitsSpace: "nbsp",
+    nonBreakingSpaceStyle: "regular",
   },
   enabledRules: {
     invisibleCopyArtifacts: true,
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     russianNumberRangeDash: true,
     russianSentenceDash: true,
     russianShortWordsNbsp: true,
+    russianInitialsNbsp: true,
   },
 };
 
@@ -74,8 +76,10 @@ function isLanguageMode(value: unknown): value is LanguageMode {
   return value === "auto" || value === "ru" || value === "en";
 }
 
-function isNumberUnitsSpace(value: unknown): value is NumberUnitsSpace {
-  return value === "nbsp" || value === "narrowNbsp";
+function isNonBreakingSpaceStyle(
+  value: unknown
+): value is NonBreakingSpaceStyle {
+  return value === "regular" || value === "narrow";
 }
 
 function normalizeSettings(value: unknown): ApplySettings {
@@ -89,11 +93,26 @@ function normalizeSettings(value: unknown): ApplySettings {
       ? (maybeSettings.options as Partial<TypographyOptions>)
       : {};
 
+  const legacyOptions = maybeOptions as Partial<TypographyOptions> & {
+    numberUnitsSpace?: unknown;
+  };
+
   const maybeEnabledRules: Partial<EnabledRules> =
     typeof maybeSettings.enabledRules === "object" &&
     maybeSettings.enabledRules !== null
       ? (maybeSettings.enabledRules as Partial<EnabledRules>)
       : {};
+
+  let nonBreakingSpaceStyle: NonBreakingSpaceStyle =
+    DEFAULT_SETTINGS.options.nonBreakingSpaceStyle;
+
+  if (isNonBreakingSpaceStyle(maybeOptions.nonBreakingSpaceStyle)) {
+    nonBreakingSpaceStyle = maybeOptions.nonBreakingSpaceStyle;
+  } else if (legacyOptions.numberUnitsSpace === "narrowNbsp") {
+    nonBreakingSpaceStyle = "narrow";
+  } else if (legacyOptions.numberUnitsSpace === "nbsp") {
+    nonBreakingSpaceStyle = "regular";
+  }
 
   return {
     languageMode: isLanguageMode(maybeSettings.languageMode)
@@ -101,9 +120,7 @@ function normalizeSettings(value: unknown): ApplySettings {
       : DEFAULT_SETTINGS.languageMode,
 
     options: {
-      numberUnitsSpace: isNumberUnitsSpace(maybeOptions.numberUnitsSpace)
-        ? maybeOptions.numberUnitsSpace
-        : DEFAULT_SETTINGS.options.numberUnitsSpace,
+      nonBreakingSpaceStyle,
     },
 
     enabledRules: {
@@ -171,6 +188,11 @@ function normalizeSettings(value: unknown): ApplySettings {
         typeof maybeEnabledRules.russianShortWordsNbsp === "boolean"
           ? maybeEnabledRules.russianShortWordsNbsp
           : DEFAULT_SETTINGS.enabledRules.russianShortWordsNbsp,
+
+      russianInitialsNbsp:
+        typeof maybeEnabledRules.russianInitialsNbsp === "boolean"
+          ? maybeEnabledRules.russianInitialsNbsp
+          : DEFAULT_SETTINGS.enabledRules.russianInitialsNbsp,
     },
   };
 }
@@ -267,8 +289,8 @@ function sendSelectionInfo() {
   });
 }
 
-function getNumberUnitsSpace(settings: ApplySettings): string {
-  if (settings.options.numberUnitsSpace === "narrowNbsp") {
+function getConfiguredNbsp(settings: ApplySettings): string {
+  if (settings.options.nonBreakingSpaceStyle === "narrow") {
     return "\u202F";
   }
 
@@ -357,7 +379,7 @@ function applyNumberUnitsNbspRule(
     "giu"
   );
 
-  const space = getNumberUnitsSpace(settings);
+  const space = getConfiguredNbsp(settings);
   let replacementCount = 0;
 
   const formattedText = text.replace(regexp, function (match, number, unit) {
@@ -472,22 +494,108 @@ function applyRussianSentenceDashRule(text: string): RuleResult {
   };
 }
 
-function applyRussianShortWordsNbspRule(text: string): RuleResult {
+function applyRussianShortWordsNbspRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
+  const regularNbsp = "\u00A0";
+  const abbreviationSpace = getConfiguredNbsp(settings);
+
+  let formattedText = text;
+  let replacementCount = 0;
+
+  function replaceAndCount(
+    regexp: RegExp,
+    replacer: (...args: any[]) => string
+  ) {
+    formattedText = formattedText.replace(regexp, function (...args) {
+      const match = args[0];
+      const normalized = replacer(...args);
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    });
+  }
+
   const shortWords =
     "а|в|во|и|к|ко|о|об|от|по|с|со|у|до|за|из|на|не|ни|но";
 
-  const regexp = new RegExp(
-    "(^|[ \\t(«„“])(" + shortWords + ")[ \\t]+(?=[А-Яа-яЁёA-Za-z0-9])",
-    "giu"
+  replaceAndCount(
+    new RegExp(
+      "(^|[ \\t\\u00A0\\u202F(«„“])(" +
+        shortWords +
+        ")[ \\t\\u00A0\\u202F]+(?=[А-Яа-яЁёA-Za-z0-9])",
+      "giu"
+    ),
+    function (_match, prefix, word) {
+      return prefix + word + regularNbsp;
+    }
   );
 
-  const matches = text.match(regexp);
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ \t\u00A0\u202F]*([еЕкКдДпПчЧнНоО])\./g,
+    function (_match, prefix, firstLetter, secondLetter) {
+      return prefix + firstLetter + "." + abbreviationSpace + secondLetter + ".";
+    }
+  );
 
   return {
-    formattedText: text.replace(regexp, function (_match, prefix, word) {
-      return prefix + word + "\u00A0";
-    }),
-    replacementCount: matches ? matches.length : 0,
+    formattedText,
+    replacementCount,
+  };
+}
+
+function applyRussianInitialsNbspRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
+  const space = getConfiguredNbsp(settings);
+  let formattedText = text;
+  let replacementCount = 0;
+
+  formattedText = formattedText.replace(
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    function (match, prefix, firstInitial, secondInitial, surname) {
+      const normalized =
+        prefix +
+        firstInitial +
+        "." +
+        space +
+        secondInitial +
+        "." +
+        space +
+        surname;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    function (match, prefix, initial, surname) {
+      const normalized = prefix + initial + "." + space + surname;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
   };
 }
 
@@ -556,6 +664,11 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "russianShortWordsNbsp",
     supportedLanguages: ["ru"],
     apply: applyRussianShortWordsNbspRule,
+  },
+  {
+    id: "russianInitialsNbsp",
+    supportedLanguages: ["ru"],
+    apply: applyRussianInitialsNbspRule,
   },
 ];
 

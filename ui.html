@@ -133,15 +133,15 @@
 </div>
 
 <div class="section">
-  <div class="section-title">Number unit space</div>
+  <div class="section-title">Non-breaking space style</div>
 
-  <select id="numberUnitsSpace">
-    <option value="nbsp">Regular non-breaking space</option>
-    <option value="narrowNbsp">Narrow non-breaking space</option>
+  <select id="nonBreakingSpaceStyle">
+    <option value="regular">Regular non-breaking space</option>
+    <option value="narrow">Narrow non-breaking space</option>
   </select>
 
   <p class="hint">
-    Used for units, currencies, sizes, and similar number pairs.
+    Used for number units, initials, and similar non-breaking pairs.
   </p>
 </div>
 
@@ -252,6 +252,14 @@
         <p class="rule-description">Keeps short Russian words together with the next word using a non-breaking space.</p>
       </div>
     </label>
+
+    <label class="rule">
+      <input id="russianInitialsNbsp" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian initials <span class="tag">Russian</span></div>
+        <p class="rule-description">Keeps initials together with each other and with the surname using a non-breaking space.</p>
+      </div>
+    </label>
   </div>
 </div>
 
@@ -269,7 +277,7 @@
   const closeButton = document.getElementById("close");
 
   const languageModeSelect = document.getElementById("languageMode");
-  const numberUnitsSpaceSelect = document.getElementById("numberUnitsSpace");
+  const nonBreakingSpaceStyleSelect = document.getElementById("nonBreakingSpaceStyle");
 
   const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
   const tabsCheckbox = document.getElementById("tabs");
@@ -284,6 +292,7 @@
   const russianNumberRangeDashCheckbox = document.getElementById("russianNumberRangeDash");
   const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
   const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
+  const russianInitialsNbspCheckbox = document.getElementById("russianInitialsNbsp");
 
   let hasTextLayers = false;
   let isLoadingSettings = true;
@@ -303,12 +312,13 @@
       russianNumberRangeDash: russianNumberRangeDashCheckbox.checked,
       russianSentenceDash: russianSentenceDashCheckbox.checked,
       russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
+      russianInitialsNbsp: russianInitialsNbspCheckbox.checked,
     };
   }
 
   function getOptions() {
     return {
-      numberUnitsSpace: numberUnitsSpaceSelect.value,
+      nonBreakingSpaceStyle: nonBreakingSpaceStyleSelect.value,
     };
   }
 
@@ -322,7 +332,7 @@
 
   function applySettingsToUi(settings) {
     languageModeSelect.value = settings.languageMode;
-    numberUnitsSpaceSelect.value = settings.options.numberUnitsSpace;
+    nonBreakingSpaceStyleSelect.value = settings.options.nonBreakingSpaceStyle;
 
     invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
     tabsCheckbox.checked = settings.enabledRules.tabs;
@@ -337,6 +347,7 @@
     russianNumberRangeDashCheckbox.checked = settings.enabledRules.russianNumberRangeDash;
     russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
     russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
+    russianInitialsNbspCheckbox.checked = settings.enabledRules.russianInitialsNbsp;
   }
 
   function hasEnabledRules() {
@@ -355,7 +366,8 @@
       enabledRules.russianQuotes ||
       enabledRules.russianNumberRangeDash ||
       enabledRules.russianSentenceDash ||
-      enabledRules.russianShortWordsNbsp
+      enabledRules.russianShortWordsNbsp ||
+      enabledRules.russianInitialsNbsp
     );
   }
 
@@ -436,7 +448,7 @@
   };
 
   languageModeSelect.onchange = handleSettingsChange;
-  numberUnitsSpaceSelect.onchange = handleSettingsChange;
+  nonBreakingSpaceStyleSelect.onchange = handleSettingsChange;
 
   invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
   tabsCheckbox.onchange = handleSettingsChange;
@@ -451,6 +463,7 @@
   russianNumberRangeDashCheckbox.onchange = handleSettingsChange;
   russianSentenceDashCheckbox.onchange = handleSettingsChange;
   russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
+  russianInitialsNbspCheckbox.onchange = handleSettingsChange;
 
   applyButton.onclick = () => {
     parent.postMessage(

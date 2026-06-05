@@ -1,13 +1,13 @@
 "use strict";
 figma.showUI(__html__, {
     width: 420,
-    height: 960,
+    height: 980,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS = {
     languageMode: "auto",
     options: {
-        numberUnitsSpace: "nbsp",
+        nonBreakingSpaceStyle: "regular",
     },
     enabledRules: {
         invisibleCopyArtifacts: true,
@@ -23,13 +23,14 @@ const DEFAULT_SETTINGS = {
         russianNumberRangeDash: true,
         russianSentenceDash: true,
         russianShortWordsNbsp: true,
+        russianInitialsNbsp: true,
     },
 };
 function isLanguageMode(value) {
     return value === "auto" || value === "ru" || value === "en";
 }
-function isNumberUnitsSpace(value) {
-    return value === "nbsp" || value === "narrowNbsp";
+function isNonBreakingSpaceStyle(value) {
+    return value === "regular" || value === "narrow";
 }
 function normalizeSettings(value) {
     const maybeSettings = typeof value === "object" && value !== null
@@ -38,18 +39,27 @@ function normalizeSettings(value) {
     const maybeOptions = typeof maybeSettings.options === "object" && maybeSettings.options !== null
         ? maybeSettings.options
         : {};
+    const legacyOptions = maybeOptions;
     const maybeEnabledRules = typeof maybeSettings.enabledRules === "object" &&
         maybeSettings.enabledRules !== null
         ? maybeSettings.enabledRules
         : {};
+    let nonBreakingSpaceStyle = DEFAULT_SETTINGS.options.nonBreakingSpaceStyle;
+    if (isNonBreakingSpaceStyle(maybeOptions.nonBreakingSpaceStyle)) {
+        nonBreakingSpaceStyle = maybeOptions.nonBreakingSpaceStyle;
+    }
+    else if (legacyOptions.numberUnitsSpace === "narrowNbsp") {
+        nonBreakingSpaceStyle = "narrow";
+    }
+    else if (legacyOptions.numberUnitsSpace === "nbsp") {
+        nonBreakingSpaceStyle = "regular";
+    }
     return {
         languageMode: isLanguageMode(maybeSettings.languageMode)
             ? maybeSettings.languageMode
             : DEFAULT_SETTINGS.languageMode,
         options: {
-            numberUnitsSpace: isNumberUnitsSpace(maybeOptions.numberUnitsSpace)
-                ? maybeOptions.numberUnitsSpace
-                : DEFAULT_SETTINGS.options.numberUnitsSpace,
+            nonBreakingSpaceStyle,
         },
         enabledRules: {
             invisibleCopyArtifacts: typeof maybeEnabledRules.invisibleCopyArtifacts === "boolean"
@@ -91,6 +101,9 @@ function normalizeSettings(value) {
             russianShortWordsNbsp: typeof maybeEnabledRules.russianShortWordsNbsp === "boolean"
                 ? maybeEnabledRules.russianShortWordsNbsp
                 : DEFAULT_SETTINGS.enabledRules.russianShortWordsNbsp,
+            russianInitialsNbsp: typeof maybeEnabledRules.russianInitialsNbsp === "boolean"
+                ? maybeEnabledRules.russianInitialsNbsp
+                : DEFAULT_SETTINGS.enabledRules.russianInitialsNbsp,
         },
     };
 }
@@ -166,8 +179,8 @@ function sendSelectionInfo() {
         textNodeCount: selectedTextNodes.length,
     });
 }
-function getNumberUnitsSpace(settings) {
-    if (settings.options.numberUnitsSpace === "narrowNbsp") {
+function getConfiguredNbsp(settings) {
+    if (settings.options.nonBreakingSpaceStyle === "narrow") {
         return "\u202F";
     }
     return "\u00A0";
@@ -231,7 +244,7 @@ function applyNumberUnitsNbspRule(text, settings) {
     const regexp = new RegExp("(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
         units +
         ")(?=$|[ \\t\\n\\r,.;:!?\\)])", "giu");
-    const space = getNumberUnitsSpace(settings);
+    const space = getConfiguredNbsp(settings);
     let replacementCount = 0;
     const formattedText = text.replace(regexp, function (match, number, unit) {
         const normalized = number + space + unit;
@@ -312,15 +325,66 @@ function applyRussianSentenceDashRule(text) {
         replacementCount,
     };
 }
-function applyRussianShortWordsNbspRule(text) {
+function applyRussianShortWordsNbspRule(text, settings) {
+    const regularNbsp = "\u00A0";
+    const abbreviationSpace = getConfiguredNbsp(settings);
+    let formattedText = text;
+    let replacementCount = 0;
+    function replaceAndCount(regexp, replacer) {
+        formattedText = formattedText.replace(regexp, function (...args) {
+            const match = args[0];
+            const normalized = replacer(...args);
+            if (match === normalized) {
+                return match;
+            }
+            replacementCount += 1;
+            return normalized;
+        });
+    }
     const shortWords = "а|в|во|и|к|ко|о|об|от|по|с|со|у|до|за|из|на|не|ни|но";
-    const regexp = new RegExp("(^|[ \\t(«„“])(" + shortWords + ")[ \\t]+(?=[А-Яа-яЁёA-Za-z0-9])", "giu");
-    const matches = text.match(regexp);
+    replaceAndCount(new RegExp("(^|[ \\t\\u00A0\\u202F(«„“])(" +
+        shortWords +
+        ")[ \\t\\u00A0\\u202F]+(?=[А-Яа-яЁёA-Za-z0-9])", "giu"), function (_match, prefix, word) {
+        return prefix + word + regularNbsp;
+    });
+    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ \t\u00A0\u202F]*([еЕкКдДпПчЧнНоО])\./g, function (_match, prefix, firstLetter, secondLetter) {
+        return prefix + firstLetter + "." + abbreviationSpace + secondLetter + ".";
+    });
     return {
-        formattedText: text.replace(regexp, function (_match, prefix, word) {
-            return prefix + word + "\u00A0";
-        }),
-        replacementCount: matches ? matches.length : 0,
+        formattedText,
+        replacementCount,
+    };
+}
+function applyRussianInitialsNbspRule(text, settings) {
+    const space = getConfiguredNbsp(settings);
+    let formattedText = text;
+    let replacementCount = 0;
+    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, firstInitial, secondInitial, surname) {
+        const normalized = prefix +
+            firstInitial +
+            "." +
+            space +
+            secondInitial +
+            "." +
+            space +
+            surname;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, initial, surname) {
+        const normalized = prefix + initial + "." + space + surname;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    return {
+        formattedText,
+        replacementCount,
     };
 }
 const TYPOGRAPHY_RULES = [
@@ -388,6 +452,11 @@ const TYPOGRAPHY_RULES = [
         id: "russianShortWordsNbsp",
         supportedLanguages: ["ru"],
         apply: applyRussianShortWordsNbspRule,
+    },
+    {
+        id: "russianInitialsNbsp",
+        supportedLanguages: ["ru"],
+        apply: applyRussianInitialsNbspRule,
     },
 ];
 function isRuleSupportedForLanguage(rule, language) {
