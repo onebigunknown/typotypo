@@ -295,10 +295,19 @@ function applySpecialSymbolsRule(text) {
     };
 }
 function applyRussianQuotesRule(text) {
-    const matches = text.match(/"[^"\n]+"/g);
+    const regexp = /(^|[\s([{,.;:!?…—–-])["“„]([^"“”„«»\n]+)["”“](?=$|[\s.,;:!?…)\]}—–-])/g;
+    let replacementCount = 0;
+    const formattedText = text.replace(regexp, function (match, prefix, quoteContent) {
+        const normalized = prefix + "«" + quoteContent + "»";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
     return {
-        formattedText: text.replace(/"([^"\n]+)"/g, "«$1»"),
-        replacementCount: matches ? matches.length : 0,
+        formattedText,
+        replacementCount,
     };
 }
 function applyRussianNumberRangeDashRule(text) {
