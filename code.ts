@@ -449,15 +449,20 @@ function applySpecialSymbolsRule(text: string): RuleResult {
 }
 
 function applyRussianQuotesRule(text: string): RuleResult {
-  const regexp =
-    /(^|[\s([{,.;:!?…—–-])["“„]([^"“”„«»\n]+)["”“](?=$|[\s.,;:!?…)\]}—–-])/g;
-
+  let formattedText = text;
   let replacementCount = 0;
 
-  const formattedText = text.replace(
-    regexp,
-    function (match, prefix, quoteContent) {
-      const normalized = prefix + "«" + quoteContent + "»";
+  function replaceAndCount(
+    regexp: RegExp,
+    replacer: (...args: string[]) => string
+  ) {
+    formattedText = formattedText.replace(regexp, function (...args) {
+      const stringArgs = args.map((arg) =>
+        typeof arg === "string" ? arg : ""
+      );
+
+      const match = stringArgs[0];
+      const normalized = replacer(...stringArgs);
 
       if (match === normalized) {
         return match;
@@ -465,6 +470,49 @@ function applyRussianQuotesRule(text: string): RuleResult {
 
       replacementCount += 1;
       return normalized;
+    });
+  }
+
+  replaceAndCount(
+    /(^|[\s([{,.;:!?…—–-])["“„]([^"“”„«»\n]+)["”“](?=$|[\s.,;:!?…)\]}—–-])/g,
+    function (_match, prefix, quoteContent) {
+      return prefix + "«" + quoteContent + "»";
+    }
+  );
+
+  replaceAndCount(
+    /«([^«»\n]*?)([.,;:])»([.,;:!?…])?/g,
+    function (match, quoteContent, innerPunctuation, outerPunctuation) {
+      const quoteContentWithPunctuation = quoteContent + innerPunctuation;
+
+      if (
+        innerPunctuation === "." &&
+        shouldKeepRussianFinalPeriod(quoteContentWithPunctuation)
+      ) {
+        if (outerPunctuation === ".") {
+          return "«" + quoteContentWithPunctuation + "»";
+        }
+
+        if (outerPunctuation) {
+          return "«" + quoteContentWithPunctuation + "»" + outerPunctuation;
+        }
+
+        return match;
+      }
+
+      const punctuationToUse = outerPunctuation || innerPunctuation;
+
+      return "«" + quoteContent + "»" + punctuationToUse;
+    }
+  );
+
+  replaceAndCount(
+    /«([^«»\n]*?)[ \t\u00A0\u202F]*[-–—−]»([.,;:!?…])?/g,
+    function (_match, quoteContent, outerPunctuation) {
+      const trimmedQuoteContent = quoteContent.replace(/[ \t\u00A0\u202F]+$/g, "");
+      const punctuation = outerPunctuation || "";
+
+      return "«" + trimmedQuoteContent + "» —" + punctuation;
     }
   );
 
