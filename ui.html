@@ -26,6 +26,12 @@
     font-weight: 600;
   }
 
+  .subsection-title {
+    margin: 12px 0 8px;
+    font-weight: 600;
+    color: #444;
+  }
+
   select {
     width: 100%;
     padding: 8px;
@@ -33,6 +39,16 @@
     border-radius: 6px;
     background: white;
     font: inherit;
+  }
+
+  .field {
+    margin-bottom: 10px;
+  }
+
+  .field-label {
+    margin-bottom: 4px;
+    color: #555;
+    font-size: 12px;
   }
 
   .hint {
@@ -146,6 +162,66 @@
 </div>
 
 <div class="section">
+  <div class="section-title">Quote styles</div>
+
+  <div class="subsection-title">Russian quotes</div>
+
+  <div class="field">
+    <div class="field-label">First level quotes</div>
+    <select id="ruPrimaryQuoteStyle">
+      <option value="frenchGuillemets">French quotes « »</option>
+      <option value="germanLowHigh">German quotes „ “</option>
+      <option value="englishDouble">English double quotes “ ”</option>
+      <option value="programmerDouble">Programmer quotes " "</option>
+      <option value="englishSingle">English single quotes ‘ ’</option>
+      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Second level quotes</div>
+    <select id="ruSecondaryQuoteStyle">
+      <option value="frenchGuillemets">French quotes « »</option>
+      <option value="germanLowHigh">German quotes „ “</option>
+      <option value="englishDouble">English double quotes “ ”</option>
+      <option value="programmerDouble">Programmer quotes " "</option>
+      <option value="englishSingle">English single quotes ‘ ’</option>
+      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+    </select>
+  </div>
+
+  <div class="subsection-title">English quotes</div>
+
+  <div class="field">
+    <div class="field-label">First level quotes</div>
+    <select id="enPrimaryQuoteStyle">
+      <option value="frenchGuillemets">French quotes « »</option>
+      <option value="germanLowHigh">German quotes „ “</option>
+      <option value="englishDouble">English double quotes “ ”</option>
+      <option value="programmerDouble">Programmer quotes " "</option>
+      <option value="englishSingle">English single quotes ‘ ’</option>
+      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Second level quotes</div>
+    <select id="enSecondaryQuoteStyle">
+      <option value="frenchGuillemets">French quotes « »</option>
+      <option value="germanLowHigh">German quotes „ “</option>
+      <option value="englishDouble">English double quotes “ ”</option>
+      <option value="programmerDouble">Programmer quotes " "</option>
+      <option value="englishSingle">English single quotes ‘ ’</option>
+      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+    </select>
+  </div>
+
+  <p class="hint">
+    Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.
+  </p>
+</div>
+
+<div class="section">
   <div class="section-title">Rules</div>
 
   <div class="rules">
@@ -222,10 +298,18 @@
     </label>
 
     <label class="rule">
+      <input id="englishQuotes" type="checkbox" checked />
+      <div>
+        <div class="rule-title">English quotes <span class="tag">English</span></div>
+        <p class="rule-description">Normalizes first- and second-level quotes using the selected English quote styles.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="russianQuotes" type="checkbox" checked />
       <div>
         <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
-        <p class="rule-description">Replaces straight double quotes ("text") with Russian guillemets («text»).</p>
+        <p class="rule-description">Normalizes first- and second-level quotes and punctuation around Russian quotes.</p>
       </div>
     </label>
 
@@ -278,10 +362,10 @@
     </label>
 
     <label class="rule">
-      <input id="russianUiFinalPeriod" type="checkbox" checked />
+      <input id="uiFinalPeriod" type="checkbox" checked />
       <div>
-        <div class="rule-title">Russian UI final period <span class="tag">Russian</span></div>
-        <p class="rule-description">Removes the final period at the end of a text layer, while preserving common abbreviations.</p>
+        <div class="rule-title">UI final period <span class="tag">Russian + English</span></div>
+        <p class="rule-description">Removes the final period at the end of a text layer while preserving common Russian and English abbreviations.</p>
       </div>
     </label>
   </div>
@@ -303,6 +387,11 @@
   const languageModeSelect = document.getElementById("languageMode");
   const nonBreakingSpaceStyleSelect = document.getElementById("nonBreakingSpaceStyle");
 
+  const ruPrimaryQuoteStyleSelect = document.getElementById("ruPrimaryQuoteStyle");
+  const ruSecondaryQuoteStyleSelect = document.getElementById("ruSecondaryQuoteStyle");
+  const enPrimaryQuoteStyleSelect = document.getElementById("enPrimaryQuoteStyle");
+  const enSecondaryQuoteStyleSelect = document.getElementById("enSecondaryQuoteStyle");
+
   const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
   const tabsCheckbox = document.getElementById("tabs");
   const ellipsisCheckbox = document.getElementById("ellipsis");
@@ -312,6 +401,7 @@
   const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
   const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
   const specialSymbolsCheckbox = document.getElementById("specialSymbols");
+  const englishQuotesCheckbox = document.getElementById("englishQuotes");
   const russianQuotesCheckbox = document.getElementById("russianQuotes");
   const russianNumberRangeDashCheckbox = document.getElementById("russianNumberRangeDash");
   const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
@@ -319,7 +409,7 @@
   const russianInitialsNbspCheckbox = document.getElementById("russianInitialsNbsp");
   const russianNumericAbbreviationsCheckbox = document.getElementById("russianNumericAbbreviations");
   const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
-  const russianUiFinalPeriodCheckbox = document.getElementById("russianUiFinalPeriod");
+  const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
 
   let hasTextLayers = false;
   let isLoadingSettings = true;
@@ -335,6 +425,7 @@
       percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
       numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
       specialSymbols: specialSymbolsCheckbox.checked,
+      englishQuotes: englishQuotesCheckbox.checked,
       russianQuotes: russianQuotesCheckbox.checked,
       russianNumberRangeDash: russianNumberRangeDashCheckbox.checked,
       russianSentenceDash: russianSentenceDashCheckbox.checked,
@@ -342,13 +433,23 @@
       russianInitialsNbsp: russianInitialsNbspCheckbox.checked,
       russianNumericAbbreviations: russianNumericAbbreviationsCheckbox.checked,
       russianLargeNumbers: russianLargeNumbersCheckbox.checked,
-      russianUiFinalPeriod: russianUiFinalPeriodCheckbox.checked,
+      uiFinalPeriod: uiFinalPeriodCheckbox.checked,
     };
   }
 
   function getOptions() {
     return {
       nonBreakingSpaceStyle: nonBreakingSpaceStyleSelect.value,
+      quoteOptions: {
+        ru: {
+          primaryQuoteStyle: ruPrimaryQuoteStyleSelect.value,
+          secondaryQuoteStyle: ruSecondaryQuoteStyleSelect.value,
+        },
+        en: {
+          primaryQuoteStyle: enPrimaryQuoteStyleSelect.value,
+          secondaryQuoteStyle: enSecondaryQuoteStyleSelect.value,
+        },
+      },
     };
   }
 
@@ -361,8 +462,25 @@
   }
 
   function applySettingsToUi(settings) {
-    languageModeSelect.value = settings.languageMode;
-    nonBreakingSpaceStyleSelect.value = settings.options.nonBreakingSpaceStyle;
+    const options = settings.options || {};
+    const quoteOptions = options.quoteOptions || {};
+    const ruQuoteOptions = quoteOptions.ru || {};
+    const enQuoteOptions = quoteOptions.en || {};
+
+    languageModeSelect.value = settings.languageMode || "auto";
+    nonBreakingSpaceStyleSelect.value = options.nonBreakingSpaceStyle || "regular";
+
+    ruPrimaryQuoteStyleSelect.value =
+      ruQuoteOptions.primaryQuoteStyle || "frenchGuillemets";
+
+    ruSecondaryQuoteStyleSelect.value =
+      ruQuoteOptions.secondaryQuoteStyle || "germanLowHigh";
+
+    enPrimaryQuoteStyleSelect.value =
+      enQuoteOptions.primaryQuoteStyle || "englishDouble";
+
+    enSecondaryQuoteStyleSelect.value =
+      enQuoteOptions.secondaryQuoteStyle || "englishSingle";
 
     invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
     tabsCheckbox.checked = settings.enabledRules.tabs;
@@ -373,6 +491,7 @@
     percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
     numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
     specialSymbolsCheckbox.checked = settings.enabledRules.specialSymbols;
+    englishQuotesCheckbox.checked = settings.enabledRules.englishQuotes;
     russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
     russianNumberRangeDashCheckbox.checked = settings.enabledRules.russianNumberRangeDash;
     russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
@@ -380,7 +499,7 @@
     russianInitialsNbspCheckbox.checked = settings.enabledRules.russianInitialsNbsp;
     russianNumericAbbreviationsCheckbox.checked = settings.enabledRules.russianNumericAbbreviations;
     russianLargeNumbersCheckbox.checked = settings.enabledRules.russianLargeNumbers;
-    russianUiFinalPeriodCheckbox.checked = settings.enabledRules.russianUiFinalPeriod;
+    uiFinalPeriodCheckbox.checked = settings.enabledRules.uiFinalPeriod;
   }
 
   function hasEnabledRules() {
@@ -396,6 +515,7 @@
       enabledRules.percentSignNoSpace ||
       enabledRules.numberUnitsNbsp ||
       enabledRules.specialSymbols ||
+      enabledRules.englishQuotes ||
       enabledRules.russianQuotes ||
       enabledRules.russianNumberRangeDash ||
       enabledRules.russianSentenceDash ||
@@ -403,7 +523,7 @@
       enabledRules.russianInitialsNbsp ||
       enabledRules.russianNumericAbbreviations ||
       enabledRules.russianLargeNumbers ||
-      enabledRules.russianUiFinalPeriod
+      enabledRules.uiFinalPeriod
     );
   }
 
@@ -486,6 +606,11 @@
   languageModeSelect.onchange = handleSettingsChange;
   nonBreakingSpaceStyleSelect.onchange = handleSettingsChange;
 
+  ruPrimaryQuoteStyleSelect.onchange = handleSettingsChange;
+  ruSecondaryQuoteStyleSelect.onchange = handleSettingsChange;
+  enPrimaryQuoteStyleSelect.onchange = handleSettingsChange;
+  enSecondaryQuoteStyleSelect.onchange = handleSettingsChange;
+
   invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
   tabsCheckbox.onchange = handleSettingsChange;
   ellipsisCheckbox.onchange = handleSettingsChange;
@@ -495,6 +620,7 @@
   percentSignNoSpaceCheckbox.onchange = handleSettingsChange;
   numberUnitsNbspCheckbox.onchange = handleSettingsChange;
   specialSymbolsCheckbox.onchange = handleSettingsChange;
+  englishQuotesCheckbox.onchange = handleSettingsChange;
   russianQuotesCheckbox.onchange = handleSettingsChange;
   russianNumberRangeDashCheckbox.onchange = handleSettingsChange;
   russianSentenceDashCheckbox.onchange = handleSettingsChange;
@@ -502,7 +628,7 @@
   russianInitialsNbspCheckbox.onchange = handleSettingsChange;
   russianNumericAbbreviationsCheckbox.onchange = handleSettingsChange;
   russianLargeNumbersCheckbox.onchange = handleSettingsChange;
-  russianUiFinalPeriodCheckbox.onchange = handleSettingsChange;
+  uiFinalPeriodCheckbox.onchange = handleSettingsChange;
 
   applyButton.onclick = () => {
     parent.postMessage(

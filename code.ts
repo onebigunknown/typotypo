@@ -43,7 +43,7 @@ type EnabledRules = {
   russianInitialsNbsp: boolean;
   russianNumericAbbreviations: boolean;
   russianLargeNumbers: boolean;
-  russianUiFinalPeriod: boolean;
+  uiFinalPeriod: boolean;
 };
 
 type TypographyOptions = {
@@ -68,7 +68,11 @@ type RuleResult = {
 type TypographyRule = {
   id: keyof EnabledRules;
   supportedLanguages: "all" | LanguageCode[];
-  apply: (text: string, settings: ApplySettings) => RuleResult;
+  apply: (
+    text: string,
+    settings: ApplySettings,
+    language: LanguageCode
+  ) => RuleResult;
 };
 
 type LanguageStats = Record<LanguageCode, number>;
@@ -108,7 +112,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     russianInitialsNbsp: true,
     russianNumericAbbreviations: true,
     russianLargeNumbers: true,
-    russianUiFinalPeriod: true,
+    uiFinalPeriod: true,
   },
 };
 
@@ -268,10 +272,12 @@ function normalizeSettings(value: unknown): ApplySettings {
     en?: unknown;
   };
 
-  const maybeEnabledRules: Partial<EnabledRules> =
+  const maybeEnabledRules =
     typeof maybeSettings.enabledRules === "object" &&
     maybeSettings.enabledRules !== null
-      ? (maybeSettings.enabledRules as Partial<EnabledRules>)
+      ? (maybeSettings.enabledRules as Partial<EnabledRules> & {
+          russianUiFinalPeriod?: unknown;
+        })
       : {};
 
   let nonBreakingSpaceStyle: NonBreakingSpaceStyle =
@@ -284,6 +290,13 @@ function normalizeSettings(value: unknown): ApplySettings {
   } else if (legacyOptions.numberUnitsSpace === "nbsp") {
     nonBreakingSpaceStyle = "regular";
   }
+
+  const uiFinalPeriod =
+    typeof maybeEnabledRules.uiFinalPeriod === "boolean"
+      ? maybeEnabledRules.uiFinalPeriod
+      : typeof maybeEnabledRules.russianUiFinalPeriod === "boolean"
+        ? maybeEnabledRules.russianUiFinalPeriod
+        : DEFAULT_SETTINGS.enabledRules.uiFinalPeriod;
 
   return {
     languageMode: isLanguageMode(maybeSettings.languageMode)
@@ -390,10 +403,7 @@ function normalizeSettings(value: unknown): ApplySettings {
           ? maybeEnabledRules.russianLargeNumbers
           : DEFAULT_SETTINGS.enabledRules.russianLargeNumbers,
 
-      russianUiFinalPeriod:
-        typeof maybeEnabledRules.russianUiFinalPeriod === "boolean"
-          ? maybeEnabledRules.russianUiFinalPeriod
-          : DEFAULT_SETTINGS.enabledRules.russianUiFinalPeriod,
+      uiFinalPeriod,
     },
   };
 }
@@ -633,6 +643,34 @@ function shouldKeepRussianFinalPeriod(textEndingWithPeriod: string): boolean {
     /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
 
   return protectedAbbreviations.test(textEndingWithPeriod);
+}
+
+function shouldKeepEnglishFinalPeriod(textEndingWithPeriod: string): boolean {
+  const protectedAbbreviations =
+    /(^|[^A-Za-z])((?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|No|Fig|Inc|Ltd|Co|Corp)\.|(?:e\.g\.|i\.e\.|a\.m\.|p\.m\.))$/i;
+
+  const protectedTechnicalEnding =
+    /(?:\b[A-Za-z0-9-]+\.[A-Za-z]{2,}|\bv?\d+(?:\.\d+)+)$/i;
+
+  return (
+    protectedAbbreviations.test(textEndingWithPeriod) ||
+    protectedTechnicalEnding.test(textEndingWithPeriod)
+  );
+}
+
+function shouldKeepFinalPeriod(
+  textEndingWithPeriod: string,
+  language: LanguageCode
+): boolean {
+  if (language === "ru") {
+    return shouldKeepRussianFinalPeriod(textEndingWithPeriod);
+  }
+
+  if (language === "en") {
+    return shouldKeepEnglishFinalPeriod(textEndingWithPeriod);
+  }
+
+  return true;
 }
 
 function applyRussianQuotesRule(
@@ -1335,7 +1373,11 @@ function applyRussianLargeNumbersRule(
   };
 }
 
-function applyRussianUiFinalPeriodRule(text: string): RuleResult {
+function applyUiFinalPeriodRule(
+  text: string,
+  _settings: ApplySettings,
+  language: LanguageCode
+): RuleResult {
   const trailingWhitespaceMatch = text.match(/[ \t\r\n\u00A0\u202F]*$/);
   const trailingWhitespace = trailingWhitespaceMatch
     ? trailingWhitespaceMatch[0]
@@ -1346,6 +1388,28 @@ function applyRussianUiFinalPeriodRule(text: string): RuleResult {
     text.length - trailingWhitespace.length
   );
 
+  const closingQuoteCharacters = "»”\"’“‘";
+  const lastCharacter = textWithoutTrailingWhitespace.slice(-1);
+  const beforeLastCharacter = textWithoutTrailingWhitespace.slice(0, -1);
+
+  if (
+    closingQuoteCharacters.includes(lastCharacter) &&
+    beforeLastCharacter.endsWith(".")
+  ) {
+    if (shouldKeepFinalPeriod(beforeLastCharacter, language)) {
+      return {
+        formattedText: text,
+        replacementCount: 0,
+      };
+    }
+
+    return {
+      formattedText:
+        beforeLastCharacter.slice(0, -1) + lastCharacter + trailingWhitespace,
+      replacementCount: 1,
+    };
+  }
+
   if (!textWithoutTrailingWhitespace.endsWith(".")) {
     return {
       formattedText: text,
@@ -1353,7 +1417,7 @@ function applyRussianUiFinalPeriodRule(text: string): RuleResult {
     };
   }
 
-  if (shouldKeepRussianFinalPeriod(textWithoutTrailingWhitespace)) {
+  if (shouldKeepFinalPeriod(textWithoutTrailingWhitespace, language)) {
     return {
       formattedText: text,
       replacementCount: 0,
@@ -1454,9 +1518,9 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     apply: applyRussianLargeNumbersRule,
   },
   {
-    id: "russianUiFinalPeriod",
-    supportedLanguages: ["ru"],
-    apply: applyRussianUiFinalPeriodRule,
+    id: "uiFinalPeriod",
+    supportedLanguages: ["ru", "en"],
+    apply: applyUiFinalPeriodRule,
   },
 ];
 
@@ -1490,7 +1554,7 @@ function applyRulesToText(
       continue;
     }
 
-    const result = rule.apply(formattedText, settings);
+    const result = rule.apply(formattedText, settings, language);
 
     formattedText = result.formattedText;
     replacementCount += result.replacementCount;
