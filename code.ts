@@ -1,6 +1,6 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 980,
+  height: 1060,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
@@ -22,6 +22,8 @@ type EnabledRules = {
   russianSentenceDash: boolean;
   russianShortWordsNbsp: boolean;
   russianInitialsNbsp: boolean;
+  russianNumericAbbreviations: boolean;
+  russianLargeNumbers: boolean;
 };
 
 type TypographyOptions = {
@@ -69,6 +71,8 @@ const DEFAULT_SETTINGS: ApplySettings = {
     russianSentenceDash: true,
     russianShortWordsNbsp: true,
     russianInitialsNbsp: true,
+    russianNumericAbbreviations: true,
+    russianLargeNumbers: true,
   },
 };
 
@@ -193,6 +197,16 @@ function normalizeSettings(value: unknown): ApplySettings {
         typeof maybeEnabledRules.russianInitialsNbsp === "boolean"
           ? maybeEnabledRules.russianInitialsNbsp
           : DEFAULT_SETTINGS.enabledRules.russianInitialsNbsp,
+
+      russianNumericAbbreviations:
+        typeof maybeEnabledRules.russianNumericAbbreviations === "boolean"
+          ? maybeEnabledRules.russianNumericAbbreviations
+          : DEFAULT_SETTINGS.enabledRules.russianNumericAbbreviations,
+
+      russianLargeNumbers:
+        typeof maybeEnabledRules.russianLargeNumbers === "boolean"
+          ? maybeEnabledRules.russianLargeNumbers
+          : DEFAULT_SETTINGS.enabledRules.russianLargeNumbers,
     },
   };
 }
@@ -370,7 +384,7 @@ function applyNumberUnitsNbspRule(
   settings: ApplySettings
 ): RuleResult {
   const units =
-    "₽|руб\\.?|рублей|р\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
+    "₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
 
   const regexp = new RegExp(
     "(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
@@ -600,6 +614,90 @@ function applyRussianInitialsNbspRule(
   };
 }
 
+function applyRussianNumericAbbreviationsRule(text: string): RuleResult {
+  let formattedText = text;
+  let replacementCount = 0;
+
+  function replaceAndCount(
+    regexp: RegExp,
+    replacer: (...args: string[]) => string
+  ) {
+    formattedText = formattedText.replace(regexp, function (...args) {
+      const stringArgs = args.map(String);
+      const match = stringArgs[0];
+      const normalized = replacer(...stringArgs);
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    });
+  }
+
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])((?:млн|млрд|трлн))\.(?=$|[ \t\u00A0\u202F\n\r,.;:!?…),])/giu,
+    function (_match, prefix, abbreviation) {
+      return prefix + abbreviation;
+    }
+  );
+
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([тТ]ыс)(?!\.)(?=$|[ \t\u00A0\u202F\n\r,;:!?…),])/g,
+    function (_match, prefix, abbreviation) {
+      return prefix + abbreviation + ".";
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
+function applyRussianLargeNumbersRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
+  const space = getConfiguredNbsp(settings);
+
+  const regexp =
+    /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9](?:[0-9 \t\u00A0\u202F]*[0-9]){4,})(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
+
+  let replacementCount = 0;
+
+  const formattedText = text.replace(
+    regexp,
+    function (match, prefix, numberWithPossibleSpaces) {
+      const rawNumber = numberWithPossibleSpaces.replace(/[ \t\u00A0\u202F]/g, "");
+
+      if (rawNumber.length < 5) {
+        return match;
+      }
+
+      const formattedNumber = rawNumber.replace(
+        /\B(?=([0-9]{3})+(?![0-9]))/g,
+        space
+      );
+
+      const normalized = prefix + formattedNumber;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
 const TYPOGRAPHY_RULES: TypographyRule[] = [
   {
     id: "invisibleCopyArtifacts",
@@ -670,6 +768,16 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "russianInitialsNbsp",
     supportedLanguages: ["ru"],
     apply: applyRussianInitialsNbspRule,
+  },
+  {
+    id: "russianNumericAbbreviations",
+    supportedLanguages: ["ru"],
+    apply: applyRussianNumericAbbreviationsRule,
+  },
+  {
+    id: "russianLargeNumbers",
+    supportedLanguages: ["ru"],
+    apply: applyRussianLargeNumbersRule,
   },
 ];
 
