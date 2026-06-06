@@ -1,11 +1,29 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 1100,
+  height: 1180,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
 type LanguageMode = "auto" | "ru" | "en";
 type NonBreakingSpaceStyle = "regular" | "narrow";
+
+type QuoteStyle =
+  | "frenchGuillemets"
+  | "germanLowHigh"
+  | "englishDouble"
+  | "programmerDouble"
+  | "englishSingle"
+  | "englishSingleReversed";
+
+type QuotePair = {
+  opening: string;
+  closing: string;
+};
+
+type QuoteOptions = {
+  primaryQuoteStyle: QuoteStyle;
+  secondaryQuoteStyle: QuoteStyle;
+};
 
 type EnabledRules = {
   invisibleCopyArtifacts: boolean;
@@ -17,6 +35,7 @@ type EnabledRules = {
   percentSignNoSpace: boolean;
   numberUnitsNbsp: boolean;
   specialSymbols: boolean;
+  englishQuotes: boolean;
   russianQuotes: boolean;
   russianNumberRangeDash: boolean;
   russianSentenceDash: boolean;
@@ -29,6 +48,10 @@ type EnabledRules = {
 
 type TypographyOptions = {
   nonBreakingSpaceStyle: NonBreakingSpaceStyle;
+  quoteOptions: {
+    ru: QuoteOptions;
+    en: QuoteOptions;
+  };
 };
 
 type ApplySettings = {
@@ -56,6 +79,16 @@ const DEFAULT_SETTINGS: ApplySettings = {
   languageMode: "auto",
   options: {
     nonBreakingSpaceStyle: "regular",
+    quoteOptions: {
+      ru: {
+        primaryQuoteStyle: "frenchGuillemets",
+        secondaryQuoteStyle: "germanLowHigh",
+      },
+      en: {
+        primaryQuoteStyle: "englishDouble",
+        secondaryQuoteStyle: "englishSingle",
+      },
+    },
   },
   enabledRules: {
     invisibleCopyArtifacts: true,
@@ -67,6 +100,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     percentSignNoSpace: true,
     numberUnitsNbsp: true,
     specialSymbols: true,
+    englishQuotes: true,
     russianQuotes: true,
     russianNumberRangeDash: true,
     russianSentenceDash: true,
@@ -88,6 +122,126 @@ function isNonBreakingSpaceStyle(
   return value === "regular" || value === "narrow";
 }
 
+function isQuoteStyle(value: unknown): value is QuoteStyle {
+  return (
+    value === "frenchGuillemets" ||
+    value === "germanLowHigh" ||
+    value === "englishDouble" ||
+    value === "programmerDouble" ||
+    value === "englishSingle" ||
+    value === "englishSingleReversed"
+  );
+}
+
+function normalizeQuoteOptions(
+  value: unknown,
+  fallback: QuoteOptions
+): QuoteOptions {
+  const maybeQuoteOptions: Partial<QuoteOptions> =
+    typeof value === "object" && value !== null
+      ? (value as Partial<QuoteOptions>)
+      : {};
+
+  return {
+    primaryQuoteStyle: isQuoteStyle(maybeQuoteOptions.primaryQuoteStyle)
+      ? maybeQuoteOptions.primaryQuoteStyle
+      : fallback.primaryQuoteStyle,
+
+    secondaryQuoteStyle: isQuoteStyle(maybeQuoteOptions.secondaryQuoteStyle)
+      ? maybeQuoteOptions.secondaryQuoteStyle
+      : fallback.secondaryQuoteStyle,
+  };
+}
+
+function getQuotePair(style: QuoteStyle): QuotePair {
+  if (style === "frenchGuillemets") {
+    return { opening: "«", closing: "»" };
+  }
+
+  if (style === "germanLowHigh") {
+    return { opening: "„", closing: "“" };
+  }
+
+  if (style === "englishDouble") {
+    return { opening: "“", closing: "”" };
+  }
+
+  if (style === "programmerDouble") {
+    return { opening: '"', closing: '"' };
+  }
+
+  if (style === "englishSingle") {
+    return { opening: "‘", closing: "’" };
+  }
+
+  return { opening: "‚", closing: "‘" };
+}
+
+function getRussianPrimaryQuotePair(settings: ApplySettings): QuotePair {
+  return getQuotePair(settings.options.quoteOptions.ru.primaryQuoteStyle);
+}
+
+function getRussianSecondaryQuotePair(settings: ApplySettings): QuotePair {
+  return getQuotePair(settings.options.quoteOptions.ru.secondaryQuoteStyle);
+}
+
+function getEnglishPrimaryQuotePair(settings: ApplySettings): QuotePair {
+  return getQuotePair(settings.options.quoteOptions.en.primaryQuoteStyle);
+}
+
+function getEnglishSecondaryQuotePair(settings: ApplySettings): QuotePair {
+  return getQuotePair(settings.options.quoteOptions.en.secondaryQuoteStyle);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function replaceQuotePairInText(
+  input: string,
+  fromPair: QuotePair,
+  toPair: QuotePair
+): RuleResult {
+  if (
+    fromPair.opening === toPair.opening &&
+    fromPair.closing === toPair.closing
+  ) {
+    return {
+      formattedText: input,
+      replacementCount: 0,
+    };
+  }
+
+  const opening = escapeRegExp(fromPair.opening);
+  const closing = escapeRegExp(fromPair.closing);
+
+  const regexp =
+    fromPair.opening === fromPair.closing
+      ? new RegExp(opening + "([^" + opening + "\\n]+?)" + closing, "g")
+      : new RegExp(opening + "([^\\n]+?)" + closing, "g");
+
+  let replacementCount = 0;
+
+  const formattedText = input.replace(
+    regexp,
+    function (match: string, quoteContent: string) {
+      const normalized = toPair.opening + quoteContent + toPair.closing;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
 function normalizeSettings(value: unknown): ApplySettings {
   const maybeSettings: Partial<ApplySettings> =
     typeof value === "object" && value !== null
@@ -101,6 +255,17 @@ function normalizeSettings(value: unknown): ApplySettings {
 
   const legacyOptions = maybeOptions as Partial<TypographyOptions> & {
     numberUnitsSpace?: unknown;
+  };
+
+  const maybeQuoteOptions =
+    typeof maybeOptions.quoteOptions === "object" &&
+    maybeOptions.quoteOptions !== null
+      ? maybeOptions.quoteOptions
+      : {};
+
+  const maybeQuoteOptionsRecord = maybeQuoteOptions as {
+    ru?: unknown;
+    en?: unknown;
   };
 
   const maybeEnabledRules: Partial<EnabledRules> =
@@ -127,6 +292,16 @@ function normalizeSettings(value: unknown): ApplySettings {
 
     options: {
       nonBreakingSpaceStyle,
+      quoteOptions: {
+        ru: normalizeQuoteOptions(
+          maybeQuoteOptionsRecord.ru,
+          DEFAULT_SETTINGS.options.quoteOptions.ru
+        ),
+        en: normalizeQuoteOptions(
+          maybeQuoteOptionsRecord.en,
+          DEFAULT_SETTINGS.options.quoteOptions.en
+        ),
+      },
     },
 
     enabledRules: {
@@ -174,6 +349,11 @@ function normalizeSettings(value: unknown): ApplySettings {
         typeof maybeEnabledRules.specialSymbols === "boolean"
           ? maybeEnabledRules.specialSymbols
           : DEFAULT_SETTINGS.enabledRules.specialSymbols,
+
+      englishQuotes:
+        typeof maybeEnabledRules.englishQuotes === "boolean"
+          ? maybeEnabledRules.englishQuotes
+          : DEFAULT_SETTINGS.enabledRules.englishQuotes,
 
       russianQuotes:
         typeof maybeEnabledRules.russianQuotes === "boolean"
@@ -448,35 +628,193 @@ function applySpecialSymbolsRule(text: string): RuleResult {
   };
 }
 
-function applyRussianQuotesRule(text: string): RuleResult {
+function shouldKeepRussianFinalPeriod(textEndingWithPeriod: string): boolean {
+  const protectedAbbreviations =
+    /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
+
+  return protectedAbbreviations.test(textEndingWithPeriod);
+}
+
+function applyRussianQuotesRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
   let formattedText = text;
   let replacementCount = 0;
+
+  const internalPrimaryQuotePair: QuotePair = { opening: "«", closing: "»" };
+  const internalSecondaryQuotePair: QuotePair = { opening: "„", closing: "“" };
+
+  const selectedPrimaryQuotePair = getRussianPrimaryQuotePair(settings);
+  const selectedSecondaryQuotePair = getRussianSecondaryQuotePair(settings);
+
+  const protectedInnerQuotes: string[] = [];
+
+  function addReplacementResult(result: RuleResult) {
+    formattedText = result.formattedText;
+    replacementCount += result.replacementCount;
+  }
 
   function replaceAndCount(
     regexp: RegExp,
     replacer: (...args: string[]) => string
   ) {
-    formattedText = formattedText.replace(regexp, function (...args) {
-      const stringArgs = args.map((arg) =>
-        typeof arg === "string" ? arg : ""
-      );
+    formattedText = formattedText.replace(
+      regexp,
+      function (...args: unknown[]) {
+        const stringArgs = args.map((arg) =>
+          typeof arg === "string" ? arg : ""
+        );
 
-      const match = stringArgs[0];
-      const normalized = replacer(...stringArgs);
+        const match = stringArgs[0];
+        const normalized = replacer(...stringArgs);
 
-      if (match === normalized) {
-        return match;
+        if (match === normalized) {
+          return match;
+        }
+
+        replacementCount += 1;
+        return normalized;
       }
-
-      replacementCount += 1;
-      return normalized;
-    });
+    );
   }
 
+  function protectExistingSecondLevelQuotesInsideGuillemets(
+    input: string
+  ): string {
+    return input.replace(
+      /«([^«»\n]*?)»/g,
+      function (_match: string, quoteContent: string) {
+        const protectedQuoteContent = quoteContent.replace(
+          /„([^„“\n]+)“/g,
+          function (innerQuoteMatch: string) {
+            const token =
+              "\uE000INNER_QUOTE_" + protectedInnerQuotes.length + "\uE001";
+
+            protectedInnerQuotes.push(innerQuoteMatch);
+
+            return token;
+          }
+        );
+
+        return "«" + protectedQuoteContent + "»";
+      }
+    );
+  }
+
+  function restoreProtectedInnerQuotes(input: string): string {
+    return input.replace(
+      /\uE000INNER_QUOTE_(\d+)\uE001/g,
+      function (match: string, index: string) {
+        return protectedInnerQuotes[Number(index)] || match;
+      }
+    );
+  }
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      selectedPrimaryQuotePair,
+      internalPrimaryQuotePair
+    )
+  );
+
   replaceAndCount(
-    /(^|[\s([{,.;:!?…—–-])["“„]([^"“”„«»\n]+)["”“](?=$|[\s.,;:!?…)\]}—–-])/g,
+    /“([^“”\n]*?)‘([^‘’\n]+)’([^“”\n]*?)”/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "«" +
+        beforeInnerQuote +
+        "„" +
+        innerQuoteContent +
+        "“" +
+        afterInnerQuote +
+        "»"
+      );
+    }
+  );
+  
+  replaceAndCount(
+    /“([^“”\n]*?)"([^"\n]+)"([^“”\n]*?)”/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "«" +
+        beforeInnerQuote +
+        "„" +
+        innerQuoteContent +
+        "“" +
+        afterInnerQuote +
+        "»"
+      );
+    }
+  );
+  
+  replaceAndCount(
+    /"([^"\n]*?)‘([^‘’\n]+)’([^"\n]*?)"/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "«" +
+        beforeInnerQuote +
+        "„" +
+        innerQuoteContent +
+        "“" +
+        afterInnerQuote +
+        "»"
+      );
+    }
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      selectedSecondaryQuotePair,
+      internalSecondaryQuotePair
+    )
+  );
+
+  formattedText = protectExistingSecondLevelQuotesInsideGuillemets(
+    formattedText
+  );
+
+  replaceAndCount(
+    /(^|[\s([{,.;:!?…—–-])["“„‚‘]([^"“”„«»‚‘’\n]+)["”“‘’](?=$|[\s.,;:!?…)\]}—–-])/g,
     function (_match, prefix, quoteContent) {
       return prefix + "«" + quoteContent + "»";
+    }
+  );
+
+  formattedText = restoreProtectedInnerQuotes(formattedText);
+
+  replaceAndCount(
+    /«([^«»\n]*?)«([^«»\n]+)»([^«»\n]*?)»/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "«" +
+        beforeInnerQuote +
+        "„" +
+        innerQuoteContent +
+        "“" +
+        afterInnerQuote +
+        "»"
+      );
+    }
+  );
+
+  replaceAndCount(
+    /«([^«»\n]*?)»/g,
+    function (_match, quoteContent) {
+      const normalizedQuoteContent = quoteContent.replace(
+        /(["“„‚‘])([^"“”„«»‚‘’\n]+)(["”“‘’])/g,
+        function (
+          _innerMatch: string,
+          _openingQuote: string,
+          innerContent: string
+        ) {
+          return "„" + innerContent + "“";
+        }
+      );
+
+      return "«" + normalizedQuoteContent + "»";
     }
   );
 
@@ -509,11 +847,235 @@ function applyRussianQuotesRule(text: string): RuleResult {
   replaceAndCount(
     /«([^«»\n]*?)[ \t\u00A0\u202F]*[-–—−]»([.,;:!?…])?/g,
     function (_match, quoteContent, outerPunctuation) {
-      const trimmedQuoteContent = quoteContent.replace(/[ \t\u00A0\u202F]+$/g, "");
+      const trimmedQuoteContent = quoteContent.replace(
+        /[ \t\u00A0\u202F]+$/g,
+        ""
+      );
+
       const punctuation = outerPunctuation || "";
 
       return "«" + trimmedQuoteContent + "» —" + punctuation;
     }
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      internalSecondaryQuotePair,
+      selectedSecondaryQuotePair
+    )
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      internalPrimaryQuotePair,
+      selectedPrimaryQuotePair
+    )
+  );
+
+  return {
+    formattedText,
+    replacementCount,
+  };
+}
+
+function applyEnglishQuotesRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
+  let formattedText = text;
+  let replacementCount = 0;
+
+  const internalPrimaryQuotePair: QuotePair = { opening: "“", closing: "”" };
+  const internalSecondaryQuotePair: QuotePair = { opening: "‘", closing: "’" };
+
+  const selectedPrimaryQuotePair = getEnglishPrimaryQuotePair(settings);
+  const selectedSecondaryQuotePair = getEnglishSecondaryQuotePair(settings);
+
+  const protectedInnerQuotes: string[] = [];
+
+  function addReplacementResult(result: RuleResult) {
+    formattedText = result.formattedText;
+    replacementCount += result.replacementCount;
+  }
+
+  function replaceAndCount(
+    regexp: RegExp,
+    replacer: (...args: string[]) => string
+  ) {
+    formattedText = formattedText.replace(
+      regexp,
+      function (...args: unknown[]) {
+        const stringArgs = args.map((arg) =>
+          typeof arg === "string" ? arg : ""
+        );
+
+        const match = stringArgs[0];
+        const normalized = replacer(...stringArgs);
+
+        if (match === normalized) {
+          return match;
+        }
+
+        replacementCount += 1;
+        return normalized;
+      }
+    );
+  }
+
+  function protectExistingSecondLevelQuotesInsidePrimaryQuotes(
+    input: string
+  ): string {
+    return input.replace(
+      /“([^“”\n]*?)”/g,
+      function (_match: string, quoteContent: string) {
+        const protectedQuoteContent = quoteContent.replace(
+          /‘([^‘’\n]+)’/g,
+          function (innerQuoteMatch: string) {
+            const token =
+              "\uE000EN_INNER_QUOTE_" + protectedInnerQuotes.length + "\uE001";
+
+            protectedInnerQuotes.push(innerQuoteMatch);
+
+            return token;
+          }
+        );
+
+        return "“" + protectedQuoteContent + "”";
+      }
+    );
+  }
+
+  function restoreProtectedInnerQuotes(input: string): string {
+    return input.replace(
+      /\uE000EN_INNER_QUOTE_(\d+)\uE001/g,
+      function (match: string, index: string) {
+        return protectedInnerQuotes[Number(index)] || match;
+      }
+    );
+  }
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      selectedPrimaryQuotePair,
+      internalPrimaryQuotePair
+    )
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      selectedSecondaryQuotePair,
+      internalSecondaryQuotePair
+    )
+  );
+
+  replaceAndCount(
+    /«([^«»\n]*?)„([^„“\n]+)“([^«»\n]*?)»/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "“" +
+        beforeInnerQuote +
+        "‘" +
+        innerQuoteContent +
+        "’" +
+        afterInnerQuote +
+        "”"
+      );
+    }
+  );
+  
+  replaceAndCount(
+    /«([^«»\n]*?)"([^"\n]+)"([^«»\n]*?)»/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "“" +
+        beforeInnerQuote +
+        "‘" +
+        innerQuoteContent +
+        "’" +
+        afterInnerQuote +
+        "”"
+      );
+    }
+  );
+  
+  replaceAndCount(
+    /«([^«»\n]*?)‘([^‘’\n]+)’([^«»\n]*?)»/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "“" +
+        beforeInnerQuote +
+        "‘" +
+        innerQuoteContent +
+        "’" +
+        afterInnerQuote +
+        "”"
+      );
+    }
+  );
+
+  formattedText =
+    protectExistingSecondLevelQuotesInsidePrimaryQuotes(formattedText);
+
+  replaceAndCount(
+    /(^|[\s([{,.;:!?…—–-])["“„«‚‘]([^"“”„«»‚‘’\n]+)["”“»‘’](?=$|[\s.,;:!?…)\]}—–-])/g,
+    function (_match, prefix, quoteContent) {
+      return prefix + "“" + quoteContent + "”";
+    }
+  );
+
+  formattedText = restoreProtectedInnerQuotes(formattedText);
+
+  replaceAndCount(
+    /“([^“”\n]*?)“([^“”\n]+)”([^“”\n]*?)”/g,
+    function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+      return (
+        "“" +
+        beforeInnerQuote +
+        "‘" +
+        innerQuoteContent +
+        "’" +
+        afterInnerQuote +
+        "”"
+      );
+    }
+  );
+
+  replaceAndCount(
+    /“([^“”\n]*?)”/g,
+    function (_match, quoteContent) {
+      const normalizedQuoteContent = quoteContent.replace(
+        /(["“„«‚‘])([^"“”„«»‚‘’\n]+)(["”“»‘’])/g,
+        function (
+          _innerMatch: string,
+          _openingQuote: string,
+          innerContent: string
+        ) {
+          return "‘" + innerContent + "’";
+        }
+      );
+
+      return "“" + normalizedQuoteContent + "”";
+    }
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      internalSecondaryQuotePair,
+      selectedSecondaryQuotePair
+    )
+  );
+
+  addReplacementResult(
+    replaceQuotePairInText(
+      formattedText,
+      internalPrimaryQuotePair,
+      selectedPrimaryQuotePair
+    )
   );
 
   return {
@@ -773,13 +1335,6 @@ function applyRussianLargeNumbersRule(
   };
 }
 
-function shouldKeepRussianFinalPeriod(textEndingWithPeriod: string): boolean {
-  const protectedAbbreviations =
-    /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
-
-  return protectedAbbreviations.test(textEndingWithPeriod);
-}
-
 function applyRussianUiFinalPeriodRule(text: string): RuleResult {
   const trailingWhitespaceMatch = text.match(/[ \t\r\n\u00A0\u202F]*$/);
   const trailingWhitespace = trailingWhitespaceMatch
@@ -857,6 +1412,11 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "specialSymbols",
     supportedLanguages: "all",
     apply: applySpecialSymbolsRule,
+  },
+  {
+    id: "englishQuotes",
+    supportedLanguages: ["en"],
+    apply: applyEnglishQuotesRule,
   },
   {
     id: "russianQuotes",
@@ -968,6 +1528,7 @@ async function loadFontsForTextNode(node: TextNode) {
 }
 
 async function applyTypographyRules(settings: ApplySettings) {
+  const safeSettings = normalizeSettings(settings);
   const selectedTextNodes = findTextNodesInSelection();
 
   let changedNodeCount = 0;
@@ -983,11 +1544,11 @@ async function applyTypographyRules(settings: ApplySettings) {
 
   for (const node of selectedTextNodes) {
     const originalText = node.characters;
-    const language = resolveLanguage(originalText, settings.languageMode);
+    const language = resolveLanguage(originalText, safeSettings.languageMode);
 
     languageStats[language] += 1;
 
-    const result = applyRulesToText(originalText, settings, language);
+    const result = applyRulesToText(originalText, safeSettings, language);
 
     skippedRuleCount += result.skippedRuleCount;
 
@@ -1041,12 +1602,14 @@ figma.on("selectionchange", () => {
 
 figma.ui.onmessage = async (message) => {
   if (message.type === "save-settings") {
-    await saveSettings(message.settings);
+    await saveSettings(normalizeSettings(message.settings));
   }
 
   if (message.type === "apply") {
-    await saveSettings(message.settings);
-    await applyTypographyRules(message.settings);
+    const safeSettings = normalizeSettings(message.settings);
+
+    await saveSettings(safeSettings);
+    await applyTypographyRules(safeSettings);
   }
 
   if (message.type === "close") {
