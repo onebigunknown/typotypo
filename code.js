@@ -1,7 +1,7 @@
 "use strict";
 figma.showUI(__html__, {
     width: 420,
-    height: 1060,
+    height: 1100,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const DEFAULT_SETTINGS = {
@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
         russianInitialsNbsp: true,
         russianNumericAbbreviations: true,
         russianLargeNumbers: true,
+        russianUiFinalPeriod: true,
     },
 };
 function isLanguageMode(value) {
@@ -112,6 +113,9 @@ function normalizeSettings(value) {
             russianLargeNumbers: typeof maybeEnabledRules.russianLargeNumbers === "boolean"
                 ? maybeEnabledRules.russianLargeNumbers
                 : DEFAULT_SETTINGS.enabledRules.russianLargeNumbers,
+            russianUiFinalPeriod: typeof maybeEnabledRules.russianUiFinalPeriod === "boolean"
+                ? maybeEnabledRules.russianUiFinalPeriod
+                : DEFAULT_SETTINGS.enabledRules.russianUiFinalPeriod,
         },
     };
 }
@@ -444,6 +448,33 @@ function applyRussianLargeNumbersRule(text, settings) {
         replacementCount,
     };
 }
+function shouldKeepRussianFinalPeriod(textEndingWithPeriod) {
+    const protectedAbbreviations = /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
+    return protectedAbbreviations.test(textEndingWithPeriod);
+}
+function applyRussianUiFinalPeriodRule(text) {
+    const trailingWhitespaceMatch = text.match(/[ \t\r\n\u00A0\u202F]*$/);
+    const trailingWhitespace = trailingWhitespaceMatch
+        ? trailingWhitespaceMatch[0]
+        : "";
+    const textWithoutTrailingWhitespace = text.slice(0, text.length - trailingWhitespace.length);
+    if (!textWithoutTrailingWhitespace.endsWith(".")) {
+        return {
+            formattedText: text,
+            replacementCount: 0,
+        };
+    }
+    if (shouldKeepRussianFinalPeriod(textWithoutTrailingWhitespace)) {
+        return {
+            formattedText: text,
+            replacementCount: 0,
+        };
+    }
+    return {
+        formattedText: textWithoutTrailingWhitespace.slice(0, -1) + trailingWhitespace,
+        replacementCount: 1,
+    };
+}
 const TYPOGRAPHY_RULES = [
     {
         id: "invisibleCopyArtifacts",
@@ -524,6 +555,11 @@ const TYPOGRAPHY_RULES = [
         id: "russianLargeNumbers",
         supportedLanguages: ["ru"],
         apply: applyRussianLargeNumbersRule,
+    },
+    {
+        id: "russianUiFinalPeriod",
+        supportedLanguages: ["ru"],
+        apply: applyRussianUiFinalPeriodRule,
     },
 ];
 function isRuleSupportedForLanguage(rule, language) {

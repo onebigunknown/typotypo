@@ -260,6 +260,30 @@
         <p class="rule-description">Keeps initials together with each other and with the surname using a non-breaking space.</p>
       </div>
     </label>
+
+    <label class="rule">
+      <input id="russianNumericAbbreviations" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian numeric abbreviations <span class="tag">Russian</span></div>
+        <p class="rule-description">Normalizes numeric abbreviations: тыс. with a period, млн/млрд/трлн without periods.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianLargeNumbers" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian large numbers <span class="tag">Russian</span></div>
+        <p class="rule-description">Groups large numbers with a non-breaking space, for example 1 000 000.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="russianUiFinalPeriod" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Russian UI final period <span class="tag">Russian</span></div>
+        <p class="rule-description">Removes the final period at the end of a text layer, while preserving common abbreviations.</p>
+      </div>
+    </label>
   </div>
 </div>
 
@@ -293,6 +317,9 @@
   const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
   const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
   const russianInitialsNbspCheckbox = document.getElementById("russianInitialsNbsp");
+  const russianNumericAbbreviationsCheckbox = document.getElementById("russianNumericAbbreviations");
+  const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
+  const russianUiFinalPeriodCheckbox = document.getElementById("russianUiFinalPeriod");
 
   let hasTextLayers = false;
   let isLoadingSettings = true;
@@ -313,6 +340,9 @@
       russianSentenceDash: russianSentenceDashCheckbox.checked,
       russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
       russianInitialsNbsp: russianInitialsNbspCheckbox.checked,
+      russianNumericAbbreviations: russianNumericAbbreviationsCheckbox.checked,
+      russianLargeNumbers: russianLargeNumbersCheckbox.checked,
+      russianUiFinalPeriod: russianUiFinalPeriodCheckbox.checked,
     };
   }
 
@@ -348,6 +378,9 @@
     russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
     russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
     russianInitialsNbspCheckbox.checked = settings.enabledRules.russianInitialsNbsp;
+    russianNumericAbbreviationsCheckbox.checked = settings.enabledRules.russianNumericAbbreviations;
+    russianLargeNumbersCheckbox.checked = settings.enabledRules.russianLargeNumbers;
+    russianUiFinalPeriodCheckbox.checked = settings.enabledRules.russianUiFinalPeriod;
   }
 
   function hasEnabledRules() {
@@ -367,7 +400,10 @@
       enabledRules.russianNumberRangeDash ||
       enabledRules.russianSentenceDash ||
       enabledRules.russianShortWordsNbsp ||
-      enabledRules.russianInitialsNbsp
+      enabledRules.russianInitialsNbsp ||
+      enabledRules.russianNumericAbbreviations ||
+      enabledRules.russianLargeNumbers ||
+      enabledRules.russianUiFinalPeriod
     );
   }
 
@@ -464,6 +500,9 @@
   russianSentenceDashCheckbox.onchange = handleSettingsChange;
   russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
   russianInitialsNbspCheckbox.onchange = handleSettingsChange;
+  russianNumericAbbreviationsCheckbox.onchange = handleSettingsChange;
+  russianLargeNumbersCheckbox.onchange = handleSettingsChange;
+  russianUiFinalPeriodCheckbox.onchange = handleSettingsChange;
 
   applyButton.onclick = () => {
     parent.postMessage(

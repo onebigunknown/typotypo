@@ -1,6 +1,6 @@
 figma.showUI(__html__, {
   width: 420,
-  height: 1060,
+  height: 1100,
 });
 
 type LanguageCode = "ru" | "en" | "unknown";
@@ -24,6 +24,7 @@ type EnabledRules = {
   russianInitialsNbsp: boolean;
   russianNumericAbbreviations: boolean;
   russianLargeNumbers: boolean;
+  russianUiFinalPeriod: boolean;
 };
 
 type TypographyOptions = {
@@ -73,6 +74,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     russianInitialsNbsp: true,
     russianNumericAbbreviations: true,
     russianLargeNumbers: true,
+    russianUiFinalPeriod: true,
   },
 };
 
@@ -207,6 +209,11 @@ function normalizeSettings(value: unknown): ApplySettings {
         typeof maybeEnabledRules.russianLargeNumbers === "boolean"
           ? maybeEnabledRules.russianLargeNumbers
           : DEFAULT_SETTINGS.enabledRules.russianLargeNumbers,
+
+      russianUiFinalPeriod:
+        typeof maybeEnabledRules.russianUiFinalPeriod === "boolean"
+          ? maybeEnabledRules.russianUiFinalPeriod
+          : DEFAULT_SETTINGS.enabledRules.russianUiFinalPeriod,
     },
   };
 }
@@ -670,7 +677,10 @@ function applyRussianLargeNumbersRule(
   const formattedText = text.replace(
     regexp,
     function (match, prefix, numberWithPossibleSpaces) {
-      const rawNumber = numberWithPossibleSpaces.replace(/[ \t\u00A0\u202F]/g, "");
+      const rawNumber = numberWithPossibleSpaces.replace(
+        /[ \t\u00A0\u202F]/g,
+        ""
+      );
 
       if (rawNumber.length < 5) {
         return match;
@@ -695,6 +705,45 @@ function applyRussianLargeNumbersRule(
   return {
     formattedText,
     replacementCount,
+  };
+}
+
+function shouldKeepRussianFinalPeriod(textEndingWithPeriod: string): boolean {
+  const protectedAbbreviations =
+    /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
+
+  return protectedAbbreviations.test(textEndingWithPeriod);
+}
+
+function applyRussianUiFinalPeriodRule(text: string): RuleResult {
+  const trailingWhitespaceMatch = text.match(/[ \t\r\n\u00A0\u202F]*$/);
+  const trailingWhitespace = trailingWhitespaceMatch
+    ? trailingWhitespaceMatch[0]
+    : "";
+
+  const textWithoutTrailingWhitespace = text.slice(
+    0,
+    text.length - trailingWhitespace.length
+  );
+
+  if (!textWithoutTrailingWhitespace.endsWith(".")) {
+    return {
+      formattedText: text,
+      replacementCount: 0,
+    };
+  }
+
+  if (shouldKeepRussianFinalPeriod(textWithoutTrailingWhitespace)) {
+    return {
+      formattedText: text,
+      replacementCount: 0,
+    };
+  }
+
+  return {
+    formattedText:
+      textWithoutTrailingWhitespace.slice(0, -1) + trailingWhitespace,
+    replacementCount: 1,
   };
 }
 
@@ -778,6 +827,11 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "russianLargeNumbers",
     supportedLanguages: ["ru"],
     apply: applyRussianLargeNumbersRule,
+  },
+  {
+    id: "russianUiFinalPeriod",
+    supportedLanguages: ["ru"],
+    apply: applyRussianUiFinalPeriodRule,
   },
 ];
 
