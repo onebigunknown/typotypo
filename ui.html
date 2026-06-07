@@ -242,6 +242,14 @@
     </label>
 
     <label class="rule">
+      <input id="manualLineBreaks" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Manual line breaks <span class="tag">All languages</span></div>
+        <p class="rule-description">Replaces single manual line breaks with spaces while preserving paragraph breaks.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="ellipsis" type="checkbox" checked />
       <div>
         <div class="rule-title">Ellipsis <span class="tag">All languages</span></div>
@@ -394,6 +402,7 @@
 
   const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
   const tabsCheckbox = document.getElementById("tabs");
+  const manualLineBreaksCheckbox = document.getElementById("manualLineBreaks");
   const ellipsisCheckbox = document.getElementById("ellipsis");
   const extraSpacesCheckbox = document.getElementById("extraSpaces");
   const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
@@ -418,6 +427,7 @@
     return {
       invisibleCopyArtifacts: invisibleCopyArtifactsCheckbox.checked,
       tabs: tabsCheckbox.checked,
+      manualLineBreaks: manualLineBreaksCheckbox.checked,
       ellipsis: ellipsisCheckbox.checked,
       extraSpaces: extraSpacesCheckbox.checked,
       trimTextEdges: trimTextEdgesCheckbox.checked,
@@ -484,6 +494,10 @@
 
     invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
     tabsCheckbox.checked = settings.enabledRules.tabs;
+    manualLineBreaksCheckbox.checked =
+      settings.enabledRules.manualLineBreaks !== undefined
+        ? settings.enabledRules.manualLineBreaks
+        : true;
     ellipsisCheckbox.checked = settings.enabledRules.ellipsis;
     extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
     trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
@@ -508,6 +522,7 @@
     return (
       enabledRules.invisibleCopyArtifacts ||
       enabledRules.tabs ||
+      enabledRules.manualLineBreaks ||
       enabledRules.ellipsis ||
       enabledRules.extraSpaces ||
       enabledRules.trimTextEdges ||
@@ -613,6 +628,7 @@
 
   invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
   tabsCheckbox.onchange = handleSettingsChange;
+  manualLineBreaksCheckbox.onchange = handleSettingsChange;
   ellipsisCheckbox.onchange = handleSettingsChange;
   extraSpacesCheckbox.onchange = handleSettingsChange;
   trimTextEdgesCheckbox.onchange = handleSettingsChange;

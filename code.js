@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
     enabledRules: {
         invisibleCopyArtifacts: true,
         tabs: true,
+        manualLineBreaks: true,
         ellipsis: true,
         extraSpaces: true,
         trimTextEdges: true,
@@ -177,6 +178,9 @@ function normalizeSettings(value) {
             tabs: typeof maybeEnabledRules.tabs === "boolean"
                 ? maybeEnabledRules.tabs
                 : DEFAULT_SETTINGS.enabledRules.tabs,
+            manualLineBreaks: typeof maybeEnabledRules.manualLineBreaks === "boolean"
+                ? maybeEnabledRules.manualLineBreaks
+                : DEFAULT_SETTINGS.enabledRules.manualLineBreaks,
             ellipsis: typeof maybeEnabledRules.ellipsis === "boolean"
                 ? maybeEnabledRules.ellipsis
                 : DEFAULT_SETTINGS.enabledRules.ellipsis,
@@ -318,6 +322,25 @@ function applyTabsRule(text) {
     return {
         formattedText: text.replace(regexp, " "),
         replacementCount: matches ? matches.length : 0,
+    };
+}
+function applyManualLineBreaksRule(text) {
+    let replacementCount = 0;
+    const normalizedLineEndings = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const formattedText = normalizedLineEndings.replace(/([^\n])[ \t\u00A0\u202F]*\n[ \t\u00A0\u202F]*([^\n])/g, function (match, beforeBreak, afterBreak) {
+        const normalized = beforeBreak + " " + afterBreak;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    if (normalizedLineEndings !== text && formattedText === normalizedLineEndings) {
+        replacementCount += 1;
+    }
+    return {
+        formattedText,
+        replacementCount,
     };
 }
 function applyEllipsisRule(text) {
@@ -827,6 +850,11 @@ const TYPOGRAPHY_RULES = [
         id: "tabs",
         supportedLanguages: "all",
         apply: applyTabsRule,
+    },
+    {
+        id: "manualLineBreaks",
+        supportedLanguages: "all",
+        apply: applyManualLineBreaksRule,
     },
     {
         id: "ellipsis",

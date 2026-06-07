@@ -28,6 +28,7 @@ type QuoteOptions = {
 type EnabledRules = {
   invisibleCopyArtifacts: boolean;
   tabs: boolean;
+  manualLineBreaks: boolean;
   ellipsis: boolean;
   extraSpaces: boolean;
   trimTextEdges: boolean;
@@ -97,6 +98,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
   enabledRules: {
     invisibleCopyArtifacts: true,
     tabs: true,
+    manualLineBreaks: true,
     ellipsis: true,
     extraSpaces: true,
     trimTextEdges: true,
@@ -328,6 +330,11 @@ function normalizeSettings(value: unknown): ApplySettings {
           ? maybeEnabledRules.tabs
           : DEFAULT_SETTINGS.enabledRules.tabs,
 
+      manualLineBreaks:
+        typeof maybeEnabledRules.manualLineBreaks === "boolean"
+          ? maybeEnabledRules.manualLineBreaks
+          : DEFAULT_SETTINGS.enabledRules.manualLineBreaks,
+
       ellipsis:
         typeof maybeEnabledRules.ellipsis === "boolean"
           ? maybeEnabledRules.ellipsis
@@ -525,6 +532,35 @@ function applyTabsRule(text: string): RuleResult {
   return {
     formattedText: text.replace(regexp, " "),
     replacementCount: matches ? matches.length : 0,
+  };
+}
+
+function applyManualLineBreaksRule(text: string): RuleResult {
+  let replacementCount = 0;
+
+  const normalizedLineEndings = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  const formattedText = normalizedLineEndings.replace(
+    /([^\n])[ \t\u00A0\u202F]*\n[ \t\u00A0\u202F]*([^\n])/g,
+    function (match: string, beforeBreak: string, afterBreak: string) {
+      const normalized = beforeBreak + " " + afterBreak;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  if (normalizedLineEndings !== text && formattedText === normalizedLineEndings) {
+    replacementCount += 1;
+  }
+
+  return {
+    formattedText,
+    replacementCount,
   };
 }
 
@@ -1441,6 +1477,11 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     id: "tabs",
     supportedLanguages: "all",
     apply: applyTabsRule,
+  },
+  {
+    id: "manualLineBreaks",
+    supportedLanguages: "all",
+    apply: applyManualLineBreaksRule,
   },
   {
     id: "ellipsis",
