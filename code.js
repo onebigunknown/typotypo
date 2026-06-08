@@ -29,7 +29,9 @@ const DEFAULT_SETTINGS = {
         spacesBeforePunctuation: true,
         percentSignNoSpace: true,
         numberUnitsNbsp: true,
+        numberSigns: true,
         specialSymbols: true,
+        englishApostrophes: true,
         englishQuotes: true,
         russianQuotes: true,
         russianNumberRangeDash: true,
@@ -199,9 +201,15 @@ function normalizeSettings(value) {
             numberUnitsNbsp: typeof maybeEnabledRules.numberUnitsNbsp === "boolean"
                 ? maybeEnabledRules.numberUnitsNbsp
                 : DEFAULT_SETTINGS.enabledRules.numberUnitsNbsp,
+            numberSigns: typeof maybeEnabledRules.numberSigns === "boolean"
+                ? maybeEnabledRules.numberSigns
+                : DEFAULT_SETTINGS.enabledRules.numberSigns,
             specialSymbols: typeof maybeEnabledRules.specialSymbols === "boolean"
                 ? maybeEnabledRules.specialSymbols
                 : DEFAULT_SETTINGS.enabledRules.specialSymbols,
+            englishApostrophes: typeof maybeEnabledRules.englishApostrophes === "boolean"
+                ? maybeEnabledRules.englishApostrophes
+                : DEFAULT_SETTINGS.enabledRules.englishApostrophes,
             englishQuotes: typeof maybeEnabledRules.englishQuotes === "boolean"
                 ? maybeEnabledRules.englishQuotes
                 : DEFAULT_SETTINGS.enabledRules.englishQuotes,
@@ -401,6 +409,23 @@ function applyNumberUnitsNbspRule(text, settings) {
         replacementCount,
     };
 }
+function applyNumberSignsRule(text, settings) {
+    const space = getConfiguredNbsp(settings);
+    const regexp = /([№§])[ \t\u00A0\u202F]*(?=\d)/g;
+    let replacementCount = 0;
+    const formattedText = text.replace(regexp, function (match, sign) {
+        const normalized = sign + space;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    return {
+        formattedText,
+        replacementCount,
+    };
+}
 function applySpecialSymbolsRule(text) {
     let formattedText = text;
     let replacementCount = 0;
@@ -442,6 +467,32 @@ function shouldKeepFinalPeriod(textEndingWithPeriod, language) {
         return shouldKeepEnglishFinalPeriod(textEndingWithPeriod);
     }
     return true;
+}
+function applyEnglishApostrophesRule(text) {
+    let formattedText = text;
+    let replacementCount = 0;
+    function replaceAndCount(regexp, replacer) {
+        formattedText = formattedText.replace(regexp, function (...args) {
+            const stringArgs = args.map((arg) => typeof arg === "string" ? arg : "");
+            const match = stringArgs[0];
+            const normalized = replacer(...stringArgs);
+            if (match === normalized) {
+                return match;
+            }
+            replacementCount += 1;
+            return normalized;
+        });
+    }
+    replaceAndCount(/([A-Za-z])'([A-Za-z])/g, function (_match, beforeApostrophe, afterApostrophe) {
+        return beforeApostrophe + "’" + afterApostrophe;
+    });
+    replaceAndCount(/(^|[\s([{—–-])'([nN])'(?=$|[\s.,;:!?)\]}—–-])/g, function (_match, prefix, letter) {
+        return prefix + "’" + letter + "’";
+    });
+    return {
+        formattedText,
+        replacementCount,
+    };
 }
 function applyRussianQuotesRule(text, settings) {
     let formattedText = text;
@@ -887,9 +938,19 @@ const TYPOGRAPHY_RULES = [
         apply: applyNumberUnitsNbspRule,
     },
     {
+        id: "numberSigns",
+        supportedLanguages: "all",
+        apply: applyNumberSignsRule,
+    },
+    {
         id: "specialSymbols",
         supportedLanguages: "all",
         apply: applySpecialSymbolsRule,
+    },
+    {
+        id: "englishApostrophes",
+        supportedLanguages: ["en"],
+        apply: applyEnglishApostrophesRule,
     },
     {
         id: "englishQuotes",

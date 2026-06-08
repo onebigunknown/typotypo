@@ -298,10 +298,26 @@
     </label>
 
     <label class="rule">
+      <input id="numberSigns" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Number signs <span class="tag">All languages</span></div>
+        <p class="rule-description">Keeps number and section signs together with the following number.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="specialSymbols" type="checkbox" checked />
       <div>
         <div class="rule-title">Special symbols <span class="tag">All languages</span></div>
         <p class="rule-description">Replaces text combinations like (C), (TM), +-, &lt;=, and &gt;= with typographic symbols.</p>
+      </div>
+    </label>
+
+    <label class="rule">
+      <input id="englishApostrophes" type="checkbox" checked />
+      <div>
+        <div class="rule-title">English apostrophes <span class="tag">English</span></div>
+        <p class="rule-description">Replaces straight apostrophes in English words with typographic apostrophes.</p>
       </div>
     </label>
 
@@ -409,7 +425,9 @@
   const spacesBeforePunctuationCheckbox = document.getElementById("spacesBeforePunctuation");
   const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
   const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
+  const numberSignsCheckbox = document.getElementById("numberSigns");
   const specialSymbolsCheckbox = document.getElementById("specialSymbols");
+  const englishApostrophesCheckbox = document.getElementById("englishApostrophes");
   const englishQuotesCheckbox = document.getElementById("englishQuotes");
   const russianQuotesCheckbox = document.getElementById("russianQuotes");
   const russianNumberRangeDashCheckbox = document.getElementById("russianNumberRangeDash");
@@ -434,7 +452,9 @@
       spacesBeforePunctuation: spacesBeforePunctuationCheckbox.checked,
       percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
       numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
+      numberSigns: numberSignsCheckbox.checked,
       specialSymbols: specialSymbolsCheckbox.checked,
+      englishApostrophes: englishApostrophesCheckbox.checked,
       englishQuotes: englishQuotesCheckbox.checked,
       russianQuotes: russianQuotesCheckbox.checked,
       russianNumberRangeDash: russianNumberRangeDashCheckbox.checked,
@@ -504,7 +524,15 @@
     spacesBeforePunctuationCheckbox.checked = settings.enabledRules.spacesBeforePunctuation;
     percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
     numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
+    numberSignsCheckbox.checked =
+      settings.enabledRules.numberSigns !== undefined
+        ? settings.enabledRules.numberSigns
+        : true;
     specialSymbolsCheckbox.checked = settings.enabledRules.specialSymbols;
+    englishApostrophesCheckbox.checked =
+      settings.enabledRules.englishApostrophes !== undefined
+        ? settings.enabledRules.englishApostrophes
+        : true;
     englishQuotesCheckbox.checked = settings.enabledRules.englishQuotes;
     russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
     russianNumberRangeDashCheckbox.checked = settings.enabledRules.russianNumberRangeDash;
@@ -529,7 +557,9 @@
       enabledRules.spacesBeforePunctuation ||
       enabledRules.percentSignNoSpace ||
       enabledRules.numberUnitsNbsp ||
+      enabledRules.numberSigns ||
       enabledRules.specialSymbols ||
+      enabledRules.englishApostrophes ||
       enabledRules.englishQuotes ||
       enabledRules.russianQuotes ||
       enabledRules.russianNumberRangeDash ||
@@ -635,7 +665,9 @@
   spacesBeforePunctuationCheckbox.onchange = handleSettingsChange;
   percentSignNoSpaceCheckbox.onchange = handleSettingsChange;
   numberUnitsNbspCheckbox.onchange = handleSettingsChange;
+  numberSignsCheckbox.onchange = handleSettingsChange;
   specialSymbolsCheckbox.onchange = handleSettingsChange;
+  englishApostrophesCheckbox.onchange = handleSettingsChange;
   englishQuotesCheckbox.onchange = handleSettingsChange;
   russianQuotesCheckbox.onchange = handleSettingsChange;
   russianNumberRangeDashCheckbox.onchange = handleSettingsChange;
