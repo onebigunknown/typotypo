@@ -40,7 +40,7 @@ type EnabledRules = {
   englishApostrophes: boolean;
   englishQuotes: boolean;
   russianQuotes: boolean;
-  russianNumberRangeDash: boolean;
+  numberRangeDash: boolean;
   russianSentenceDash: boolean;
   russianShortWordsNbsp: boolean;
   russianInitialsNbsp: boolean;
@@ -112,7 +112,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     englishApostrophes: true,
     englishQuotes: true,
     russianQuotes: true,
-    russianNumberRangeDash: true,
+    numberRangeDash: true,
     russianSentenceDash: true,
     russianShortWordsNbsp: true,
     russianInitialsNbsp: true,
@@ -283,6 +283,7 @@ function normalizeSettings(value: unknown): ApplySettings {
     maybeSettings.enabledRules !== null
       ? (maybeSettings.enabledRules as Partial<EnabledRules> & {
           russianUiFinalPeriod?: unknown;
+          russianNumberRangeDash?: unknown;
         })
       : {};
 
@@ -394,10 +395,12 @@ function normalizeSettings(value: unknown): ApplySettings {
           ? maybeEnabledRules.russianQuotes
           : DEFAULT_SETTINGS.enabledRules.russianQuotes,
 
-      russianNumberRangeDash:
-        typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
-          ? maybeEnabledRules.russianNumberRangeDash
-          : DEFAULT_SETTINGS.enabledRules.russianNumberRangeDash,
+      numberRangeDash:
+        typeof maybeEnabledRules.numberRangeDash === "boolean"
+          ? maybeEnabledRules.numberRangeDash
+          : typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
+            ? maybeEnabledRules.russianNumberRangeDash
+            : DEFAULT_SETTINGS.enabledRules.numberRangeDash,
 
       russianSentenceDash:
         typeof maybeEnabledRules.russianSentenceDash === "boolean"
@@ -1263,7 +1266,7 @@ function applyEnglishQuotesRule(
   };
 }
 
-function applyRussianNumberRangeDashRule(text: string): RuleResult {
+function applyNumberRangeDashRule(text: string): RuleResult {
   const regexp =
     /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
 
@@ -1644,9 +1647,9 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     apply: applyRussianQuotesRule,
   },
   {
-    id: "russianNumberRangeDash",
-    supportedLanguages: ["ru"],
-    apply: applyRussianNumberRangeDashRule,
+    id: "numberRangeDash",
+    supportedLanguages: "all",
+    apply: applyNumberRangeDashRule,
   },
   {
     id: "russianSentenceDash",

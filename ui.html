@@ -338,9 +338,9 @@
     </label>
 
     <label class="rule">
-      <input id="russianNumberRangeDash" type="checkbox" checked />
+      <input id="numberRangeDash" type="checkbox" checked />
       <div>
-        <div class="rule-title">Russian number ranges <span class="tag">Russian</span></div>
+        <div class="rule-title">Number ranges <span class="tag">All languages</span></div>
         <p class="rule-description">Uses an en dash without spaces in numeric ranges, for example 2020–2024.</p>
       </div>
     </label>
@@ -430,7 +430,7 @@
   const englishApostrophesCheckbox = document.getElementById("englishApostrophes");
   const englishQuotesCheckbox = document.getElementById("englishQuotes");
   const russianQuotesCheckbox = document.getElementById("russianQuotes");
-  const russianNumberRangeDashCheckbox = document.getElementById("russianNumberRangeDash");
+  const numberRangeDashCheckbox = document.getElementById("numberRangeDash");
   const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
   const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
   const russianInitialsNbspCheckbox = document.getElementById("russianInitialsNbsp");
@@ -457,7 +457,7 @@
       englishApostrophes: englishApostrophesCheckbox.checked,
       englishQuotes: englishQuotesCheckbox.checked,
       russianQuotes: russianQuotesCheckbox.checked,
-      russianNumberRangeDash: russianNumberRangeDashCheckbox.checked,
+      numberRangeDash: numberRangeDashCheckbox.checked,
       russianSentenceDash: russianSentenceDashCheckbox.checked,
       russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
       russianInitialsNbsp: russianInitialsNbspCheckbox.checked,
@@ -535,7 +535,12 @@
         : true;
     englishQuotesCheckbox.checked = settings.enabledRules.englishQuotes;
     russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
-    russianNumberRangeDashCheckbox.checked = settings.enabledRules.russianNumberRangeDash;
+    numberRangeDashCheckbox.checked =
+      settings.enabledRules.numberRangeDash !== undefined
+        ? settings.enabledRules.numberRangeDash
+        : settings.enabledRules.russianNumberRangeDash !== undefined
+          ? settings.enabledRules.russianNumberRangeDash
+          : true;
     russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
     russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
     russianInitialsNbspCheckbox.checked = settings.enabledRules.russianInitialsNbsp;
@@ -562,7 +567,7 @@
       enabledRules.englishApostrophes ||
       enabledRules.englishQuotes ||
       enabledRules.russianQuotes ||
-      enabledRules.russianNumberRangeDash ||
+      enabledRules.numberRangeDash ||
       enabledRules.russianSentenceDash ||
       enabledRules.russianShortWordsNbsp ||
       enabledRules.russianInitialsNbsp ||
@@ -670,7 +675,7 @@
   englishApostrophesCheckbox.onchange = handleSettingsChange;
   englishQuotesCheckbox.onchange = handleSettingsChange;
   russianQuotesCheckbox.onchange = handleSettingsChange;
-  russianNumberRangeDashCheckbox.onchange = handleSettingsChange;
+  numberRangeDashCheckbox.onchange = handleSettingsChange;
   russianSentenceDashCheckbox.onchange = handleSettingsChange;
   russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
   russianInitialsNbspCheckbox.onchange = handleSettingsChange;

@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS = {
         englishApostrophes: true,
         englishQuotes: true,
         russianQuotes: true,
-        russianNumberRangeDash: true,
+        numberRangeDash: true,
         russianSentenceDash: true,
         russianShortWordsNbsp: true,
         russianInitialsNbsp: true,
@@ -216,9 +216,11 @@ function normalizeSettings(value) {
             russianQuotes: typeof maybeEnabledRules.russianQuotes === "boolean"
                 ? maybeEnabledRules.russianQuotes
                 : DEFAULT_SETTINGS.enabledRules.russianQuotes,
-            russianNumberRangeDash: typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
-                ? maybeEnabledRules.russianNumberRangeDash
-                : DEFAULT_SETTINGS.enabledRules.russianNumberRangeDash,
+            numberRangeDash: typeof maybeEnabledRules.numberRangeDash === "boolean"
+                ? maybeEnabledRules.numberRangeDash
+                : typeof maybeEnabledRules.russianNumberRangeDash === "boolean"
+                    ? maybeEnabledRules.russianNumberRangeDash
+                    : DEFAULT_SETTINGS.enabledRules.numberRangeDash,
             russianSentenceDash: typeof maybeEnabledRules.russianSentenceDash === "boolean"
                 ? maybeEnabledRules.russianSentenceDash
                 : DEFAULT_SETTINGS.enabledRules.russianSentenceDash,
@@ -713,7 +715,7 @@ function applyEnglishQuotesRule(text, settings) {
         replacementCount,
     };
 }
-function applyRussianNumberRangeDashRule(text) {
+function applyNumberRangeDashRule(text) {
     const regexp = /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
     let replacementCount = 0;
     const formattedText = text.replace(regexp, function (match, prefix, startNumber, endNumber) {
@@ -971,9 +973,9 @@ const TYPOGRAPHY_RULES = [
         apply: applyRussianQuotesRule,
     },
     {
-        id: "russianNumberRangeDash",
-        supportedLanguages: ["ru"],
-        apply: applyRussianNumberRangeDashRule,
+        id: "numberRangeDash",
+        supportedLanguages: "all",
+        apply: applyNumberRangeDashRule,
     },
     {
         id: "russianSentenceDash",
