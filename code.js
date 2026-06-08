@@ -444,6 +444,14 @@ function applySpecialSymbolsRule(text) {
     replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
     replaceAndCount(/<=/g, "≤");
     replaceAndCount(/>=/g, "≥");
+    formattedText = formattedText.replace(/(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*[xXхХ][ \t\u00A0\u202F]*(\d+(?:[,.]\d+)?)/g, function (match, leftNumber, rightNumber) {
+        const normalized = leftNumber + "×" + rightNumber;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
     return {
         formattedText,
         replacementCount,
