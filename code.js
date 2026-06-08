@@ -1034,6 +1034,166 @@ function applyRulesToText(text, settings, language) {
         skippedRuleCount,
     };
 }
+function getCharacterStyleSnapshot(node, index) {
+    return {
+        fontName: node.getRangeFontName(index, index + 1),
+        fontSize: node.getRangeFontSize(index, index + 1),
+        fills: node.getRangeFills(index, index + 1),
+        textDecoration: node.getRangeTextDecoration(index, index + 1),
+        textCase: node.getRangeTextCase(index, index + 1),
+        letterSpacing: node.getRangeLetterSpacing(index, index + 1),
+        lineHeight: node.getRangeLineHeight(index, index + 1),
+    };
+}
+function getTextStyleSnapshots(node) {
+    const styles = [];
+    for (let i = 0; i < node.characters.length; i++) {
+        styles.push(getCharacterStyleSnapshot(node, i));
+    }
+    return styles;
+}
+function findNextMatchingCharacter(originalText, formattedText, originalIndex, formattedIndex) {
+    const lookaheadLimit = 80;
+    const maxOriginalIndex = Math.min(originalText.length, originalIndex + lookaheadLimit);
+    const maxFormattedIndex = Math.min(formattedText.length, formattedIndex + lookaheadLimit);
+    let bestMatch = null;
+    let bestDistance = Infinity;
+    for (let currentOriginalIndex = originalIndex; currentOriginalIndex < maxOriginalIndex; currentOriginalIndex++) {
+        for (let currentFormattedIndex = formattedIndex; currentFormattedIndex < maxFormattedIndex; currentFormattedIndex++) {
+            if (originalText[currentOriginalIndex] !== formattedText[currentFormattedIndex]) {
+                continue;
+            }
+            const distance = currentOriginalIndex - originalIndex + currentFormattedIndex - formattedIndex;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestMatch = {
+                    originalIndex: currentOriginalIndex,
+                    formattedIndex: currentFormattedIndex,
+                };
+            }
+        }
+    }
+    return bestMatch;
+}
+function mapFormattedCharactersToOriginalCharacters(originalText, formattedText) {
+    const originalIndexByFormattedIndex = [];
+    let originalIndex = 0;
+    let formattedIndex = 0;
+    while (formattedIndex < formattedText.length) {
+        if (originalIndex < originalText.length &&
+            originalText[originalIndex] === formattedText[formattedIndex]) {
+            originalIndexByFormattedIndex[formattedIndex] = originalIndex;
+            originalIndex += 1;
+            formattedIndex += 1;
+            continue;
+        }
+        const nextMatch = findNextMatchingCharacter(originalText, formattedText, originalIndex, formattedIndex);
+        const nextOriginalIndex = nextMatch ? nextMatch.originalIndex : originalText.length;
+        const nextFormattedIndex = nextMatch ? nextMatch.formattedIndex : formattedText.length;
+        const styleSourceIndex = Math.max(0, Math.min(originalText.length - 1, originalIndex < originalText.length ? originalIndex : originalIndex - 1));
+        while (formattedIndex < nextFormattedIndex) {
+            originalIndexByFormattedIndex[formattedIndex] = styleSourceIndex;
+            formattedIndex += 1;
+        }
+        originalIndex = nextOriginalIndex;
+    }
+    return originalIndexByFormattedIndex;
+}
+function getStyleKey(style) {
+    return JSON.stringify({
+        fontName: style.fontName,
+        fontSize: style.fontSize,
+        fills: style.fills,
+        textDecoration: style.textDecoration,
+        textCase: style.textCase,
+        letterSpacing: style.letterSpacing,
+        lineHeight: style.lineHeight,
+    });
+}
+function applyStyleToRange(node, start, end, style) {
+    if (start >= end) {
+        return;
+    }
+    function applySafely(propertyName, applyProperty) {
+        try {
+            applyProperty();
+        }
+        catch (error) {
+            console.warn(`Could not restore ${propertyName} for range ${start}-${end}:`, error);
+        }
+    }
+    if (style.fontName !== figma.mixed) {
+        applySafely("fontName", () => {
+            node.setRangeFontName(start, end, style.fontName);
+        });
+    }
+    if (style.fontSize !== figma.mixed) {
+        applySafely("fontSize", () => {
+            node.setRangeFontSize(start, end, style.fontSize);
+        });
+    }
+    if (style.fills !== figma.mixed) {
+        applySafely("fills", () => {
+            node.setRangeFills(start, end, style.fills);
+        });
+    }
+    if (style.textDecoration !== figma.mixed) {
+        applySafely("textDecoration", () => {
+            node.setRangeTextDecoration(start, end, style.textDecoration);
+        });
+    }
+    if (style.textCase !== figma.mixed) {
+        applySafely("textCase", () => {
+            node.setRangeTextCase(start, end, style.textCase);
+        });
+    }
+    if (style.letterSpacing !== figma.mixed) {
+        applySafely("letterSpacing", () => {
+            node.setRangeLetterSpacing(start, end, style.letterSpacing);
+        });
+    }
+    if (style.lineHeight !== figma.mixed) {
+        applySafely("lineHeight", () => {
+            node.setRangeLineHeight(start, end, style.lineHeight);
+        });
+    }
+}
+function applyStyleSnapshotsToFormattedText(node, originalText, formattedText, originalStyles) {
+    if (originalStyles.length === 0 || formattedText.length === 0) {
+        return;
+    }
+    const originalIndexByFormattedIndex = mapFormattedCharactersToOriginalCharacters(originalText, formattedText);
+    let rangeStart = 0;
+    let currentStyle = originalStyles[originalIndexByFormattedIndex[0]] || originalStyles[0];
+    let currentStyleKey = getStyleKey(currentStyle);
+    for (let index = 1; index < formattedText.length; index++) {
+        const style = originalStyles[originalIndexByFormattedIndex[index]] || currentStyle;
+        const styleKey = getStyleKey(style);
+        if (styleKey === currentStyleKey) {
+            continue;
+        }
+        applyStyleToRange(node, rangeStart, index, currentStyle);
+        rangeStart = index;
+        currentStyle = style;
+        currentStyleKey = styleKey;
+    }
+    applyStyleToRange(node, rangeStart, formattedText.length, currentStyle);
+}
+async function loadFontsFromStyleSnapshots(styles) {
+    const fonts = styles
+        .map((style) => style.fontName)
+        .filter((fontName) => fontName !== figma.mixed);
+    const uniqueFonts = Array.from(new Map(fonts.map((font) => [`${font.family}-${font.style}`, font])).values());
+    await Promise.all(uniqueFonts.map((font) => figma.loadFontAsync(font)));
+}
+async function updateTextNodeCharactersPreservingStyles(node, formattedText) {
+    const originalText = node.characters;
+    const originalStyles = getTextStyleSnapshots(node);
+    await loadFontsForTextNode(node);
+    await loadFontsFromStyleSnapshots(originalStyles);
+    node.characters = formattedText;
+    applyStyleSnapshotsToFormattedText(node, originalText, formattedText, originalStyles);
+}
 async function loadFontsForTextNode(node) {
     const fonts = [];
     function addFont(fontName) {
@@ -1074,8 +1234,7 @@ async function applyTypographyRules(settings) {
             continue;
         }
         try {
-            await loadFontsForTextNode(node);
-            node.characters = result.formattedText;
+            await updateTextNodeCharactersPreservingStyles(node, result.formattedText);
             changedNodeCount += 1;
             totalReplacementCount += result.replacementCount;
         }
