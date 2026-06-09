@@ -470,7 +470,7 @@ function applySpecialSymbolsRule(text, settings) {
         "1/4": "¼",
         "3/4": "¾",
     };
-    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё.\/\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…\)\]\}»”’])/g, function (match, prefix, fraction) {
+    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’])/g, function (match, prefix, fraction) {
         const replacement = fractionReplacements[fraction];
         const normalized = prefix + replacement;
         if (match === normalized) {
@@ -1188,6 +1188,7 @@ function protectTextFragments(text) {
             return token + trailingPunctuation;
         });
     }
+    protectByRegexp(/`[^`\n]+`/g);
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
     protectByRegexp(/\bwww\.[^\s<>]+/gi);

@@ -750,7 +750,7 @@ function applySpecialSymbolsRule(
   };
 
   formattedText = formattedText.replace(
-    /(^|[^0-9A-Za-zА-Яа-яЁё.\/\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…\)\]\}»”’])/g,
+    /(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’])/g,
     function (match: string, prefix: string, fraction: string) {
       const replacement = fractionReplacements[fraction];
       const normalized = prefix + replacement;
@@ -1988,6 +1988,8 @@ function protectTextFragments(text: string): {
       return token + trailingPunctuation;
     });
   }
+
+  protectByRegexp(/`[^`\n]+`/g);
 
   protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
   protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
