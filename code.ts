@@ -971,6 +971,20 @@ function applyEnglishApostrophesRule(text: string): RuleResult {
     }
   );
 
+  replaceAndCount(
+    /(^|[\s([{—–-])'(\d{2}s)/g,
+    function (_match, prefix, decade) {
+      return prefix + "’" + decade;
+    }
+  );
+
+  replaceAndCount(
+    /([A-Za-z])'(?=\s+[A-Za-z])/g,
+    function (_match, beforeApostrophe) {
+      return beforeApostrophe + "’";
+    }
+  );
+
   return {
     formattedText,
     replacementCount,
