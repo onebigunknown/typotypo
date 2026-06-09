@@ -741,6 +741,29 @@ function applySpecialSymbolsRule(
   replaceAndCount(/!=/g, "≠");
   replaceAndCount(/~=|≈=/g, "≈");
 
+  const fractionReplacements: Record<string, string> = {
+    "1/2": "½",
+    "1/3": "⅓",
+    "2/3": "⅔",
+    "1/4": "¼",
+    "3/4": "¾",
+  };
+
+  formattedText = formattedText.replace(
+    /(^|[^0-9A-Za-zА-Яа-яЁё.\/\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…\)\]\}»”’])/g,
+    function (match: string, prefix: string, fraction: string) {
+      const replacement = fractionReplacements[fraction];
+      const normalized = prefix + replacement;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
   formattedText = formattedText.replace(
     /<->|<[-–—−]|[-–—−]>/g,
     function (match: string) {
