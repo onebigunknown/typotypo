@@ -597,7 +597,7 @@ function applyEnglishApostrophesRule(text) {
     replaceAndCount(/(^|[\s([{—–-])'([nN])'(?=$|[\s.,;:!?)\]}—–-])/g, function (_match, prefix, letter) {
         return prefix + "’" + letter + "’";
     });
-    replaceAndCount(/(^|[\s([{—–-])'(\d{2}s)/g, function (_match, prefix, decade) {
+    replaceAndCount(/(^|[\s([{—–-])'(\d{2}s\b)/g, function (_match, prefix, decade) {
         return prefix + "’" + decade;
     });
     replaceAndCount(/([A-Za-z])'(?=\s+[A-Za-z])/g, function (_match, beforeApostrophe) {
@@ -764,6 +764,27 @@ function applyEnglishQuotesRule(text, settings) {
     }
     addReplacementResult(replaceQuotePairInText(formattedText, selectedPrimaryQuotePair, internalPrimaryQuotePair));
     addReplacementResult(replaceQuotePairInText(formattedText, selectedSecondaryQuotePair, internalSecondaryQuotePair));
+    replaceAndCount(/"([^"\n]*?)['‘]([^'‘’"\n]+)['’]([^"\n]*?)"/g, function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+        return ("“" +
+            beforeInnerQuote +
+            "‘" +
+            innerQuoteContent +
+            "’" +
+            afterInnerQuote +
+            "”");
+    });
+    replaceAndCount(/'([^'"\n]*?)"([^"\n]+)"([^'"\n]*?)'/g, function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
+        return ("‘" +
+            beforeInnerQuote +
+            "“" +
+            innerQuoteContent +
+            "”" +
+            afterInnerQuote +
+            "’");
+    });
+    replaceAndCount(/(^|[\s([{,.;:!?…—–-])'([^'‘’"\n][^'\n]*?[^'‘’"\n])'(?=$|[\s.,;:!?…)\]}—–-])/g, function (_match, prefix, quoteContent) {
+        return prefix + "‘" + quoteContent + "’";
+    });
     replaceAndCount(/«([^«»\n]*?)„([^„“\n]+)“([^«»\n]*?)»/g, function (_match, beforeInnerQuote, innerQuoteContent, afterInnerQuote) {
         return ("“" +
             beforeInnerQuote +
@@ -793,7 +814,7 @@ function applyEnglishQuotesRule(text, settings) {
     });
     formattedText =
         protectExistingSecondLevelQuotesInsidePrimaryQuotes(formattedText);
-    replaceAndCount(/(^|[\s([{,.;:!?…—–-])["“„«‚‘]([^"“”„«»‚‘’\n]+)["”“»‘’](?=$|[\s.,;:!?…)\]}—–-])/g, function (_match, prefix, quoteContent) {
+    replaceAndCount(/(^|[\s([{,.;:!?…—–-])["“„«]([^"“”„«»\n]+)["”“»](?=$|[\s.,;:!?…)\]}—–-])/g, function (_match, prefix, quoteContent) {
         return prefix + "“" + quoteContent + "”";
     });
     formattedText = restoreProtectedInnerQuotes(formattedText);
@@ -1168,17 +1189,18 @@ function protectTextFragments(text) {
         });
     }
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
-    protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>'"]+/g);
-    protectByRegexp(/\bwww\.[^\s<>'"]+/gi);
-    protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>'"]+/g);
+    protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
+    protectByRegexp(/\bwww\.[^\s<>]+/gi);
+    protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>]+/g);
     protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
-    protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>'"]*)?/gi);
+    protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>]*)?/gi);
     protectByRegexp(/\b(?:v\d+|\d+)(?:\.\d+){1,}(?:[-+][A-Za-z0-9._-]+)?\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
     protectByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
     protectByRegexp(/\b(?=[A-Za-z0-9/]*[A-Za-z])[A-Za-z0-9]+(?:\/[A-Za-z0-9]+)+\b/g);
     protectByRegexp(/\b\d+\/\d+-[A-Za-z0-9_-]+\b/g);
+    protectByRegexp(/\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g);
     return {
         protectedText,
         fragments,
