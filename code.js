@@ -479,6 +479,24 @@ function applySpecialSymbolsRule(text, settings) {
         replacementCount += 1;
         return normalized;
     });
+    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’])/giu, function (match, prefix, number) {
+        const normalizedNumber = normalizeSignedNumber(number);
+        const normalized = prefix + normalizedNumber + space + "₽";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’])/giu, function (match, prefix, number) {
+        const normalizedNumber = normalizeSignedNumber(number);
+        const normalized = prefix + normalizedNumber + space + "₽";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
     formattedText = formattedText.replace(/<->|<[-–—−]|[-–—−]>/g, function (match) {
         const normalized = match === "<->"
             ? "←→"

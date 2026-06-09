@@ -765,6 +765,36 @@ function applySpecialSymbolsRule(
   );
 
   formattedText = formattedText.replace(
+    /(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’])/giu,
+    function (match: string, prefix: string, number: string) {
+      const normalizedNumber = normalizeSignedNumber(number);
+      const normalized = prefix + normalizedNumber + space + "₽";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’])/giu,
+    function (match: string, prefix: string, number: string) {
+      const normalizedNumber = normalizeSignedNumber(number);
+      const normalized = prefix + normalizedNumber + space + "₽";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
     /<->|<[-–—−]|[-–—−]>/g,
     function (match: string) {
       const normalized =
