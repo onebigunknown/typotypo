@@ -1267,13 +1267,31 @@ function applyEnglishQuotesRule(
 }
 
 function applyNumberRangeDashRule(text: string): RuleResult {
-  const regexp =
+  const timeRangeRegexp =
+    /(^|[^\d:])(\d{1,2}:\d{2})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,2}:\d{2})(?=$|[^\d:])/g;
+
+  const numberRangeRegexp =
     /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
 
+  let formattedText = text;
   let replacementCount = 0;
 
-  const formattedText = text.replace(
-    regexp,
+  formattedText = formattedText.replace(
+    timeRangeRegexp,
+    function (match, prefix, startTime, endTime) {
+      const normalized = prefix + startTime + "–" + endTime;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    numberRangeRegexp,
     function (match, prefix, startNumber, endNumber) {
       const normalized = prefix + startNumber + "–" + endNumber;
 
