@@ -1122,8 +1122,14 @@ function isRuleSupportedForLanguage(rule, language) {
     }
     return rule.supportedLanguages.includes(language);
 }
-const PROTECTED_TEXT_TOKEN_PREFIX = "\uE100TYPO_PROTECTED_";
-const PROTECTED_TEXT_TOKEN_SUFFIX = "\uE101";
+const PROTECTED_TEXT_TOKEN_START = "\uE100";
+const PROTECTED_TEXT_TOKEN_END = "\uE101";
+const PROTECTED_TEXT_TOKEN_CHAR_OFFSET = 0xe200;
+function createProtectedTextToken(index) {
+    return (PROTECTED_TEXT_TOKEN_START +
+        String.fromCharCode(PROTECTED_TEXT_TOKEN_CHAR_OFFSET + index) +
+        PROTECTED_TEXT_TOKEN_END);
+}
 function splitTrailingPunctuation(value) {
     const trailingPunctuationMatch = value.match(/[.,;:!?…]+$/);
     if (!trailingPunctuationMatch) {
@@ -1147,7 +1153,7 @@ function protectTextFragments(text) {
             if (protectedValue.length === 0) {
                 return match;
             }
-            const token = PROTECTED_TEXT_TOKEN_PREFIX + fragments.length + PROTECTED_TEXT_TOKEN_SUFFIX;
+            const token = createProtectedTextToken(fragments.length);
             fragments.push({
                 token,
                 value: protectedValue,
@@ -1160,6 +1166,13 @@ function protectTextFragments(text) {
     protectByRegexp(/\bwww\.[^\s<>'"]+/gi);
     protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>'"]+/g);
     protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
+    protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>'"]*)?/gi);
+    protectByRegexp(/\b(?:v\d+|\d+)(?:\.\d+){1,}(?:[-+][A-Za-z0-9._-]+)?\b/g);
+    protectByRegexp(/\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}\b/g);
+    protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
+    protectByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
+    protectByRegexp(/\b(?=[A-Za-z0-9/]*[A-Za-z])[A-Za-z0-9]+(?:\/[A-Za-z0-9]+)+\b/g);
+    protectByRegexp(/\b\d+\/\d+-[A-Za-z0-9_-]+\b/g);
     return {
         protectedText,
         fragments,
