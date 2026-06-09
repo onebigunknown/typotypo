@@ -667,8 +667,8 @@ function applyNumberSignsRule(
   text: string,
   _settings: ApplySettings
 ): RuleResult {
-  const regularNbsp = " ";
-  const regexp = /([№§])[ 	  ]*(?=\d)/g;
+  const regularNbsp = "\u00A0";
+  const regexp = /([№§])[ \t\u00A0\u202F]*(?=\d)/g;
 
   let replacementCount = 0;
 
@@ -1557,7 +1557,7 @@ function applyRussianShortWordsNbspRule(
   text: string,
   _settings: ApplySettings
 ): RuleResult {
-  const regularNbsp = " ";
+  const regularNbsp = "\u00A0";
 
   let formattedText = text;
   let replacementCount = 0;
@@ -1615,15 +1615,22 @@ function applyRussianShortWordsNbspRule(
     }
   );
 
+
   replaceAndCount(
-    /(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ 	  ]*([еЕкКдДпПчЧнНоО])\./g,
+    /(^|[^А-Яа-яЁёA-Za-z])([дД])\.[ \t\u00A0\u202F]+(?=\d)/g,
+    function (_match, prefix, abbreviation) {
+      return prefix + abbreviation + "." + regularNbsp;
+    }
+  );
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ \t\u00A0\u202F]*([еЕкКдДпПчЧнНоО])\./g,
     function (_match, prefix, firstLetter, secondLetter) {
       return prefix + firstLetter + "." + regularNbsp + secondLetter + ".";
     }
   );
 
   replaceAndCount(
-    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([тТ])\.[ 	  ]*([дДпП])\./g,
+    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ \t\u00A0\u202F]+([тТ])\.[ \t\u00A0\u202F]*([дДпП])\./g,
     function (_match, prefix, conjunction, firstLetter, secondLetter) {
       return (
         prefix +
@@ -1639,14 +1646,14 @@ function applyRussianShortWordsNbspRule(
   );
 
   replaceAndCount(
-    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([дД]р)\./g,
+    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ \t\u00A0\u202F]+([дД]р)\./g,
     function (_match, prefix, conjunction, abbreviation) {
       return prefix + conjunction + regularNbsp + abbreviation + ".";
     }
   );
 
   replaceAndCount(
-    /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ 	  ]+(?=[А-Яа-яЁё])/g,
+    /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=[А-Яа-яЁё])/g,
     function (_match, prefix, number) {
       return prefix + number + regularNbsp;
     }
@@ -1686,12 +1693,12 @@ function applyRussianInitialsNbspRule(
   text: string,
   _settings: ApplySettings
 ): RuleResult {
-  const space = " ";
+  const space = "\u00A0";
   let formattedText = text;
   let replacementCount = 0;
 
   formattedText = formattedText.replace(
-    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]*([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
     function (match, prefix, firstInitial, secondInitial, surname) {
       const normalized =
         prefix +
@@ -1713,7 +1720,7 @@ function applyRussianInitialsNbspRule(
   );
 
   formattedText = formattedText.replace(
-    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
     function (match, prefix, initial, surname) {
       const normalized = prefix + initial + "." + space + surname;
 

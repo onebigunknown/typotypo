@@ -412,8 +412,8 @@ function applyNumberUnitsNbspRule(text, settings) {
     };
 }
 function applyNumberSignsRule(text, _settings) {
-    const regularNbsp = " ";
-    const regexp = /([№§])[ 	  ]*(?=\d)/g;
+    const regularNbsp = "\u00A0";
+    const regexp = /([№§])[ \t\u00A0\u202F]*(?=\d)/g;
     let replacementCount = 0;
     const formattedText = text.replace(regexp, function (match, sign) {
         const normalized = sign + regularNbsp;
@@ -887,7 +887,7 @@ function applyRussianSentenceDashRule(text) {
     };
 }
 function applyRussianShortWordsNbspRule(text, _settings) {
-    const regularNbsp = " ";
+    const regularNbsp = "\u00A0";
     let formattedText = text;
     let replacementCount = 0;
     function replaceAndCount(regexp, replacer) {
@@ -916,10 +916,13 @@ function applyRussianShortWordsNbspRule(text, _settings) {
         ")\.[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9№§])", "giu"), function (_match, prefix, abbreviation) {
         return prefix + abbreviation + "." + regularNbsp;
     });
-    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ 	  ]*([еЕкКдДпПчЧнНоО])\./g, function (_match, prefix, firstLetter, secondLetter) {
+    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([дД])\.[ \t\u00A0\u202F]+(?=\d)/g, function (_match, prefix, abbreviation) {
+        return prefix + abbreviation + "." + regularNbsp;
+    });
+    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ \t\u00A0\u202F]*([еЕкКдДпПчЧнНоО])\./g, function (_match, prefix, firstLetter, secondLetter) {
         return prefix + firstLetter + "." + regularNbsp + secondLetter + ".";
     });
-    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([тТ])\.[ 	  ]*([дДпП])\./g, function (_match, prefix, conjunction, firstLetter, secondLetter) {
+    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([иИ])[ \t\u00A0\u202F]+([тТ])\.[ \t\u00A0\u202F]*([дДпП])\./g, function (_match, prefix, conjunction, firstLetter, secondLetter) {
         return (prefix +
             conjunction +
             regularNbsp +
@@ -929,10 +932,10 @@ function applyRussianShortWordsNbspRule(text, _settings) {
             secondLetter +
             ".");
     });
-    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([дД]р)\./g, function (_match, prefix, conjunction, abbreviation) {
+    replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([иИ])[ \t\u00A0\u202F]+([дД]р)\./g, function (_match, prefix, conjunction, abbreviation) {
         return prefix + conjunction + regularNbsp + abbreviation + ".";
     });
-    replaceAndCount(/(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ 	  ]+(?=[А-Яа-яЁё])/g, function (_match, prefix, number) {
+    replaceAndCount(/(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=[А-Яа-яЁё])/g, function (_match, prefix, number) {
         return prefix + number + regularNbsp;
     });
     replaceAndCount(new RegExp("([А-Яа-яЁёA-Za-z0-9»”’)])([ \t\u00A0\u202F]+)(" +
@@ -951,10 +954,10 @@ function applyRussianShortWordsNbspRule(text, _settings) {
     };
 }
 function applyRussianInitialsNbspRule(text, _settings) {
-    const space = " ";
+    const space = "\u00A0";
     let formattedText = text;
     let replacementCount = 0;
-    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]*([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, firstInitial, secondInitial, surname) {
+    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, firstInitial, secondInitial, surname) {
         const normalized = prefix +
             firstInitial +
             "." +
@@ -969,7 +972,7 @@ function applyRussianInitialsNbspRule(text, _settings) {
         replacementCount += 1;
         return normalized;
     });
-    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, initial, surname) {
+    formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g, function (match, prefix, initial, surname) {
         const normalized = prefix + initial + "." + space + surname;
         if (match === normalized) {
             return match;
