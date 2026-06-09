@@ -720,19 +720,36 @@ function applySpecialSymbolsRule(
   replaceAndCount(/\([cс]\)/giu, "©");
   replaceAndCount(/\((tm|тм)\)/giu, "™");
   replaceAndCount(/\([rр]\)/giu, "®");
+  replaceAndCount(/\+\/-/g, "±");
   replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
   replaceAndCount(/<=/g, "≤");
   replaceAndCount(/>=/g, "≥");
+  formattedText = formattedText.replace(
+    /(\S)[ \t\u00A0\u202F]*!=[ \t\u00A0\u202F]*(?=\S)/g,
+    function (match: string, leftCharacter: string) {
+      const normalized = leftCharacter + " ≠ ";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  replaceAndCount(/!=/g, "≠");
+  replaceAndCount(/~=|≈=/g, "≈");
 
   formattedText = formattedText.replace(
     /<->|<[-–—−]|[-–—−]>/g,
     function (match: string) {
       const normalized =
         match === "<->"
-          ? "↔︎"
+          ? "←→"
           : match.startsWith("<")
-            ? "←︎"
-            : "→︎";
+            ? "←"
+            : "→";
 
       if (match === normalized) {
         return match;
