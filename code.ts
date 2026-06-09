@@ -665,17 +665,17 @@ function applyNumberUnitsNbspRule(
 
 function applyNumberSignsRule(
   text: string,
-  settings: ApplySettings
+  _settings: ApplySettings
 ): RuleResult {
-  const space = getConfiguredNbsp(settings);
-  const regexp = /([№§])[ \t\u00A0\u202F]*(?=\d)/g;
+  const regularNbsp = " ";
+  const regexp = /([№§])[ 	  ]*(?=\d)/g;
 
   let replacementCount = 0;
 
   const formattedText = text.replace(
     regexp,
     function (match: string, sign: string) {
-      const normalized = sign + space;
+      const normalized = sign + regularNbsp;
 
       if (match === normalized) {
         return match;
@@ -1555,10 +1555,9 @@ function applyRussianSentenceDashRule(text: string): RuleResult {
 
 function applyRussianShortWordsNbspRule(
   text: string,
-  settings: ApplySettings
+  _settings: ApplySettings
 ): RuleResult {
-  const regularNbsp = "\u00A0";
-  const abbreviationSpace = getConfiguredNbsp(settings);
+  const regularNbsp = " ";
 
   let formattedText = text;
   let replacementCount = 0;
@@ -1582,13 +1581,21 @@ function applyRussianShortWordsNbspRule(
   }
 
   const shortWords =
-    "а|в|во|и|к|ко|о|об|от|по|с|со|у|до|за|из|на|не|ни|но";
+    "а|б|без|безо|бы|в|во|вне|вот|всё|где|да|даже|для|до|если|есть|ещё|же|за|и|из|изо|из-за|из-под|или|иль|к|ко|как|ли|ль|либо|между|на|над|надо|не|ни|но|о|об|обо|около|оно|от|перед|по|по-за|по-над|под|подо|после|при|про|ради|с|со|сквозь|так|также|там|тем|то|тогда|того|тоже|у|хоть|хотя|чего|через|что|чтобы|это";
+
+  const trailingShortWords =
+    "в|во|к|ко|о|об|обо|от|по|с|со|у|до|за|из|на|над|под|при|про|для";
+
+  const particles = "б|бы|ж|же|ли|ль";
+
+  const addressAbbreviations =
+    "г|обл|кр|ст|пос|с|ул|пер|пр|пр-т|просп|пл|бул|б-р|наб|ш|туп|оф|кв|комн|под|мкр|уч|вл|влад|стр|корп|литер|эт|пт|гл|рис|илл";
 
   replaceAndCount(
     new RegExp(
-      "(^|[ \\t\\u00A0\\u202F(«„“])(" +
+      "(^|[ \t\u00A0\u202F(«„“])(" +
         shortWords +
-        ")[ \\t\\u00A0\\u202F]+(?=[А-Яа-яЁёA-Za-z0-9])",
+        ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9])",
       "giu"
     ),
     function (_match, prefix, word) {
@@ -1597,9 +1604,75 @@ function applyRussianShortWordsNbspRule(
   );
 
   replaceAndCount(
-    /(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ \t\u00A0\u202F]*([еЕкКдДпПчЧнНоО])\./g,
+    new RegExp(
+      "(^|[^А-Яа-яЁёA-Za-z])(" +
+        addressAbbreviations +
+        ")\.[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9№§])",
+      "giu"
+    ),
+    function (_match, prefix, abbreviation) {
+      return prefix + abbreviation + "." + regularNbsp;
+    }
+  );
+
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([тТ])\.[ 	  ]*([еЕкКдДпПчЧнНоО])\./g,
     function (_match, prefix, firstLetter, secondLetter) {
-      return prefix + firstLetter + "." + abbreviationSpace + secondLetter + ".";
+      return prefix + firstLetter + "." + regularNbsp + secondLetter + ".";
+    }
+  );
+
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([тТ])\.[ 	  ]*([дДпП])\./g,
+    function (_match, prefix, conjunction, firstLetter, secondLetter) {
+      return (
+        prefix +
+        conjunction +
+        regularNbsp +
+        firstLetter +
+        "." +
+        regularNbsp +
+        secondLetter +
+        "."
+      );
+    }
+  );
+
+  replaceAndCount(
+    /(^|[^А-Яа-яЁёA-Za-z])([иИ])[ 	  ]+([дД]р)\./g,
+    function (_match, prefix, conjunction, abbreviation) {
+      return prefix + conjunction + regularNbsp + abbreviation + ".";
+    }
+  );
+
+  replaceAndCount(
+    /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ 	  ]+(?=[А-Яа-яЁё])/g,
+    function (_match, prefix, number) {
+      return prefix + number + regularNbsp;
+    }
+  );
+
+  replaceAndCount(
+    new RegExp(
+      "([А-Яа-яЁёA-Za-z0-9»”’)])([ \t\u00A0\u202F]+)(" +
+        particles +
+        ")(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)])",
+      "giu"
+    ),
+    function (_match, previousCharacter, _space, particle) {
+      return previousCharacter + regularNbsp + particle;
+    }
+  );
+
+  replaceAndCount(
+    new RegExp(
+      "([А-Яа-яЁёA-Za-z0-9»”’)])([ \t\u00A0\u202F]+)(" +
+        trailingShortWords +
+        ")(?=$|[\n\r,.;:!?…»”’)])",
+      "giu"
+    ),
+    function (_match, previousCharacter, _space, word) {
+      return previousCharacter + regularNbsp + word;
     }
   );
 
@@ -1611,14 +1684,14 @@ function applyRussianShortWordsNbspRule(
 
 function applyRussianInitialsNbspRule(
   text: string,
-  settings: ApplySettings
+  _settings: ApplySettings
 ): RuleResult {
-  const space = getConfiguredNbsp(settings);
+  const space = " ";
   let formattedText = text;
   let replacementCount = 0;
 
   formattedText = formattedText.replace(
-    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]*([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
     function (match, prefix, firstInitial, secondInitial, surname) {
       const normalized =
         prefix +
@@ -1640,7 +1713,7 @@ function applyRussianInitialsNbspRule(
   );
 
   formattedText = formattedText.replace(
-    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ \t\u00A0\u202F]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
+    /(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z])\.[ 	  ]+([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)/g,
     function (match, prefix, initial, surname) {
       const normalized = prefix + initial + "." + space + surname;
 
