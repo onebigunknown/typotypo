@@ -634,7 +634,7 @@ function applyNumberUnitsNbspRule(
   settings: ApplySettings
 ): RuleResult {
   const units =
-    "₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
+    "°[CFС]|₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
 
   const regexp = new RegExp(
     "(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
@@ -692,9 +692,13 @@ function applyNumberSignsRule(
   };
 }
 
-function applySpecialSymbolsRule(text: string): RuleResult {
+function applySpecialSymbolsRule(
+  text: string,
+  settings: ApplySettings
+): RuleResult {
   let formattedText = text;
   let replacementCount = 0;
+  const space = getConfiguredNbsp(settings);
 
   function replaceAndCount(regexp: RegExp, replacement: string) {
     formattedText = formattedText.replace(regexp, function (match) {
@@ -707,12 +711,98 @@ function applySpecialSymbolsRule(text: string): RuleResult {
     });
   }
 
+  function normalizeSignedNumber(number: string): string {
+    return number
+      .replace(/^([+−–—-])[ \t\u00A0\u202F]+(?=\d)/, "$1")
+      .replace(/^[-–—−]/, "−");
+  }
+
   replaceAndCount(/\([cс]\)/giu, "©");
   replaceAndCount(/\((tm|тм)\)/giu, "™");
   replaceAndCount(/\([rр]\)/giu, "®");
   replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
   replaceAndCount(/<=/g, "≤");
   replaceAndCount(/>=/g, "≥");
+
+  formattedText = formattedText.replace(
+    /<->|<[-–—−]|[-–—−]>/g,
+    function (match: string) {
+      const normalized =
+        match === "<->"
+          ? "↔︎"
+          : match.startsWith("<")
+            ? "←︎"
+            : "→︎";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[ \t\u00A0\u202F([{])[-–—−][ \t\u00A0\u202F]*(?=\d)/g,
+    function (
+      match: string,
+      prefix: string,
+      offset: number,
+      fullText: string
+    ) {
+      const dashIndex = offset + prefix.length;
+
+      const previousNonSpaceCharacter = fullText
+        .slice(0, dashIndex)
+        .replace(/[ \t\u00A0\u202F]+$/g, "")
+        .slice(-1);
+
+      if (/\d/.test(previousNonSpaceCharacter)) {
+        return match;
+      }
+
+      const normalized = prefix + "−";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g,
+    function (match: string, prefix: string, number: string, unit: string) {
+      const normalizedUnit = unit === "F" ? "°F" : "°C";
+      const normalizedNumber = normalizeSignedNumber(number);
+      const normalized = prefix + normalizedNumber + space + normalizedUnit;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi,
+    function (match: string, prefix: string, number: string) {
+      const normalizedNumber = normalizeSignedNumber(number);
+      const normalized = prefix + normalizedNumber + "°";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
 
   formattedText = formattedText.replace(
     /(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*[xXхХ][ \t\u00A0\u202F]*(\d+(?:[,.]\d+)?)/g,
@@ -1312,7 +1402,7 @@ function applyNumberRangeDashRule(text: string): RuleResult {
 
 function applyRussianSentenceDashRule(text: string): RuleResult {
   const regexp =
-    /([А-Яа-яЁёA-Za-z0-9»”’")\]\.!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"(\[])/g;
+    /([А-Яа-яЁёA-Za-z0-9»”’")\].!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"([])/g;
 
   let replacementCount = 0;
 
@@ -1917,7 +2007,7 @@ function applyStyleToRange(
 
   if (style.fills !== figma.mixed) {
     applySafely("fills", () => {
-      node.setRangeFills(start, end, style.fills as readonly Paint[]);
+      node.setRangeFills(start, end, style.fills as Paint[]);
     });
   }
 

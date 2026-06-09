@@ -392,7 +392,7 @@ function applyPercentSignNoSpaceRule(text) {
     };
 }
 function applyNumberUnitsNbspRule(text, settings) {
-    const units = "₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
+    const units = "°[CFС]|₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
     const regexp = new RegExp("(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
         units +
         ")(?=$|[ \\t\\n\\r,.;:!?\\)])", "giu");
@@ -428,9 +428,10 @@ function applyNumberSignsRule(text, settings) {
         replacementCount,
     };
 }
-function applySpecialSymbolsRule(text) {
+function applySpecialSymbolsRule(text, settings) {
     let formattedText = text;
     let replacementCount = 0;
+    const space = getConfiguredNbsp(settings);
     function replaceAndCount(regexp, replacement) {
         formattedText = formattedText.replace(regexp, function (match) {
             if (match === replacement) {
@@ -440,12 +441,64 @@ function applySpecialSymbolsRule(text) {
             return replacement;
         });
     }
+    function normalizeSignedNumber(number) {
+        return number
+            .replace(/^([+−–—-])[ \t\u00A0\u202F]+(?=\d)/, "$1")
+            .replace(/^[-–—−]/, "−");
+    }
     replaceAndCount(/\([cс]\)/giu, "©");
     replaceAndCount(/\((tm|тм)\)/giu, "™");
     replaceAndCount(/\([rр]\)/giu, "®");
     replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
     replaceAndCount(/<=/g, "≤");
     replaceAndCount(/>=/g, "≥");
+    formattedText = formattedText.replace(/<->|<[-–—−]|[-–—−]>/g, function (match) {
+        const normalized = match === "<->"
+            ? "↔︎"
+            : match.startsWith("<")
+                ? "←︎"
+                : "→︎";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{])[-–—−][ \t\u00A0\u202F]*(?=\d)/g, function (match, prefix, offset, fullText) {
+        const dashIndex = offset + prefix.length;
+        const previousNonSpaceCharacter = fullText
+            .slice(0, dashIndex)
+            .replace(/[ \t\u00A0\u202F]+$/g, "")
+            .slice(-1);
+        if (/\d/.test(previousNonSpaceCharacter)) {
+            return match;
+        }
+        const normalized = prefix + "−";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g, function (match, prefix, number, unit) {
+        const normalizedUnit = unit === "F" ? "°F" : "°C";
+        const normalizedNumber = normalizeSignedNumber(number);
+        const normalized = prefix + normalizedNumber + space + normalizedUnit;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi, function (match, prefix, number) {
+        const normalizedNumber = normalizeSignedNumber(number);
+        const normalized = prefix + normalizedNumber + "°";
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
     formattedText = formattedText.replace(/(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*[xXхХ][ \t\u00A0\u202F]*(\d+(?:[,.]\d+)?)/g, function (match, leftNumber, rightNumber) {
         const normalized = leftNumber + "×" + rightNumber;
         if (match === normalized) {
@@ -742,7 +795,7 @@ function applyNumberRangeDashRule(text) {
     };
 }
 function applyRussianSentenceDashRule(text) {
-    const regexp = /([А-Яа-яЁёA-Za-z0-9»”’")\]\.!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"(\[])/g;
+    const regexp = /([А-Яа-яЁёA-Za-z0-9»”’")\].!?…])([ \t\u00A0\u202F]+)[-–—−]([ \t\u00A0\u202F]+)([А-Яа-яЁёA-Za-z0-9«„“"([])/g;
     let replacementCount = 0;
     const formattedText = text.replace(regexp, function (match, leftChar, _leftSpace, _rightSpace, rightChar) {
         const isNumberRange = /\d/.test(leftChar) && /\d/.test(rightChar);
