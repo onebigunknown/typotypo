@@ -1819,12 +1819,97 @@ function isRuleSupportedForLanguage(
   return rule.supportedLanguages.includes(language);
 }
 
+
+type ProtectedTextFragment = {
+  token: string;
+  value: string;
+};
+
+const PROTECTED_TEXT_TOKEN_PREFIX = "\uE100TYPO_PROTECTED_";
+const PROTECTED_TEXT_TOKEN_SUFFIX = "\uE101";
+
+function splitTrailingPunctuation(value: string): {
+  protectedValue: string;
+  trailingPunctuation: string;
+} {
+  const trailingPunctuationMatch = value.match(/[.,;:!?…]+$/);
+
+  if (!trailingPunctuationMatch) {
+    return {
+      protectedValue: value,
+      trailingPunctuation: "",
+    };
+  }
+
+  const trailingPunctuation = trailingPunctuationMatch[0];
+
+  return {
+    protectedValue: value.slice(0, value.length - trailingPunctuation.length),
+    trailingPunctuation,
+  };
+}
+
+function protectTextFragments(text: string): {
+  protectedText: string;
+  fragments: ProtectedTextFragment[];
+} {
+  const fragments: ProtectedTextFragment[] = [];
+  let protectedText = text;
+
+  function protectByRegexp(regexp: RegExp) {
+    protectedText = protectedText.replace(regexp, function (match: string) {
+      const { protectedValue, trailingPunctuation } =
+        splitTrailingPunctuation(match);
+
+      if (protectedValue.length === 0) {
+        return match;
+      }
+
+      const token =
+        PROTECTED_TEXT_TOKEN_PREFIX + fragments.length + PROTECTED_TEXT_TOKEN_SUFFIX;
+
+      fragments.push({
+        token,
+        value: protectedValue,
+      });
+
+      return token + trailingPunctuation;
+    });
+  }
+
+  protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
+  protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>'"]+/g);
+  protectByRegexp(/\bwww\.[^\s<>'"]+/gi);
+  protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>'"]+/g);
+  protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
+
+  return {
+    protectedText,
+    fragments,
+  };
+}
+
+function restoreProtectedTextFragments(
+  text: string,
+  fragments: ProtectedTextFragment[]
+): string {
+  let restoredText = text;
+
+  for (const fragment of fragments) {
+    restoredText = restoredText.split(fragment.token).join(fragment.value);
+  }
+
+  return restoredText;
+}
+
 function applyRulesToText(
   text: string,
   settings: ApplySettings,
   language: LanguageCode
 ): RuleResult & { skippedRuleCount: number } {
-  let formattedText = text;
+  const { protectedText, fragments } = protectTextFragments(text);
+
+  let formattedText = protectedText;
   let replacementCount = 0;
   let skippedRuleCount = 0;
 
@@ -1845,7 +1930,7 @@ function applyRulesToText(
   }
 
   return {
-    formattedText,
+    formattedText: restoreProtectedTextFragments(formattedText, fragments),
     replacementCount,
     skippedRuleCount,
   };

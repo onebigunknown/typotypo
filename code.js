@@ -1088,8 +1088,59 @@ function isRuleSupportedForLanguage(rule, language) {
     }
     return rule.supportedLanguages.includes(language);
 }
+const PROTECTED_TEXT_TOKEN_PREFIX = "\uE100TYPO_PROTECTED_";
+const PROTECTED_TEXT_TOKEN_SUFFIX = "\uE101";
+function splitTrailingPunctuation(value) {
+    const trailingPunctuationMatch = value.match(/[.,;:!?…]+$/);
+    if (!trailingPunctuationMatch) {
+        return {
+            protectedValue: value,
+            trailingPunctuation: "",
+        };
+    }
+    const trailingPunctuation = trailingPunctuationMatch[0];
+    return {
+        protectedValue: value.slice(0, value.length - trailingPunctuation.length),
+        trailingPunctuation,
+    };
+}
+function protectTextFragments(text) {
+    const fragments = [];
+    let protectedText = text;
+    function protectByRegexp(regexp) {
+        protectedText = protectedText.replace(regexp, function (match) {
+            const { protectedValue, trailingPunctuation } = splitTrailingPunctuation(match);
+            if (protectedValue.length === 0) {
+                return match;
+            }
+            const token = PROTECTED_TEXT_TOKEN_PREFIX + fragments.length + PROTECTED_TEXT_TOKEN_SUFFIX;
+            fragments.push({
+                token,
+                value: protectedValue,
+            });
+            return token + trailingPunctuation;
+        });
+    }
+    protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
+    protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>'"]+/g);
+    protectByRegexp(/\bwww\.[^\s<>'"]+/gi);
+    protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>'"]+/g);
+    protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
+    return {
+        protectedText,
+        fragments,
+    };
+}
+function restoreProtectedTextFragments(text, fragments) {
+    let restoredText = text;
+    for (const fragment of fragments) {
+        restoredText = restoredText.split(fragment.token).join(fragment.value);
+    }
+    return restoredText;
+}
 function applyRulesToText(text, settings, language) {
-    let formattedText = text;
+    const { protectedText, fragments } = protectTextFragments(text);
+    let formattedText = protectedText;
     let replacementCount = 0;
     let skippedRuleCount = 0;
     for (const rule of TYPOGRAPHY_RULES) {
@@ -1105,7 +1156,7 @@ function applyRulesToText(text, settings, language) {
         replacementCount += result.replacementCount;
     }
     return {
-        formattedText,
+        formattedText: restoreProtectedTextFragments(formattedText, fragments),
         replacementCount,
         skippedRuleCount,
     };
