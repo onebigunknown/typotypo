@@ -385,7 +385,7 @@ function applySpacesBeforePunctuationRule(text) {
     };
 }
 function applyPercentSignNoSpaceRule(text) {
-    const regexp = /(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]+%/g;
+    const regexp = /((?:\d+(?:[,.]\d+)?)|(?:\uE100[\uE200-\uF8FF]\uE101))[ \t\u00A0\u202F]+%/g;
     const matches = text.match(regexp);
     return {
         formattedText: text.replace(regexp, "$1%"),
@@ -559,7 +559,7 @@ function applySpecialSymbolsRule(text, settings) {
     };
 }
 function shouldKeepRussianFinalPeriod(textEndingWithPeriod) {
-    const protectedAbbreviations = /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
+    const protectedAbbreviations = /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|р\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
     return protectedAbbreviations.test(textEndingWithPeriod);
 }
 function shouldKeepEnglishFinalPeriod(textEndingWithPeriod) {
@@ -907,7 +907,7 @@ function applyRussianShortWordsNbspRule(text, _settings) {
     const addressAbbreviations = "г|обл|кр|ст|пос|с|ул|пер|пр|пр-т|просп|пл|бул|б-р|наб|ш|туп|оф|кв|комн|под|мкр|уч|вл|влад|стр|корп|литер|эт|пт|гл|рис|илл";
     replaceAndCount(new RegExp("(^|[ \t\u00A0\u202F(«„“])(" +
         shortWords +
-        ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9])", "giu"), function (_match, prefix, word) {
+        ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9\uE100])", "giu"), function (_match, prefix, word) {
         return prefix + word + regularNbsp;
     });
     replaceAndCount(new RegExp("(^|[^А-Яа-яЁёA-Za-z])(" +
@@ -1209,21 +1209,60 @@ function splitTrailingPunctuation(value) {
 function protectTextFragments(text) {
     const fragments = [];
     let protectedText = text;
+    function protectValue(value, trailingPunctuation = "") {
+        if (value.length === 0) {
+            return value + trailingPunctuation;
+        }
+        const token = createProtectedTextToken(fragments.length);
+        fragments.push({
+            token,
+            value,
+        });
+        return token + trailingPunctuation;
+    }
     function protectByRegexp(regexp) {
         protectedText = protectedText.replace(regexp, function (match) {
             const { protectedValue, trailingPunctuation } = splitTrailingPunctuation(match);
-            if (protectedValue.length === 0) {
-                return match;
-            }
-            const token = createProtectedTextToken(fragments.length);
-            fragments.push({
-                token,
-                value: protectedValue,
-            });
-            return token + trailingPunctuation;
+            return protectValue(protectedValue, trailingPunctuation);
         });
     }
+    function protectCurlyBracePlaceholders() {
+        let result = "";
+        let lastIndex = 0;
+        let depth = 0;
+        let placeholderStart = -1;
+        for (let index = 0; index < protectedText.length; index += 1) {
+            const character = protectedText[index];
+            if (character === "{") {
+                if (depth === 0) {
+                    placeholderStart =
+                        index > lastIndex && protectedText[index - 1] === "$"
+                            ? index - 1
+                            : index;
+                }
+                depth += 1;
+            }
+            else if (character === "}" && depth > 0) {
+                depth -= 1;
+                if (depth === 0 && placeholderStart >= 0) {
+                    const placeholderEnd = index + 1;
+                    const placeholder = protectedText.slice(placeholderStart, placeholderEnd);
+                    result += protectedText.slice(lastIndex, placeholderStart);
+                    result += protectValue(placeholder);
+                    lastIndex = placeholderEnd;
+                    placeholderStart = -1;
+                }
+            }
+        }
+        if (lastIndex === 0) {
+            return;
+        }
+        protectedText = result + protectedText.slice(lastIndex);
+    }
     protectByRegexp(/`[^`\n]+`/g);
+    protectCurlyBracePlaceholders();
+    protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
+    protectByRegexp(/\$\d+\b/g);
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
     protectByRegexp(/\bwww\.[^\s<>]+/gi);
