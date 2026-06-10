@@ -276,9 +276,18 @@ function findTextNodesInSelection() {
     }
     return textNodes;
 }
+function getTextForLanguageDetection(text) {
+    return text
+        .replace(/`[^`\n]+`/g, " ")
+        .replace(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g, " ")
+        .replace(/\$?\{[^{}\n]*\}/g, " ")
+        .replace(/%(?:\d+\$)?[@sdif]/g, " ")
+        .replace(/\$\d+\b/g, " ");
+}
 function detectDominantLanguage(text) {
-    const cyrillicMatches = text.match(/[А-Яа-яЁё]/g) || [];
-    const latinMatches = text.match(/[A-Za-z]/g) || [];
+    const languageDetectionText = getTextForLanguageDetection(text);
+    const cyrillicMatches = languageDetectionText.match(/[А-Яа-яЁё]/g) || [];
+    const latinMatches = languageDetectionText.match(/[A-Za-z]/g) || [];
     const cyrillicCount = cyrillicMatches.length;
     const latinCount = latinMatches.length;
     const totalLetterCount = cyrillicCount + latinCount;
@@ -471,7 +480,7 @@ function applySpecialSymbolsRule(text, settings) {
         "1/4": "¼",
         "3/4": "¾",
     };
-    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’])/g, function (match, prefix, fraction) {
+    formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’\uE100])/g, function (match, prefix, fraction) {
         const replacement = fractionReplacements[fraction];
         const normalized = prefix + replacement;
         if (match === normalized) {
@@ -480,7 +489,16 @@ function applySpecialSymbolsRule(text, settings) {
         replacementCount += 1;
         return normalized;
     });
-    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’])/giu, function (match, prefix, number) {
+    formattedText = formattedText.replace(/(\uE101)(1\/2|1\/3|2\/3|1\/4|3\/4)(?=\uE100)/g, function (match, prefix, fraction) {
+        const replacement = fractionReplacements[fraction];
+        const normalized = prefix + replacement;
+        if (match === normalized) {
+            return match;
+        }
+        replacementCount += 1;
+        return normalized;
+    });
+    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’\uE100])/giu, function (match, prefix, number) {
         const normalizedNumber = normalizeSignedNumber(number);
         const normalized = prefix + normalizedNumber + space + "₽";
         if (match === normalized) {
@@ -489,7 +507,7 @@ function applySpecialSymbolsRule(text, settings) {
         replacementCount += 1;
         return normalized;
     });
-    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’])/giu, function (match, prefix, number) {
+    formattedText = formattedText.replace(/(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’\uE100])/giu, function (match, prefix, number) {
         const normalizedNumber = normalizeSignedNumber(number);
         const normalized = prefix + normalizedNumber + space + "₽";
         if (match === normalized) {
@@ -1226,6 +1244,9 @@ function protectTextFragments(text) {
             return protectValue(protectedValue, trailingPunctuation);
         });
     }
+    function protectHtmlLikeTags() {
+        protectByRegexp(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g);
+    }
     function protectCurlyBracePlaceholders() {
         let result = "";
         let lastIndex = 0;
@@ -1260,6 +1281,7 @@ function protectTextFragments(text) {
         protectedText = result + protectedText.slice(lastIndex);
     }
     protectByRegexp(/`[^`\n]+`/g);
+    protectHtmlLikeTags();
     protectCurlyBracePlaceholders();
     protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
     protectByRegexp(/\$\d+\b/g);

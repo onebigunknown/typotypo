@@ -476,9 +476,19 @@ function findTextNodesInSelection(): TextNode[] {
   return textNodes;
 }
 
+function getTextForLanguageDetection(text: string): string {
+  return text
+    .replace(/`[^`\n]+`/g, " ")
+    .replace(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g, " ")
+    .replace(/\$?\{[^{}\n]*\}/g, " ")
+    .replace(/%(?:\d+\$)?[@sdif]/g, " ")
+    .replace(/\$\d+\b/g, " ");
+}
+
 function detectDominantLanguage(text: string): LanguageCode {
-  const cyrillicMatches = text.match(/[А-Яа-яЁё]/g) || [];
-  const latinMatches = text.match(/[A-Za-z]/g) || [];
+  const languageDetectionText = getTextForLanguageDetection(text);
+  const cyrillicMatches = languageDetectionText.match(/[А-Яа-яЁё]/g) || [];
+  const latinMatches = languageDetectionText.match(/[A-Za-z]/g) || [];
 
   const cyrillicCount = cyrillicMatches.length;
   const latinCount = latinMatches.length;
@@ -751,7 +761,7 @@ function applySpecialSymbolsRule(
   };
 
   formattedText = formattedText.replace(
-    /(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’])/g,
+    /(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’\uE100])/g,
     function (match: string, prefix: string, fraction: string) {
       const replacement = fractionReplacements[fraction];
       const normalized = prefix + replacement;
@@ -766,7 +776,22 @@ function applySpecialSymbolsRule(
   );
 
   formattedText = formattedText.replace(
-    /(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’])/giu,
+    /(\uE101)(1\/2|1\/3|2\/3|1\/4|3\/4)(?=\uE100)/g,
+    function (match: string, prefix: string, fraction: string) {
+      const replacement = fractionReplacements[fraction];
+      const normalized = prefix + replacement;
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’\uE100])/giu,
     function (match: string, prefix: string, number: string) {
       const normalizedNumber = normalizeSignedNumber(number);
       const normalized = prefix + normalizedNumber + space + "₽";
@@ -781,7 +806,7 @@ function applySpecialSymbolsRule(
   );
 
   formattedText = formattedText.replace(
-    /(^|[ \t\u00A0\u202F([{«„“"'])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’])/giu,
+    /(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’\uE100])/giu,
     function (match: string, prefix: string, number: string) {
       const normalizedNumber = normalizeSignedNumber(number);
       const normalized = prefix + normalizedNumber + space + "₽";
@@ -2078,6 +2103,12 @@ function protectTextFragments(text: string): {
     });
   }
 
+  function protectHtmlLikeTags() {
+    protectByRegexp(
+      /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g
+    );
+  }
+
   function protectCurlyBracePlaceholders() {
     let result = "";
     let lastIndex = 0;
@@ -2122,6 +2153,7 @@ function protectTextFragments(text: string): {
   }
 
   protectByRegexp(/`[^`\n]+`/g);
+  protectHtmlLikeTags();
   protectCurlyBracePlaceholders();
   protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
   protectByRegexp(/\$\d+\b/g);
