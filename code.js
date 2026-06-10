@@ -354,9 +354,10 @@ function applyManualLineBreaksRule(text) {
     };
 }
 function applyEllipsisRule(text) {
-    const matches = text.match(/\.{3}/g);
+    const regexp = /\.{3,}/g;
+    const matches = text.match(regexp);
     return {
-        formattedText: text.replace(/\.{3}/g, "…"),
+        formattedText: text.replace(regexp, "…"),
         replacementCount: matches ? matches.length : 0,
     };
 }
@@ -568,13 +569,11 @@ function shouldKeepEnglishFinalPeriod(textEndingWithPeriod) {
         protectedTechnicalEnding.test(textEndingWithPeriod));
 }
 function shouldKeepFinalPeriod(textEndingWithPeriod, language) {
-    if (language === "ru") {
-        return shouldKeepRussianFinalPeriod(textEndingWithPeriod);
+    if (language === "unknown") {
+        return true;
     }
-    if (language === "en") {
-        return shouldKeepEnglishFinalPeriod(textEndingWithPeriod);
-    }
-    return true;
+    return (shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
+        shouldKeepEnglishFinalPeriod(textEndingWithPeriod));
 }
 function applyEnglishApostrophesRule(text) {
     let formattedText = text;
@@ -1034,42 +1033,42 @@ function applyRussianLargeNumbersRule(text, settings) {
     };
 }
 function applyUiFinalPeriodRule(text, _settings, language) {
-    const trailingWhitespaceMatch = text.match(/[ \t\r\n\u00A0\u202F]*$/);
-    const trailingWhitespace = trailingWhitespaceMatch
-        ? trailingWhitespaceMatch[0]
-        : "";
-    const textWithoutTrailingWhitespace = text.slice(0, text.length - trailingWhitespace.length);
-    const closingQuoteCharacters = "»”\"’“‘";
-    const lastCharacter = textWithoutTrailingWhitespace.slice(-1);
-    const beforeLastCharacter = textWithoutTrailingWhitespace.slice(0, -1);
-    if (closingQuoteCharacters.includes(lastCharacter) &&
-        beforeLastCharacter.endsWith(".")) {
-        if (shouldKeepFinalPeriod(beforeLastCharacter, language)) {
-            return {
-                formattedText: text,
-                replacementCount: 0,
-            };
+    let replacementCount = 0;
+    function normalizeLine(line) {
+        const trailingWhitespaceMatch = line.match(/[ \t\u00A0\u202F]*$/);
+        const trailingWhitespace = trailingWhitespaceMatch
+            ? trailingWhitespaceMatch[0]
+            : "";
+        const lineWithoutTrailingWhitespace = line.slice(0, line.length - trailingWhitespace.length);
+        const closingCharacters = "»”\"’“‘)]}";
+        const lastCharacter = lineWithoutTrailingWhitespace.slice(-1);
+        const beforeLastCharacter = lineWithoutTrailingWhitespace.slice(0, -1);
+        if (closingCharacters.includes(lastCharacter) &&
+            beforeLastCharacter.endsWith(".")) {
+            if (shouldKeepFinalPeriod(beforeLastCharacter, language)) {
+                return line;
+            }
+            replacementCount += 1;
+            return beforeLastCharacter.slice(0, -1) + lastCharacter + trailingWhitespace;
         }
-        return {
-            formattedText: beforeLastCharacter.slice(0, -1) + lastCharacter + trailingWhitespace,
-            replacementCount: 1,
-        };
+        if (!lineWithoutTrailingWhitespace.endsWith(".")) {
+            return line;
+        }
+        if (shouldKeepFinalPeriod(lineWithoutTrailingWhitespace, language)) {
+            return line;
+        }
+        replacementCount += 1;
+        return lineWithoutTrailingWhitespace.slice(0, -1) + trailingWhitespace;
     }
-    if (!textWithoutTrailingWhitespace.endsWith(".")) {
-        return {
-            formattedText: text,
-            replacementCount: 0,
-        };
-    }
-    if (shouldKeepFinalPeriod(textWithoutTrailingWhitespace, language)) {
-        return {
-            formattedText: text,
-            replacementCount: 0,
-        };
-    }
+    const formattedText = text.replace(/([^\r\n]*)(\r\n|\n|\r|$)/g, function (match, line, lineEnding) {
+        if (match === "") {
+            return match;
+        }
+        return normalizeLine(line) + lineEnding;
+    });
     return {
-        formattedText: textWithoutTrailingWhitespace.slice(0, -1) + trailingWhitespace,
-        replacementCount: 1,
+        formattedText,
+        replacementCount,
     };
 }
 const TYPOGRAPHY_RULES = [
