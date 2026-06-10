@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS = {
         extraSpaces: true,
         trimTextEdges: true,
         spacesBeforePunctuation: true,
+        spacesAfterPunctuation: true,
         percentSignNoSpace: true,
         numberUnitsNbsp: true,
         numberSigns: true,
@@ -195,6 +196,9 @@ function normalizeSettings(value) {
             spacesBeforePunctuation: typeof maybeEnabledRules.spacesBeforePunctuation === "boolean"
                 ? maybeEnabledRules.spacesBeforePunctuation
                 : DEFAULT_SETTINGS.enabledRules.spacesBeforePunctuation,
+            spacesAfterPunctuation: typeof maybeEnabledRules.spacesAfterPunctuation === "boolean"
+                ? maybeEnabledRules.spacesAfterPunctuation
+                : DEFAULT_SETTINGS.enabledRules.spacesAfterPunctuation,
             percentSignNoSpace: typeof maybeEnabledRules.percentSignNoSpace === "boolean"
                 ? maybeEnabledRules.percentSignNoSpace
                 : DEFAULT_SETTINGS.enabledRules.percentSignNoSpace,
@@ -386,11 +390,115 @@ function applyTrimTextEdgesRule(text) {
     };
 }
 function applySpacesBeforePunctuationRule(text) {
-    const regexp = /[ \t]+([,.;:!?])/g;
-    const matches = text.match(regexp);
+    let formattedText = text;
+    let replacementCount = 0;
+    formattedText = formattedText.replace(/[ \t\u00A0\u202F]+([,.;:!?])/g, function (match, punctuation) {
+        if (match === punctuation) {
+            return match;
+        }
+        replacementCount += 1;
+        return punctuation;
+    });
+    function isSpaceLike(character) {
+        return /[ \t\n\r\u00A0\u202F]/.test(character);
+    }
+    function isClosingPunctuationOrOperator(character) {
+        return /[,.;:!?)\]}»”’=<>]/.test(character);
+    }
+    function isOpeningPunctuation(character) {
+        return /[({[«„“"']/.test(character);
+    }
+    function shouldAddSpaceAfterPunctuation(punctuation, previousCharacter, nextCharacter) {
+        if (!nextCharacter || isSpaceLike(nextCharacter)) {
+            return false;
+        }
+        if (isClosingPunctuationOrOperator(nextCharacter)) {
+            return false;
+        }
+        if ((punctuation === "," || punctuation === ":") &&
+            /\d/.test(previousCharacter) &&
+            /\d/.test(nextCharacter)) {
+            return false;
+        }
+        if (punctuation === ".") {
+            if (/\d/.test(previousCharacter) && /\d/.test(nextCharacter)) {
+                return false;
+            }
+            return (/[А-ЯЁA-Z]/.test(nextCharacter) ||
+                isOpeningPunctuation(nextCharacter) ||
+                nextCharacter === PROTECTED_TEXT_TOKEN_START);
+        }
+        return true;
+    }
+    let result = "";
+    for (let index = 0; index < formattedText.length; index += 1) {
+        const character = formattedText[index];
+        const nextCharacter = formattedText[index + 1] || "";
+        const previousCharacter = index > 0 ? formattedText[index - 1] : "";
+        result += character;
+        if (!/[,.;:!?]/.test(character)) {
+            continue;
+        }
+        if (shouldAddSpaceAfterPunctuation(character, previousCharacter, nextCharacter)) {
+            result += " ";
+            replacementCount += 1;
+        }
+    }
     return {
-        formattedText: text.replace(regexp, "$1"),
-        replacementCount: matches ? matches.length : 0,
+        formattedText: result,
+        replacementCount,
+    };
+}
+function applySpacesAfterPunctuationRule(text) {
+    let replacementCount = 0;
+    function isSpaceLike(character) {
+        return /[ \t\n\r\u00A0\u202F]/.test(character);
+    }
+    function isClosingPunctuationOrOperator(character) {
+        return /[,.;:!?)\]}»”’=<>]/.test(character);
+    }
+    function isOpeningPunctuation(character) {
+        return /[({[«„“"']/.test(character);
+    }
+    function shouldAddSpaceAfterPunctuation(punctuation, previousCharacter, nextCharacter) {
+        if (!nextCharacter || isSpaceLike(nextCharacter)) {
+            return false;
+        }
+        if (isClosingPunctuationOrOperator(nextCharacter)) {
+            return false;
+        }
+        if ((punctuation === "," || punctuation === ":") &&
+            /\d/.test(previousCharacter) &&
+            /\d/.test(nextCharacter)) {
+            return false;
+        }
+        if (punctuation === ".") {
+            if (/\d/.test(previousCharacter) && /\d/.test(nextCharacter)) {
+                return false;
+            }
+            return (/[А-ЯЁA-Z]/.test(nextCharacter) ||
+                isOpeningPunctuation(nextCharacter) ||
+                nextCharacter === PROTECTED_TEXT_TOKEN_START);
+        }
+        return true;
+    }
+    let formattedText = "";
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        const nextCharacter = text[index + 1] || "";
+        const previousCharacter = index > 0 ? text[index - 1] : "";
+        formattedText += character;
+        if (!/[,.;:!?]/.test(character)) {
+            continue;
+        }
+        if (shouldAddSpaceAfterPunctuation(character, previousCharacter, nextCharacter)) {
+            formattedText += " ";
+            replacementCount += 1;
+        }
+    }
+    return {
+        formattedText,
+        replacementCount,
     };
 }
 function applyPercentSignNoSpaceRule(text) {
@@ -1124,6 +1232,11 @@ const TYPOGRAPHY_RULES = [
         id: "spacesBeforePunctuation",
         supportedLanguages: "all",
         apply: applySpacesBeforePunctuationRule,
+    },
+    {
+        id: "spacesAfterPunctuation",
+        supportedLanguages: "all",
+        apply: applySpacesAfterPunctuationRule,
     },
     {
         id: "percentSignNoSpace",

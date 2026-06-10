@@ -282,6 +282,14 @@
     </label>
 
     <label class="rule">
+      <input id="spacesAfterPunctuation" type="checkbox" checked />
+      <div>
+        <div class="rule-title">Spaces after punctuation <span class="tag">All languages</span></div>
+        <p class="rule-description">Adds missing spaces after comma, colon, semicolon, question mark, and exclamation mark while preserving numbers, time, URLs, code-like strings, inline code, and tags.</p>
+      </div>
+    </label>
+
+    <label class="rule">
       <input id="percentSignNoSpace" type="checkbox" checked />
       <div>
         <div class="rule-title">Percent sign <span class="tag">All languages</span></div>
@@ -423,6 +431,7 @@
   const extraSpacesCheckbox = document.getElementById("extraSpaces");
   const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
   const spacesBeforePunctuationCheckbox = document.getElementById("spacesBeforePunctuation");
+  const spacesAfterPunctuationCheckbox = document.getElementById("spacesAfterPunctuation");
   const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
   const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
   const numberSignsCheckbox = document.getElementById("numberSigns");
@@ -450,6 +459,7 @@
       extraSpaces: extraSpacesCheckbox.checked,
       trimTextEdges: trimTextEdgesCheckbox.checked,
       spacesBeforePunctuation: spacesBeforePunctuationCheckbox.checked,
+      spacesAfterPunctuation: spacesAfterPunctuationCheckbox.checked,
       percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
       numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
       numberSigns: numberSignsCheckbox.checked,
@@ -522,6 +532,10 @@
     extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
     trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
     spacesBeforePunctuationCheckbox.checked = settings.enabledRules.spacesBeforePunctuation;
+    spacesAfterPunctuationCheckbox.checked =
+      settings.enabledRules.spacesAfterPunctuation !== undefined
+        ? settings.enabledRules.spacesAfterPunctuation
+        : true;
     percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
     numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
     numberSignsCheckbox.checked =
@@ -560,6 +574,7 @@
       enabledRules.extraSpaces ||
       enabledRules.trimTextEdges ||
       enabledRules.spacesBeforePunctuation ||
+      enabledRules.spacesAfterPunctuation ||
       enabledRules.percentSignNoSpace ||
       enabledRules.numberUnitsNbsp ||
       enabledRules.numberSigns ||
