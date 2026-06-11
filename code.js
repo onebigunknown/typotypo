@@ -286,6 +286,7 @@ function findTextNodesInSelection() {
 function getTextForLanguageDetection(text) {
     return text
         .replace(/`[^`\n]+`/g, " ")
+        .replace(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g, " ")
         .replace(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g, " ")
         .replace(/\$?\{[^{}\n]*\}/g, " ")
         .replace(/%(?:\d+\$)?[@sdif]/g, " ")
@@ -1414,6 +1415,11 @@ function protectTextFragments(text) {
             return protectValue(protectedValue, trailingPunctuation);
         });
     }
+    function protectExactByRegexp(regexp) {
+        protectedText = protectedText.replace(regexp, function (match) {
+            return protectValue(match);
+        });
+    }
     function protectHtmlLikeTags() {
         protectByRegexp(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g);
     }
@@ -1453,6 +1459,7 @@ function protectTextFragments(text) {
     protectByRegexp(/`[^`\n]+`/g);
     protectHtmlLikeTags();
     protectCurlyBracePlaceholders();
+    protectExactByRegexp(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g);
     protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
     protectByRegexp(/\$\d+\b/g);
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
@@ -1478,7 +1485,8 @@ function restoreProtectedTextFragments(text, fragments) {
     for (const fragment of fragments) {
         restoredText = restoredText.split(fragment.token).join(fragment.value);
     }
-    restoredText = restoredText.replace(/([,.;:!?…])[ 	  ]+(<\/[A-Za-z][A-Za-z0-9:-]*>)/g, "$1$2");
+    restoredText = restoredText.replace(/([,.;:!?…])[ \t\u00A0\u202F]+(<\/[A-Za-z][A-Za-z0-9:-]*>)/g, "$1$2");
+    restoredText = restoredText.replace(/(&(?:nbsp|#160|#x202F);)[ \t\u00A0\u202F]+/gi, "$1");
     return restoredText;
 }
 function applyRulesToText(text, settings, language) {
