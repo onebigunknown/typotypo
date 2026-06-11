@@ -599,12 +599,36 @@ function applyManualLineBreaksRule(text: string): RuleResult {
 }
 
 function applyEllipsisRule(text: string): RuleResult {
-  const regexp = /\.{3,}/g;
-  const matches = text.match(regexp);
+  let formattedText = text;
+  let replacementCount = 0;
+
+  function replaceAndCount(regexp: RegExp, replacement: string) {
+    formattedText = formattedText.replace(regexp, function (match: string) {
+      if (match === replacement) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return replacement;
+    });
+  }
+
+  replaceAndCount(/\.{3,}\?/g, "?..");
+  replaceAndCount(/\?\.{3,}/g, "?..");
+  replaceAndCount(/…\?/g, "?..");
+  replaceAndCount(/\?…/g, "?..");
+
+  replaceAndCount(/\.{3,}!/g, "!..");
+  replaceAndCount(/!\.{3,}/g, "!..");
+  replaceAndCount(/…!/g, "!..");
+  replaceAndCount(/!…/g, "!..");
+
+  replaceAndCount(/\.{3,}/g, "…");
+  replaceAndCount(/…{2,}/g, "…");
 
   return {
-    formattedText: text.replace(regexp, "…"),
-    replacementCount: matches ? matches.length : 0,
+    formattedText,
+    replacementCount,
   };
 }
 
@@ -643,6 +667,60 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     }
   );
 
+  formattedText = formattedText.replace(/!\?/g, function (match: string) {
+    if (match === "?!") {
+      return match;
+    }
+
+    replacementCount += 1;
+    return "?!";
+  });
+
+  formattedText = formattedText.replace(
+    /([!?.,;:])\1+/g,
+    function (match: string, punctuation: string, offset: number, fullText: string) {
+      if (
+        punctuation === "." &&
+        offset > 0 &&
+        (fullText[offset - 1] === "?" || fullText[offset - 1] === "!")
+      ) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return punctuation;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /([А-Яа-яЁёA-Za-z0-9])\.([»”’])/g,
+    function (
+      match: string,
+      characterBeforePeriod: string,
+      closingQuote: string,
+      offset: number,
+      fullText: string
+    ) {
+      const textEndingWithPeriod = fullText.slice(0, offset + 2);
+
+      if (
+        shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
+        shouldKeepEnglishFinalPeriod(textEndingWithPeriod)
+      ) {
+        return match;
+      }
+
+      const normalized = characterBeforePeriod + closingQuote + ".";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
+
   function isSpaceLike(character: string): boolean {
     return /[ \t\n\r\u00A0\u202F]/.test(character);
   }
@@ -661,6 +739,10 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     nextCharacter: string
   ): boolean {
     if (!nextCharacter || isSpaceLike(nextCharacter)) {
+      return false;
+    }
+
+    if (nextCharacter === PROTECTED_TEXT_TOKEN_START) {
       return false;
     }
 
@@ -788,6 +870,83 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
 
 function applySpacesAfterPunctuationRule(text: string): RuleResult {
   let replacementCount = 0;
+  let normalizedText = text;
+
+  function replaceAndCount(regexp: RegExp, replacement: string) {
+    normalizedText = normalizedText.replace(regexp, function (match: string) {
+      if (match === replacement) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return replacement;
+    });
+  }
+
+  replaceAndCount(/!\?/g, "?!");
+
+  replaceAndCount(/\.{3,}\?/g, "?..");
+  replaceAndCount(/\?\.{3,}/g, "?..");
+  replaceAndCount(/…\?/g, "?..");
+  replaceAndCount(/\?…/g, "?..");
+
+  replaceAndCount(/\.{3,}!/g, "!..");
+  replaceAndCount(/!\.{3,}/g, "!..");
+  replaceAndCount(/…!/g, "!..");
+  replaceAndCount(/!…/g, "!..");
+
+  replaceAndCount(/\.{3,}/g, "…");
+  replaceAndCount(/…{2,}/g, "…");
+
+  normalizedText = normalizedText.replace(
+    /([!?.,;:])\1+/g,
+    function (
+      match: string,
+      punctuation: string,
+      offset: number,
+      fullText: string
+    ) {
+      if (
+        punctuation === "." &&
+        offset > 0 &&
+        (fullText[offset - 1] === "?" || fullText[offset - 1] === "!")
+      ) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return punctuation;
+    }
+  );
+
+  normalizedText = normalizedText.replace(
+    /([А-Яа-яЁёA-Za-z0-9])\.([»”’])/g,
+    function (
+      match: string,
+      characterBeforePeriod: string,
+      closingQuote: string,
+      offset: number,
+      fullText: string
+    ) {
+      const textEndingWithPeriod = fullText.slice(0, offset + 2);
+
+      if (
+        shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
+        shouldKeepEnglishFinalPeriod(textEndingWithPeriod)
+      ) {
+        return match;
+      }
+
+      const normalized = characterBeforePeriod + closingQuote + ".";
+
+      if (match === normalized) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return normalized;
+    }
+  );
 
   function isSpaceLike(character: string): boolean {
     return /[ \t\n\r\u00A0\u202F]/.test(character);
@@ -807,6 +966,10 @@ function applySpacesAfterPunctuationRule(text: string): RuleResult {
     nextCharacter: string
   ): boolean {
     if (!nextCharacter || isSpaceLike(nextCharacter)) {
+      return false;
+    }
+
+    if (nextCharacter === PROTECTED_TEXT_TOKEN_START) {
       return false;
     }
 
@@ -839,10 +1002,10 @@ function applySpacesAfterPunctuationRule(text: string): RuleResult {
 
   let formattedText = "";
 
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    const nextCharacter = text[index + 1] || "";
-    const previousCharacter = index > 0 ? text[index - 1] : "";
+  for (let index = 0; index < normalizedText.length; index += 1) {
+    const character = normalizedText[index];
+    const nextCharacter = normalizedText[index + 1] || "";
+    const previousCharacter = index > 0 ? normalizedText[index - 1] : "";
 
     formattedText += character;
 
@@ -2127,6 +2290,10 @@ function applyUiFinalPeriodRule(
       return line;
     }
 
+    if (/[?!]\.\.$/.test(lineWithoutTrailingWhitespace)) {
+      return line;
+    }
+
     if (shouldKeepFinalPeriod(lineWithoutTrailingWhitespace, language)) {
       return line;
     }
@@ -2431,6 +2598,11 @@ function restoreProtectedTextFragments(
   for (const fragment of fragments) {
     restoredText = restoredText.split(fragment.token).join(fragment.value);
   }
+
+  restoredText = restoredText.replace(
+    /([,.;:!?…])[ 	  ]+(<\/[A-Za-z][A-Za-z0-9:-]*>)/g,
+    "$1$2"
+  );
 
   return restoredText;
 }
