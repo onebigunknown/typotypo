@@ -691,6 +691,68 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     return true;
   }
 
+  function applyBracketSpacingCleanup(input: string): RuleResult {
+    let bracketReplacementCount = 0;
+
+    let output = input.replace(
+      /([([])[ \t\u00A0\u202F]+(?=[А-Яа-яЁё0-9%№§])/g,
+      function (match: string, openingBracket: string) {
+        if (match === openingBracket) {
+          return match;
+        }
+
+        bracketReplacementCount += 1;
+        return openingBracket;
+      }
+    );
+
+    output = output.replace(
+      /([А-Яа-яЁё0-9%₽№§])[ \t\u00A0\u202F]+([)\]])/g,
+      function (match: string, beforeBracket: string, closingBracket: string) {
+        const normalized = beforeBracket + closingBracket;
+
+        if (match === normalized) {
+          return match;
+        }
+
+        bracketReplacementCount += 1;
+        return normalized;
+      }
+    );
+
+    output = output.replace(
+      /([А-Яа-яЁё0-9»”’)\].!?])([([])(?=[^ \t\n\r\u00A0\u202F)\]])/g,
+      function (
+        match: string,
+        beforeBracket: string,
+        openingBracket: string,
+        offset: number,
+        fullText: string
+      ) {
+        const nextCharacter =
+          fullText[offset + beforeBracket.length + openingBracket.length] || "";
+
+        if (/\d/.test(beforeBracket) && /\d/.test(nextCharacter)) {
+          return match;
+        }
+
+        const normalized = beforeBracket + " " + openingBracket;
+
+        if (match === normalized) {
+          return match;
+        }
+
+        bracketReplacementCount += 1;
+        return normalized;
+      }
+    );
+
+    return {
+      formattedText: output,
+      replacementCount: bracketReplacementCount,
+    };
+  }
+
   let result = "";
 
   for (let index = 0; index < formattedText.length; index += 1) {
@@ -716,9 +778,11 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     }
   }
 
+  const bracketSpacingResult = applyBracketSpacingCleanup(result);
+
   return {
-    formattedText: result,
-    replacementCount,
+    formattedText: bracketSpacingResult.formattedText,
+    replacementCount: replacementCount + bracketSpacingResult.replacementCount,
   };
 }
 
