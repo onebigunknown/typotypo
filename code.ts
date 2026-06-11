@@ -32,8 +32,7 @@ type EnabledRules = {
   ellipsis: boolean;
   extraSpaces: boolean;
   trimTextEdges: boolean;
-  spacesBeforePunctuation: boolean;
-  spacesAfterPunctuation: boolean;
+  spacingCleanup: boolean;
   percentSignNoSpace: boolean;
   numberUnitsNbsp: boolean;
   numberSigns: boolean;
@@ -105,8 +104,7 @@ const DEFAULT_SETTINGS: ApplySettings = {
     ellipsis: true,
     extraSpaces: true,
     trimTextEdges: true,
-    spacesBeforePunctuation: true,
-    spacesAfterPunctuation: true,
+    spacingCleanup: true,
     percentSignNoSpace: true,
     numberUnitsNbsp: true,
     numberSigns: true,
@@ -286,6 +284,8 @@ function normalizeSettings(value: unknown): ApplySettings {
       ? (maybeSettings.enabledRules as Partial<EnabledRules> & {
           russianUiFinalPeriod?: unknown;
           russianNumberRangeDash?: unknown;
+          spacesBeforePunctuation?: unknown;
+          spacesAfterPunctuation?: unknown;
         })
       : {};
 
@@ -306,6 +306,18 @@ function normalizeSettings(value: unknown): ApplySettings {
       : typeof maybeEnabledRules.russianUiFinalPeriod === "boolean"
         ? maybeEnabledRules.russianUiFinalPeriod
         : DEFAULT_SETTINGS.enabledRules.uiFinalPeriod;
+
+  const legacySpacingValues = [
+    maybeEnabledRules.spacesBeforePunctuation,
+    maybeEnabledRules.spacesAfterPunctuation,
+  ].filter((value): value is boolean => typeof value === "boolean");
+
+  const spacingCleanup =
+    typeof maybeEnabledRules.spacingCleanup === "boolean"
+      ? maybeEnabledRules.spacingCleanup
+      : legacySpacingValues.length > 0
+        ? legacySpacingValues.some(Boolean)
+        : DEFAULT_SETTINGS.enabledRules.spacingCleanup;
 
   return {
     languageMode: isLanguageMode(maybeSettings.languageMode)
@@ -357,15 +369,7 @@ function normalizeSettings(value: unknown): ApplySettings {
           ? maybeEnabledRules.trimTextEdges
           : DEFAULT_SETTINGS.enabledRules.trimTextEdges,
 
-      spacesBeforePunctuation:
-        typeof maybeEnabledRules.spacesBeforePunctuation === "boolean"
-          ? maybeEnabledRules.spacesBeforePunctuation
-          : DEFAULT_SETTINGS.enabledRules.spacesBeforePunctuation,
-
-      spacesAfterPunctuation:
-        typeof maybeEnabledRules.spacesAfterPunctuation === "boolean"
-          ? maybeEnabledRules.spacesAfterPunctuation
-          : DEFAULT_SETTINGS.enabledRules.spacesAfterPunctuation,
+      spacingCleanup,
 
       percentSignNoSpace:
         typeof maybeEnabledRules.percentSignNoSpace === "boolean"
@@ -651,11 +655,22 @@ function applyTrimTextEdgesRule(text: string): RuleResult {
   };
 }
 
-function applySpacesBeforePunctuationRule(text: string): RuleResult {
-  let formattedText = text;
+function applySpacingCleanupRule(text: string): RuleResult {
   let replacementCount = 0;
+  let normalizedText = text;
 
-  formattedText = formattedText.replace(
+  function replaceAndCount(regexp: RegExp, replacement: string) {
+    normalizedText = normalizedText.replace(regexp, function (match: string) {
+      if (match === replacement) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return replacement;
+    });
+  }
+
+  normalizedText = normalizedText.replace(
     /[ \t\u00A0\u202F]+([,.;:!?])/g,
     function (match: string, punctuation: string) {
       if (match === punctuation) {
@@ -667,18 +682,29 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     }
   );
 
-  formattedText = formattedText.replace(/!\?/g, function (match: string) {
-    if (match === "?!") {
-      return match;
-    }
+  replaceAndCount(/!\?/g, "?!");
 
-    replacementCount += 1;
-    return "?!";
-  });
+  replaceAndCount(/\.{3,}\?/g, "?..");
+  replaceAndCount(/\?\.{3,}/g, "?..");
+  replaceAndCount(/…\?/g, "?..");
+  replaceAndCount(/\?…/g, "?..");
 
-  formattedText = formattedText.replace(
+  replaceAndCount(/\.{3,}!/g, "!..");
+  replaceAndCount(/!\.{3,}/g, "!..");
+  replaceAndCount(/…!/g, "!..");
+  replaceAndCount(/!…/g, "!..");
+
+  replaceAndCount(/\.{3,}/g, "…");
+  replaceAndCount(/…{2,}/g, "…");
+
+  normalizedText = normalizedText.replace(
     /([!?.,;:])\1+/g,
-    function (match: string, punctuation: string, offset: number, fullText: string) {
+    function (
+      match: string,
+      punctuation: string,
+      offset: number,
+      fullText: string
+    ) {
       if (
         punctuation === "." &&
         offset > 0 &&
@@ -692,7 +718,7 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     }
   );
 
-  formattedText = formattedText.replace(
+  normalizedText = normalizedText.replace(
     /([А-Яа-яЁёA-Za-z0-9])\.([»”’])/g,
     function (
       match: string,
@@ -835,179 +861,14 @@ function applySpacesBeforePunctuationRule(text: string): RuleResult {
     };
   }
 
-  let result = "";
-
-  for (let index = 0; index < formattedText.length; index += 1) {
-    const character = formattedText[index];
-    const nextCharacter = formattedText[index + 1] || "";
-    const previousCharacter = index > 0 ? formattedText[index - 1] : "";
-
-    result += character;
-
-    if (!/[,.;:!?]/.test(character)) {
-      continue;
-    }
-
-    if (
-      shouldAddSpaceAfterPunctuation(
-        character,
-        previousCharacter,
-        nextCharacter
-      )
-    ) {
-      result += " ";
-      replacementCount += 1;
-    }
-  }
-
-  const bracketSpacingResult = applyBracketSpacingCleanup(result);
-
-  return {
-    formattedText: bracketSpacingResult.formattedText,
-    replacementCount: replacementCount + bracketSpacingResult.replacementCount,
-  };
-}
-
-function applySpacesAfterPunctuationRule(text: string): RuleResult {
-  let replacementCount = 0;
-  let normalizedText = text;
-
-  function replaceAndCount(regexp: RegExp, replacement: string) {
-    normalizedText = normalizedText.replace(regexp, function (match: string) {
-      if (match === replacement) {
-        return match;
-      }
-
-      replacementCount += 1;
-      return replacement;
-    });
-  }
-
-  replaceAndCount(/!\?/g, "?!");
-
-  replaceAndCount(/\.{3,}\?/g, "?..");
-  replaceAndCount(/\?\.{3,}/g, "?..");
-  replaceAndCount(/…\?/g, "?..");
-  replaceAndCount(/\?…/g, "?..");
-
-  replaceAndCount(/\.{3,}!/g, "!..");
-  replaceAndCount(/!\.{3,}/g, "!..");
-  replaceAndCount(/…!/g, "!..");
-  replaceAndCount(/!…/g, "!..");
-
-  replaceAndCount(/\.{3,}/g, "…");
-  replaceAndCount(/…{2,}/g, "…");
-
-  normalizedText = normalizedText.replace(
-    /([!?.,;:])\1+/g,
-    function (
-      match: string,
-      punctuation: string,
-      offset: number,
-      fullText: string
-    ) {
-      if (
-        punctuation === "." &&
-        offset > 0 &&
-        (fullText[offset - 1] === "?" || fullText[offset - 1] === "!")
-      ) {
-        return match;
-      }
-
-      replacementCount += 1;
-      return punctuation;
-    }
-  );
-
-  normalizedText = normalizedText.replace(
-    /([А-Яа-яЁёA-Za-z0-9])\.([»”’])/g,
-    function (
-      match: string,
-      characterBeforePeriod: string,
-      closingQuote: string,
-      offset: number,
-      fullText: string
-    ) {
-      const textEndingWithPeriod = fullText.slice(0, offset + 2);
-
-      if (
-        shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
-        shouldKeepEnglishFinalPeriod(textEndingWithPeriod)
-      ) {
-        return match;
-      }
-
-      const normalized = characterBeforePeriod + closingQuote + ".";
-
-      if (match === normalized) {
-        return match;
-      }
-
-      replacementCount += 1;
-      return normalized;
-    }
-  );
-
-  function isSpaceLike(character: string): boolean {
-    return /[ \t\n\r\u00A0\u202F]/.test(character);
-  }
-
-  function isClosingPunctuationOrOperator(character: string): boolean {
-    return /[,.;:!?)\]}»”’=<>]/.test(character);
-  }
-
-  function isOpeningPunctuation(character: string): boolean {
-    return /[({[«„“"']/.test(character);
-  }
-
-  function shouldAddSpaceAfterPunctuation(
-    punctuation: string,
-    previousCharacter: string,
-    nextCharacter: string
-  ): boolean {
-    if (!nextCharacter || isSpaceLike(nextCharacter)) {
-      return false;
-    }
-
-    if (nextCharacter === PROTECTED_TEXT_TOKEN_START) {
-      return false;
-    }
-
-    if (isClosingPunctuationOrOperator(nextCharacter)) {
-      return false;
-    }
-
-    if (
-      (punctuation === "," || punctuation === ":") &&
-      /\d/.test(previousCharacter) &&
-      /\d/.test(nextCharacter)
-    ) {
-      return false;
-    }
-
-    if (punctuation === ".") {
-      if (/\d/.test(previousCharacter) && /\d/.test(nextCharacter)) {
-        return false;
-      }
-
-      return (
-        /[А-ЯЁA-Z]/.test(nextCharacter) ||
-        isOpeningPunctuation(nextCharacter) ||
-        nextCharacter === PROTECTED_TEXT_TOKEN_START
-      );
-    }
-
-    return true;
-  }
-
-  let formattedText = "";
+  let spacedText = "";
 
   for (let index = 0; index < normalizedText.length; index += 1) {
     const character = normalizedText[index];
     const nextCharacter = normalizedText[index + 1] || "";
     const previousCharacter = index > 0 ? normalizedText[index - 1] : "";
 
-    formattedText += character;
+    spacedText += character;
 
     if (!/[,.;:!?]/.test(character)) {
       continue;
@@ -1020,14 +881,16 @@ function applySpacesAfterPunctuationRule(text: string): RuleResult {
         nextCharacter
       )
     ) {
-      formattedText += " ";
+      spacedText += " ";
       replacementCount += 1;
     }
   }
 
+  const bracketSpacingResult = applyBracketSpacingCleanup(spacedText);
+
   return {
-    formattedText,
-    replacementCount,
+    formattedText: bracketSpacingResult.formattedText,
+    replacementCount: replacementCount + bracketSpacingResult.replacementCount,
   };
 }
 
@@ -1312,6 +1175,27 @@ function applySpecialSymbolsRule(
 
       replacementCount += 1;
       return normalized;
+    }
+  );
+
+  formattedText = formattedText.replace(
+    /([!?.,;:])\1+/g,
+    function (
+      match: string,
+      punctuation: string,
+      offset: number,
+      fullText: string
+    ) {
+      if (
+        punctuation === "." &&
+        offset > 0 &&
+        (fullText[offset - 1] === "?" || fullText[offset - 1] === "!")
+      ) {
+        return match;
+      }
+
+      replacementCount += 1;
+      return punctuation;
     }
   );
 
@@ -2351,14 +2235,9 @@ const TYPOGRAPHY_RULES: TypographyRule[] = [
     apply: applyTrimTextEdgesRule,
   },
   {
-    id: "spacesBeforePunctuation",
+    id: "spacingCleanup",
     supportedLanguages: "all",
-    apply: applySpacesBeforePunctuationRule,
-  },
-  {
-    id: "spacesAfterPunctuation",
-    supportedLanguages: "all",
-    apply: applySpacesAfterPunctuationRule,
+    apply: applySpacingCleanupRule,
   },
   {
     id: "percentSignNoSpace",

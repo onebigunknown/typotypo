@@ -274,7 +274,7 @@
     </label>
 
     <label class="rule">
-      <input id="spacesBeforePunctuation" type="checkbox" checked />
+      <input id="spacingCleanup" type="checkbox" checked />
       <div>
         <div class="rule-title">Spacing cleanup <span class="tag">All languages</span></div>
         <p class="rule-description">Cleans spaces around punctuation, bracket spacing, repeated punctuation marks, and periods around closing quotes while preserving numbers, time, URLs, code-like strings, inline code, tags, and placeholders.</p>
@@ -422,7 +422,7 @@
   const ellipsisCheckbox = document.getElementById("ellipsis");
   const extraSpacesCheckbox = document.getElementById("extraSpaces");
   const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
-  const spacesBeforePunctuationCheckbox = document.getElementById("spacesBeforePunctuation");
+  const spacingCleanupCheckbox = document.getElementById("spacingCleanup");
   const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
   const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
   const numberSignsCheckbox = document.getElementById("numberSigns");
@@ -449,8 +449,7 @@
       ellipsis: ellipsisCheckbox.checked,
       extraSpaces: extraSpacesCheckbox.checked,
       trimTextEdges: trimTextEdgesCheckbox.checked,
-      spacesBeforePunctuation: spacesBeforePunctuationCheckbox.checked,
-      spacesAfterPunctuation: spacesBeforePunctuationCheckbox.checked,
+      spacingCleanup: spacingCleanupCheckbox.checked,
       percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
       numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
       numberSigns: numberSignsCheckbox.checked,
@@ -522,9 +521,11 @@
     ellipsisCheckbox.checked = settings.enabledRules.ellipsis;
     extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
     trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
-    spacesBeforePunctuationCheckbox.checked =
-      settings.enabledRules.spacesBeforePunctuation !== false ||
-      settings.enabledRules.spacesAfterPunctuation === true;
+    spacingCleanupCheckbox.checked =
+      settings.enabledRules.spacingCleanup !== undefined
+        ? settings.enabledRules.spacingCleanup
+        : settings.enabledRules.spacesBeforePunctuation !== false ||
+          settings.enabledRules.spacesAfterPunctuation === true;
     percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
     numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
     numberSignsCheckbox.checked =
@@ -562,8 +563,7 @@
       enabledRules.ellipsis ||
       enabledRules.extraSpaces ||
       enabledRules.trimTextEdges ||
-      enabledRules.spacesBeforePunctuation ||
-      enabledRules.spacesAfterPunctuation ||
+      enabledRules.spacingCleanup ||
       enabledRules.percentSignNoSpace ||
       enabledRules.numberUnitsNbsp ||
       enabledRules.numberSigns ||
@@ -671,7 +671,7 @@
   ellipsisCheckbox.onchange = handleSettingsChange;
   extraSpacesCheckbox.onchange = handleSettingsChange;
   trimTextEdgesCheckbox.onchange = handleSettingsChange;
-  spacesBeforePunctuationCheckbox.onchange = handleSettingsChange;
+  spacingCleanupCheckbox.onchange = handleSettingsChange;
   percentSignNoSpaceCheckbox.onchange = handleSettingsChange;
   numberUnitsNbspCheckbox.onchange = handleSettingsChange;
   numberSignsCheckbox.onchange = handleSettingsChange;
