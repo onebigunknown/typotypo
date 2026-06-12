@@ -4,8 +4,6 @@ const path = require("node:path");
 const vm = require("node:vm");
 const ts = require("typescript");
 
-const CODE_PATH = path.join(process.cwd(), "code.ts");
-
 function loadFormatter() {
   const enginePath = path.join(process.cwd(), "typography-engine.ts");
 
@@ -43,6 +41,9 @@ function loadFormatter() {
     const language = TypotypoEngine.resolveLanguage(input, settings.languageMode);
     return TypotypoEngine.applyRulesToText(input, settings, language).formattedText;
   },
+  detect(input, languageMode = "auto") {
+    return TypotypoEngine.resolveLanguage(input, languageMode);
+  },
 };
 `;
 
@@ -66,81 +67,368 @@ function loadFormatter() {
 }
 
 const NBSP = "\u00A0";
+const NNBSP = "\u202F";
 
-const testCases = [
+const formatCases = [
+  // Cleanup
   {
-    name: "spacing, brackets, punctuation, currency, fractions, ranges",
-    input:
-      "Привет ,мир. Ошибка:повторите(код 500). Готово!!! Ну правда...? 100р!! 1/2?? 2020 - 2024(период)",
-    expected:
-      `Привет, мир. Ошибка: повторите (код 500). Готово! Ну правда?.. 100${NBSP}₽! ½? 2020–2024 (период)`,
+    group: "cleanup",
+    name: "removes invisible copy artifacts",
+    input: "До\u00ADба\u200Bвить\uFEFF трек",
+    expected: "Добавить трек",
   },
   {
-    name: "placeholders stay intact while surrounding text is formatted",
-    input:
-      "До {count} треков. Привет, {{name}}. Скидка {discount} %. Ошибка {code} != 0. Цена ${price} р. %d треков, %@ слушает сейчас.",
-    expected:
-      `До${NBSP}{count} треков. Привет, {{name}}. Скидка {discount}%. Ошибка {code} ≠ 0. Цена \${price} р. %d треков, %@ слушает сейчас`,
+    group: "cleanup",
+    name: "replaces tabs with one regular space",
+    input: "Трек\t\tальбом",
+    expected: "Трек альбом",
   },
   {
-    name: "HTML-like tags are protected but visible text inside is formatted",
-    input: "<b>100р</b>, <b>1/2</b>, <b>ошибка!=0</b>.",
-    expected: `<b>100${NBSP}₽</b>, <b>½</b>, <b>ошибка ≠ 0</b>`,
+    group: "cleanup",
+    name: "single manual line break becomes a space",
+    input: "Первая строка\nвторая строка",
+    expected: "Первая строка вторая строка",
   },
   {
-    name: "HTML entities are protected and do not create extra spaces",
-    input: "Ошибка&nbsp;!=0. Цена&nbsp;100р. Скидка&nbsp;1/2.",
-    expected: `Ошибка&nbsp;≠ 0. Цена&nbsp;100${NBSP}₽ Скидка&nbsp;½`,
+    group: "cleanup",
+    name: "paragraph break is preserved",
+    input: "Первый абзац\n\nВторой абзац",
+    expected: "Первый абзац\n\nВторой абзац",
   },
   {
-    name: "URLs, inline code, and code-like strings are protected",
-    input:
-      "Не ломать: https://example.com/a??b, `100р!!`, function(), array[index], if(a>b).",
-    expected:
-      "Не ломать: https://example.com/a??b, `100р!!`, function(), array[index], if(a>b)",
+    group: "cleanup",
+    name: "extra spaces and text edges are cleaned",
+    input: "  Привет   мир  ",
+    expected: "Привет мир",
   },
   {
-    name: "Russian non-breaking spaces for initials, short words, signs, and addresses",
-    input: "А. А. Иванов, Петров К. П. до 5 треков, д. 5, № 5, § 3.",
-    expected: `А.${NBSP}А.${NBSP}Иванов, Петров${NBSP}К. П. до${NBSP}5${NBSP}треков, д.${NBSP}5, №${NBSP}5, §${NBSP}3`,
+    group: "cleanup",
+    name: "regular and non-breaking repeated spaces collapse",
+    input: `Привет${NBSP}${NBSP}мир   сейчас`,
+    expected: "Привет мир сейчас",
+  },
+
+  // Spacing cleanup and punctuation
+  {
+    group: "spacing cleanup",
+    name: "spaces before punctuation are removed and spaces after punctuation are added",
+    input: "Привет ,мир:ошибка;повторите,готово?да!нет.Продолжить",
+    expected: "Привет, мир: ошибка; повторите, готово? да! нет. Продолжить",
+  },
+  {
+    group: "spacing cleanup",
+    name: "decimal numbers and time stay intact",
+    input: "Версия 1.2.3, цена 1,5, время 10:00.",
+    expected: "Версия 1.2.3, цена 1,5, время 10:00",
+  },
+  {
+    group: "spacing cleanup",
+    name: "repeated punctuation is normalized",
+    input: "Готово!!! Удалить?? Что!? Правда...? Точно...!",
+    expected: "Готово! Удалить? Что?! Правда?.. Точно!..",
+  },
+  {
+    group: "spacing cleanup",
+    name: "bracket spacing is cleaned",
+    input: "Плейлист(обновлён). Скидка ( 30% ). До 5 треков(максимум).",
+    expected: `Плейлист (обновлён). Скидка (30%). До${NBSP}5${NBSP}треков (максимум)`,
+  },
+  {
+    group: "spacing cleanup",
+    name: "number brackets are not converted into multiplication or ranges",
+    input: "Версия 2(10), значение 5(6).",
+    expected: "Версия 2(10), значение 5(6)",
+  },
+
+  // UI final period
+  {
+    group: "ui final period",
+    name: "short UI final period is removed",
+    input: "Плейлист создан.",
+    expected: "Плейлист создан",
+  },
+  {
+    group: "ui final period",
+    name: "question and exclamation ellipsis variants are preserved",
+    input: "Ну правда?.. Точно!..",
+    expected: "Ну правда?.. Точно!..",
+  },
+  {
+    group: "ui final period",
+    name: "Russian abbreviations keep final period",
+    input: "и т. д.",
+    expected: `и${NBSP}т.${NBSP}д.`,
+  },
+  {
+    group: "ui final period",
+    name: "English abbreviations and technical endings keep final period",
+    input: "Dr. example.com v2.0 т. д. 100 руб.",
+    expected: `Dr. example.com v2.0 т. д. 100${NBSP}руб.`,
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "ui final period",
+    name: "currency abbreviation keeps final period",
+    input: "100 руб.",
+    expected: `100${NBSP}руб.`,
+  },
+
+  // Number spacing, units, and signs
+  {
+    group: "number spacing",
+    name: "percent sign is glued to number and placeholders",
+    input: "Скидка 50 %. Скидка {discount} %.",
+    expected: "Скидка 50%. Скидка {discount}%",
+  },
+  {
+    group: "number spacing",
+    name: "units and file sizes use configured NBSP",
+    input: "5 км, 300 МБ, 25 °C.",
+    expected: `5${NBSP}км, 300${NBSP}МБ, 25${NBSP}°C`,
+  },
+  {
+    group: "number spacing",
+    name: "temperature without space is normalized",
+    input: "25°C, -5 C",
+    expected: `25${NBSP}°C, −5${NBSP}°C`,
+  },
+  {
+    group: "number spacing",
+    name: "number and section signs use regular NBSP",
+    input: "№5, § 3.",
+    expected: `№${NBSP}5, §${NBSP}3.`,
+  },
+  {
+    group: "number spacing",
+    name: "large Russian numbers are grouped and glued to following word",
+    input: "1000000 треков.",
+    expected: `1${NBSP}000${NBSP}000${NBSP}треков`,
     settings: { languageMode: "ru" },
   },
   {
-    name: "special symbols, temperatures, multiplication, arrows, and comparisons",
-    input: "25°C, - 45 deg, 10x20, ошибка<=0, ошибка>=1, a<->b.",
-    expected: `25${NBSP}°C, −45°, 10×20, ошибка≤0, ошибка≥1, a←→b`,
+    group: "number spacing",
+    name: "numeric abbreviations are normalized",
+    input: "5 тыс, 3 млн., 2 млрд.",
+    expected: `5${NBSP}тыс., 3${NBSP}млн, 2${NBSP}млрд`,
+    settings: { languageMode: "ru" },
   },
   {
-    name: "English apostrophes",
-    input: "don't, you're, artists' picks, James' album, rock 'n' roll, 5'11\".",
-    expected: "don’t, you’re, artists’ picks, James’ album, rock ’n’ roll, 5'11\"",
-    settings: { languageMode: "en" },
-  },
-  {
-    name: "English quote nesting",
-    input: "'First level with \"second level\" inside'",
-    expected: "‘First level with “second level” inside’",
-    settings: { languageMode: "en" },
-  },
-  {
-    name: "UI final period preserves known abbreviations and technical endings",
-    input: "Dr. example.com v2.0 т. д. 100 руб.",
-    expected: `Dr. example.com v2.0 т. д. 100${NBSP}руб.`,
-  },
-  {
-    name: "space-entities with common variants",
-    input: "Ошибка&#160;!=0. Ошибка&#x202F;!=0. Цена&nbsp;100р.",
-    expected: `Ошибка&#160;≠ 0. Ошибка&#x202F;≠ 0. Цена&nbsp;100${NBSP}₽`,
-  },
-  {
-    name: "narrow NBSP remains limited around currency; Russian word pairs stay regular NBSP",
+    group: "number spacing",
+    name: "narrow NBSP affects units but Russian word pairs stay regular NBSP",
     input: "100 ₽, до 5 треков.",
-    expected: `100 ₽, до${NBSP}5${NBSP}треков`,
+    expected: `100${NNBSP}₽, до${NBSP}5${NBSP}треков`,
     settings: {
       languageMode: "ru",
       options: { nonBreakingSpaceStyle: "narrow" },
     },
   },
+
+  // Russian NBSP rules
+  {
+    group: "russian nbsp",
+    name: "short prepositions and particles are glued",
+    input: "до 5 треков, в мире, я бы пошёл, он же сказал.",
+    expected: `до${NBSP}5${NBSP}треков, в${NBSP}мире, я${NBSP}бы${NBSP}пошёл, он${NBSP}же${NBSP}сказал`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "initials are glued to each other and surname",
+    input: "А. А. Иванов написал текст.",
+    expected: `А.${NBSP}А.${NBSP}Иванов написал текст`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "address abbreviation does not become broken d-dot case",
+    input: "до 5 треков, д. 5.",
+    expected: `до${NBSP}5${NBSP}треков, д.${NBSP}5`,
+    settings: { languageMode: "ru" },
+  },
+
+  // Special symbols
+  {
+    group: "symbols",
+    name: "copyright, trademark, registered, plus-minus, and approximation",
+    input: "(C), (TM), (R), +/-, + -, ~=.",
+    expected: "©, ™, ®, ±, ±, ≈",
+  },
+  {
+    group: "symbols",
+    name: "comparisons are normalized in text expressions",
+    input: "ошибка!=0, ошибка<=0, ошибка>=1.",
+    expected: "ошибка ≠ 0, ошибка≤0, ошибка≥1",
+  },
+  {
+    group: "symbols",
+    name: "fractions are normalized before punctuation",
+    input: "1/2? 1/3! 2/3, 1/4; 3/4:",
+    expected: "½? ⅓! ⅔, ¼; ¾:",
+  },
+  {
+    group: "symbols",
+    name: "short ruble sign is normalized for signed and unsigned values",
+    input: "100р, 100 р., -100р, +100 р.",
+    expected: `100${NBSP}₽, 100${NBSP}₽, −100${NBSP}₽, +100${NBSP}₽`,
+  },
+  {
+    group: "symbols",
+    name: "latin p is not treated as Cyrillic ruble abbreviation",
+    input: "100р! 100p!",
+    expected: `100${NBSP}₽! 100p!`,
+  },
+  {
+    group: "symbols",
+    name: "degrees and degree words are normalized",
+    input: "-5 C, 25 ° С, 90 degrees, 45deg.",
+    expected: `−5${NBSP}°C, 25${NBSP}°C, 90°, 45°`,
+  },
+  {
+    group: "symbols",
+    name: "multiplication sign is only used between numbers",
+    input: "10x20, 2 х 3, iPhone X, x-axis.",
+    expected: "10×20, 2×3, iPhone X, x-axis",
+  },
+  {
+    group: "symbols",
+    name: "arrows are normalized but fat arrow is preserved",
+    input: "a -> b, a <- b, a <-> b, a => b.",
+    expected: "a → b, a ← b, a ←→ b, a => b",
+  },
+
+  // Ranges and dashes
+  {
+    group: "ranges and dashes",
+    name: "numeric ranges use en dash without spaces",
+    input: "2020 - 2024, 1–5, 10:00 - 12:00",
+    expected: "2020–2024, 1–5, 10:00–12:00",
+  },
+  {
+    group: "ranges and dashes",
+    name: "Russian sentence dash uses em dash with regular NBSP before",
+    input: "Музыка - настроение.",
+    expected: `Музыка${NBSP}— настроение`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "ranges and dashes",
+    name: "minus sign before number is normalized",
+    input: "Температура -5, баланс - 100.",
+    expected: "Температура −5, баланс −100",
+    settings: { languageMode: "ru" },
+  },
+
+  // Quotes
+  {
+    group: "quotes ru",
+    name: "straight Russian quotes become guillemets",
+    input: '"Подписка подключена"',
+    expected: "«Подписка подключена»",
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "quotes ru",
+    name: "Russian quote punctuation moves outside and final period is removed in UI text",
+    input: "«Подписка подключена.»",
+    expected: "«Подписка подключена»",
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "quotes ru",
+    name: "Russian abbreviation period inside quotes is preserved",
+    input: "«и т. д.»",
+    expected: `«и${NBSP}т.${NBSP}д.»`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "quotes en",
+    name: "English apostrophes are normalized in words and decades",
+    input: "don't, you're, artists' picks, James' album, rock 'n' roll, '80s.",
+    expected: "don’t, you’re, artists’ picks, James’ album, rock ’n’ roll, ’80s",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes en",
+    name: "English double and single nested quotes are normalized",
+    input: "\"First level with 'second level' inside\".",
+    expected: "“First level with ‘second level’ inside”",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes en",
+    name: "English height notation is not converted to apostrophes",
+    input: "Height 5'11\".",
+    expected: "Height 5'11\"",
+    settings: { languageMode: "en" },
+  },
+
+  // Protection layer
+  {
+    group: "protection",
+    name: "URLs, emails, and deep links are protected",
+    input: "https://example.com/a??b. www.example.com/test, mail@example.com, app://open/item?id=1.",
+    expected: "https://example.com/a??b. www.example.com/test, mail@example.com, app://open/item?id=1",
+  },
+  {
+    group: "protection",
+    name: "file paths are protected",
+    input: "./src/code.ts, ../ui.html, ~/file, C:\\Users\\Name\\file.txt.",
+    expected: "./src/code.ts, ../ui.html, ~/file, C:\\Users\\Name\\file.txt",
+  },
+  {
+    group: "protection",
+    name: "inline code is protected but surrounding text is formatted",
+    input: "`100р!!` и 100р!!",
+    expected: `\`100р!!\` и${NBSP}100${NBSP}₽!`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "protection",
+    name: "code-like tokens are protected",
+    input: "button_primary, domain.surface.screen, release-1.2.3.",
+    expected: "button_primary, domain.surface.screen, release-1.2.3",
+  },
+  {
+    group: "protection",
+    name: "placeholders stay intact while surrounding text is formatted",
+    input: "До {count} треков. Привет, {{name}}. Скидка {discount} %. Ошибка {code} != 0. Цена ${price} р. %d треков, %@ слушает сейчас.",
+    expected: `До${NBSP}{count} треков. Привет, {{name}}. Скидка {discount}%. Ошибка {code} ≠ 0. Цена \${price} р. %d треков, %@ слушает сейчас`,
+  },
+  {
+    group: "protection",
+    name: "HTML-like tags are protected and visible text inside is formatted",
+    input: '<b>100р</b>, <a href="{url}">1/2</a>, <b>ошибка!=0</b>.',
+    expected: `<b>100${NBSP}₽</b>, <a href="{url}">½</a>, <b>ошибка ≠ 0</b>`,
+  },
+  {
+    group: "protection",
+    name: "HTML entities are protected",
+    input: "&nbsp;, &amp;, &quot;, &laquo;, &raquo;, &#160;, &#x202F;.",
+    expected: "&nbsp;, &amp;, &quot;, &laquo;, &raquo;, &#160;, &#x202F;.",
+  },
+  {
+    group: "protection",
+    name: "space entities do not create extra regular spaces",
+    input: "Ошибка&nbsp;!=0. Ошибка&#160;!=0. Ошибка&#x202F;!=0.",
+    expected: "Ошибка&nbsp;≠ 0. Ошибка&#160;≠ 0. Ошибка&#x202F;≠ 0",
+  },
+  {
+    group: "protection",
+    name: "entities can sit next to formatted visible text",
+    input: "Цена&nbsp;100р. Скидка&nbsp;1/2.",
+    expected: `Цена&nbsp;100${NBSP}₽ Скидка&nbsp;½`,
+  },
+];
+
+const languageCases = [
+  { name: "detects Russian text", input: "Привет мир", expected: "ru" },
+  { name: "detects English text", input: "Hello world", expected: "en" },
+  { name: "ignores HTML tags, entities, and placeholders", input: "<b>Привет</b>&nbsp;{count}", expected: "ru" },
+  { name: "returns unknown for placeholder-only text", input: "{count}", expected: "unknown" },
+  { name: "returns unknown for very short latin text", input: "OK", expected: "unknown" },
+  { name: "returns unknown for balanced mixed text", input: "Привет Hello", expected: "unknown" },
+  { name: "forced Russian mode wins over auto-detect", input: "Hello world", mode: "ru", expected: "ru" },
+  { name: "forced English mode wins over auto-detect", input: "Привет мир", mode: "en", expected: "en" },
 ];
 
 function visible(value) {
@@ -150,30 +438,51 @@ function visible(value) {
     .replace(/\n/g, "⏎\n");
 }
 
+function incrementGroupCount(groupCounts, group) {
+  groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
+}
+
 function run() {
   const formatter = loadFormatter();
   const failures = [];
+  const groupCounts = new Map();
 
-  for (const testCase of testCases) {
+  for (const testCase of formatCases) {
     const actual = formatter.format(testCase.input, testCase.settings || {});
+    incrementGroupCount(groupCounts, testCase.group);
 
     if (actual !== testCase.expected) {
-      failures.push({ ...testCase, actual });
+      failures.push({ type: "format", ...testCase, actual });
     }
   }
 
+  for (const testCase of languageCases) {
+    const actual = formatter.detect(testCase.input, testCase.mode || "auto");
+    incrementGroupCount(groupCounts, "language detection");
+
+    if (actual !== testCase.expected) {
+      failures.push({ type: "language", ...testCase, actual });
+    }
+  }
+
+  const totalCount = formatCases.length + languageCases.length;
+
   if (failures.length === 0) {
-    console.log(`Typography regression tests passed: ${testCases.length}/${testCases.length}`);
+    console.log(`Typography regression tests passed: ${totalCount}/${totalCount}`);
+    console.log("\nCoverage by group:");
+    for (const [group, count] of [...groupCounts.entries()].sort()) {
+      console.log(`- ${group}: ${count}`);
+    }
     return;
   }
 
-  console.error(`Typography regression tests failed: ${failures.length}/${testCases.length}`);
+  console.error(`Typography regression tests failed: ${failures.length}/${totalCount}`);
 
   for (const failure of failures) {
-    console.error(`\n✗ ${failure.name}`);
+    console.error(`\n✗ [${failure.group || "language detection"}] ${failure.name}`);
     console.error("Input:   ", visible(failure.input));
-    console.error("Expected:", visible(failure.expected));
-    console.error("Actual:  ", visible(failure.actual));
+    console.error("Expected:", visible(String(failure.expected)));
+    console.error("Actual:  ", visible(String(failure.actual)));
   }
 
   process.exitCode = 1;
