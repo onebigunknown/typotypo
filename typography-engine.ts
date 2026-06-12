@@ -442,18 +442,107 @@ namespace TypotypoEngine {
     };
   }
 
-  function getTextForLanguageDetection(text: string): string {
-    return text
+  function getIcuVariantTextForLanguageDetection(fragment: string): string {
+    if (!/^\{\s*[^,{}]+,\s*(?:plural|select|selectordinal)\b/i.test(fragment)) {
+      return " ";
+    }
+
+    let result = "";
+    let depth = 0;
+
+    for (let index = 0; index < fragment.length; index += 1) {
+      const character = fragment[index];
+
+      if (character === "{") {
+        depth += 1;
+
+        if (depth === 2) {
+          result += " ";
+        }
+
+        continue;
+      }
+
+      if (character === "}") {
+        if (depth === 2) {
+          result += " ";
+        }
+
+        if (depth > 0) {
+          depth -= 1;
+        }
+
+        continue;
+      }
+
+      if (depth >= 2) {
+        result += character;
+      }
+    }
+
+    return result || " ";
+  }
+
+  function replaceBalancedCurlyBraceFragmentsForLanguageDetection(
+    text: string,
+    includeIcuVariantText: boolean
+  ): string {
+    let result = "";
+    let lastIndex = 0;
+    let depth = 0;
+    let fragmentStart = -1;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const character = text[index];
+
+      if (character === "{") {
+        if (depth === 0) {
+          fragmentStart =
+            index > lastIndex && text[index - 1] === "$" ? index - 1 : index;
+        }
+
+        depth += 1;
+      } else if (character === "}" && depth > 0) {
+        depth -= 1;
+
+        if (depth === 0 && fragmentStart >= 0) {
+          const fragment = text.slice(fragmentStart, index + 1);
+
+          result += text.slice(lastIndex, fragmentStart);
+          result += includeIcuVariantText
+            ? getIcuVariantTextForLanguageDetection(fragment)
+            : " ";
+          lastIndex = index + 1;
+          fragmentStart = -1;
+        }
+      }
+    }
+
+    if (lastIndex === 0) {
+      return text;
+    }
+
+    return result + text.slice(lastIndex);
+  }
+
+  function getTextForLanguageDetection(
+    text: string,
+    includeIcuVariantText = false
+  ): string {
+    const textWithoutProtectedSyntax = text
       .replace(/`[^`\n]+`/g, " ")
       .replace(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g, " ")
-      .replace(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g, " ")
-      .replace(/\$?\{[^{}\n]*\}/g, " ")
+      .replace(/<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g, " ");
+
+    return replaceBalancedCurlyBraceFragmentsForLanguageDetection(
+      textWithoutProtectedSyntax,
+      includeIcuVariantText
+    )
       .replace(/%(?:\d+\$)?[@sdif]/g, " ")
       .replace(/\$\d+\b/g, " ");
   }
 
-  function detectDominantLanguage(text: string): LanguageCode {
-    const languageDetectionText = getTextForLanguageDetection(text);
+  function detectLanguageFromPreparedText(languageDetectionText: string): LanguageCode {
     const cyrillicMatches = languageDetectionText.match(/[А-Яа-яЁё]/g) || [];
     const latinMatches = languageDetectionText.match(/[A-Za-z]/g) || [];
 
@@ -477,6 +566,30 @@ namespace TypotypoEngine {
     }
 
     return "unknown";
+  }
+
+  function getLetterCount(value: string): number {
+    const cyrillicMatches = value.match(/[А-Яа-яЁё]/g) || [];
+    const latinMatches = value.match(/[A-Za-z]/g) || [];
+
+    return cyrillicMatches.length + latinMatches.length;
+  }
+
+  function detectDominantLanguage(text: string): LanguageCode {
+    const surroundingText = getTextForLanguageDetection(text, false);
+    const surroundingTextLanguage = detectLanguageFromPreparedText(
+      surroundingText
+    );
+
+    if (surroundingTextLanguage !== "unknown") {
+      return surroundingTextLanguage;
+    }
+
+    if (getLetterCount(surroundingText) === 0) {
+      return "unknown";
+    }
+
+    return detectLanguageFromPreparedText(getTextForLanguageDetection(text, true));
   }
 
   export function resolveLanguage(text: string, languageMode: LanguageMode): LanguageCode {
@@ -2351,7 +2464,7 @@ namespace TypotypoEngine {
       );
     }
 
-    function protectCurlyBracePlaceholders() {
+    function protectBalancedCurlyBraceFragments() {
       let result = "";
       let lastIndex = 0;
       let depth = 0;
@@ -2396,7 +2509,7 @@ namespace TypotypoEngine {
 
     protectByRegexp(/`[^`\n]+`/g);
     protectHtmlLikeTags();
-    protectCurlyBracePlaceholders();
+    protectBalancedCurlyBraceFragments();
     protectExactByRegexp(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g);
     protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
     protectByRegexp(/\$\d+\b/g);

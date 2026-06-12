@@ -418,6 +418,37 @@ const formatCases = [
     input: "Цена&nbsp;100р. Скидка&nbsp;1/2.",
     expected: `Цена&nbsp;100${NBSP}₽ Скидка&nbsp;½`,
   },
+  {
+    group: "icu protection",
+    name: "plural block is protected while short surrounding Russian text is auto-detected",
+    input: "До {count, plural, one {# трек} few {# трека} many {# треков} other {# трека}}.",
+    expected: `До${NBSP}{count, plural, one {# трек} few {# трека} many {# треков} other {# трека}}`,
+  },
+  {
+    group: "icu protection",
+    name: "select block is protected while final period is removed",
+    input: "Статус:{gender, select, male {Он готов} female {Она готова} other {Готово}}.",
+    expected: "Статус:{gender, select, male {Он готов} female {Она готова} other {Готово}}",
+  },
+  {
+    group: "icu protection",
+    name: "nested select and plural block is protected",
+    input: "{gender, select, male {{count, plural, one {# track} other {# tracks}}} other {No tracks}}",
+    expected: "{gender, select, male {{count, plural, one {# track} other {# tracks}}} other {No tracks}}",
+  },
+  {
+    group: "icu protection",
+    name: "number skeleton block is protected and outside percent is glued",
+    input: "Скидка {discount, number, percent} %.",
+    expected: "Скидка {discount, number, percent}%",
+  },
+  {
+    group: "icu protection",
+    name: "English sentence around plural block is formatted without touching ICU syntax",
+    input: "You have {count, plural, one {# track} other {# tracks}}.",
+    expected: "You have {count, plural, one {# track} other {# tracks}}",
+    settings: { languageMode: "auto" },
+  },
 ];
 
 const languageCases = [
@@ -425,6 +456,10 @@ const languageCases = [
   { name: "detects English text", input: "Hello world", expected: "en" },
   { name: "ignores HTML tags, entities, and placeholders", input: "<b>Привет</b>&nbsp;{count}", expected: "ru" },
   { name: "returns unknown for placeholder-only text", input: "{count}", expected: "unknown" },
+  { name: "returns unknown for ICU-only text", input: "{count, plural, one {# трек} few {# трека} many {# треков} other {# трека}}", expected: "unknown" },
+  { name: "uses ICU variant text for very short surrounding Russian text", input: "До {count, plural, one {# трек} few {# трека} many {# треков} other {# трека}}", expected: "ru" },
+  { name: "ignores ICU internals when detecting surrounding Russian text", input: "Добавьте {count, plural, one {# track} other {# tracks}}", expected: "ru" },
+  { name: "ignores ICU internals when detecting surrounding English text", input: "You have {count, plural, one {# трек} other {# треков}}", expected: "en" },
   { name: "returns unknown for very short latin text", input: "OK", expected: "unknown" },
   { name: "returns unknown for balanced mixed text", input: "Привет Hello", expected: "unknown" },
   { name: "forced Russian mode wins over auto-detect", input: "Hello world", mode: "ru", expected: "ru" },
