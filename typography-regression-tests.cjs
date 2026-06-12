@@ -7,39 +7,41 @@ const ts = require("typescript");
 const CODE_PATH = path.join(process.cwd(), "code.ts");
 
 function loadFormatter() {
-  if (!fs.existsSync(CODE_PATH)) {
-    throw new Error(`Cannot find code.ts in ${process.cwd()}`);
+  const enginePath = path.join(process.cwd(), "typography-engine.ts");
+
+  if (!fs.existsSync(enginePath)) {
+    throw new Error(`Cannot find typography-engine.ts in ${process.cwd()}`);
   }
 
-  const source = fs.readFileSync(CODE_PATH, "utf8");
+  const source = fs.readFileSync(enginePath, "utf8");
   const testBridge = `
 ;(globalThis).__typotypoTestApi = {
-  DEFAULT_SETTINGS,
-  normalizeSettings,
-  resolveLanguage,
-  applyRulesToText,
+  DEFAULT_SETTINGS: TypotypoEngine.DEFAULT_SETTINGS,
+  normalizeSettings: TypotypoEngine.normalizeSettings,
+  resolveLanguage: TypotypoEngine.resolveLanguage,
+  applyRulesToText: TypotypoEngine.applyRulesToText,
   format(input, settingsOverride = {}) {
     const overrideOptions = settingsOverride.options || {};
     const overrideQuoteOptions = overrideOptions.quoteOptions || {};
-    const settings = normalizeSettings({
-      ...DEFAULT_SETTINGS,
+    const settings = TypotypoEngine.normalizeSettings({
+      ...TypotypoEngine.DEFAULT_SETTINGS,
       ...settingsOverride,
       options: {
-        ...DEFAULT_SETTINGS.options,
+        ...TypotypoEngine.DEFAULT_SETTINGS.options,
         ...overrideOptions,
         quoteOptions: {
-          ...DEFAULT_SETTINGS.options.quoteOptions,
+          ...TypotypoEngine.DEFAULT_SETTINGS.options.quoteOptions,
           ...overrideQuoteOptions,
         },
       },
       enabledRules: {
-        ...DEFAULT_SETTINGS.enabledRules,
+        ...TypotypoEngine.DEFAULT_SETTINGS.enabledRules,
         ...(settingsOverride.enabledRules || {}),
       },
     });
 
-    const language = resolveLanguage(input, settings.languageMode);
-    return applyRulesToText(input, settings, language).formattedText;
+    const language = TypotypoEngine.resolveLanguage(input, settings.languageMode);
+    return TypotypoEngine.applyRulesToText(input, settings, language).formattedText;
   },
 };
 `;
@@ -47,38 +49,17 @@ function loadFormatter() {
   const compiled = ts.transpileModule(source + testBridge, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2019,
-      module: ts.ModuleKind.CommonJS,
+      module: ts.ModuleKind.None,
     },
   }).outputText;
 
-  const context = {
-    console,
-    __html__: "",
-    figma: {
-      showUI() {},
-      on() {},
-      notify() {},
-      closePlugin() {},
-      currentPage: { selection: [] },
-      mixed: Symbol("figma.mixed"),
-      loadFontAsync: async () => {},
-      clientStorage: {
-        getAsync: async () => undefined,
-        setAsync: async () => {},
-      },
-      ui: {
-        postMessage() {},
-        onmessage: null,
-      },
-    },
-  };
-
+  const context = { console };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(compiled, context, { filename: "code.ts" });
+  vm.runInContext(compiled, context, { filename: "typography-engine.ts" });
 
   if (!context.__typotypoTestApi) {
-    throw new Error("Could not expose formatter test API from code.ts");
+    throw new Error("Could not expose formatter test API from typography-engine.ts");
   }
 
   return context.__typotypoTestApi;
