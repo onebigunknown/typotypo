@@ -920,6 +920,36 @@ namespace TypotypoEngine {
       };
     }
 
+    function applyUiSeparatorSpacingCleanup(input: string): RuleResult {
+      let separatorReplacementCount = 0;
+
+      const formattedText = input.replace(
+        /([^ \t\n\r\u00A0\u202F|·])([ \t\u00A0\u202F]*)([|·])([ \t\u00A0\u202F]*)([^ \t\n\r\u00A0\u202F|·])/g,
+        function (
+          match: string,
+          leftCharacter: string,
+          _leftSpacing: string,
+          separator: string,
+          _rightSpacing: string,
+          rightCharacter: string
+        ) {
+          const normalized = leftCharacter + " " + separator + " " + rightCharacter;
+
+          if (match === normalized) {
+            return match;
+          }
+
+          separatorReplacementCount += 1;
+          return normalized;
+        }
+      );
+
+      return {
+        formattedText,
+        replacementCount: separatorReplacementCount,
+      };
+    }
+
     let spacedText = "";
 
     for (let index = 0; index < normalizedText.length; index += 1) {
@@ -946,10 +976,16 @@ namespace TypotypoEngine {
     }
 
     const bracketSpacingResult = applyBracketSpacingCleanup(spacedText);
+    const separatorSpacingResult = applyUiSeparatorSpacingCleanup(
+      bracketSpacingResult.formattedText
+    );
 
     return {
-      formattedText: bracketSpacingResult.formattedText,
-      replacementCount: replacementCount + bracketSpacingResult.replacementCount,
+      formattedText: separatorSpacingResult.formattedText,
+      replacementCount:
+        replacementCount +
+        bracketSpacingResult.replacementCount +
+        separatorSpacingResult.replacementCount,
     };
   }
 
@@ -2522,6 +2558,7 @@ namespace TypotypoEngine {
 
     protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>]*)?/gi);
     protectByRegexp(/\b(?:v\d+|\d+)(?:\.\d+){1,}(?:[-+][A-Za-z0-9._-]+)?\b/g);
+    protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+(?:\|[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+)+\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
     protectByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);

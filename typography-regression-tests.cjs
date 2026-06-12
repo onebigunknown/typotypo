@@ -140,6 +140,53 @@ const formatCases = [
     expected: "Версия 2(10), значение 5(6)",
   },
 
+  // UI separators
+  {
+    group: "ui separators",
+    name: "vertical bar gets one regular space on both sides in Russian UI text",
+    input: "Треки|альбомы. Артисты |плейлисты. Подкасты| радио.",
+    expected: "Треки | альбомы. Артисты | плейлисты. Подкасты | радио",
+  },
+  {
+    group: "ui separators",
+    name: "middle dot gets one regular space on both sides",
+    input: "Треки·альбомы. Треки ·альбомы. Треки· альбомы.",
+    expected: "Треки · альбомы. Треки · альбомы. Треки · альбомы",
+  },
+  {
+    group: "ui separators",
+    name: "English vertical bar separator is normalized",
+    input: "Tracks|Albums",
+    expected: "Tracks | Albums",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "ui separators",
+    name: "slashes are not treated as UI separators",
+    input: "Треки/альбомы.",
+    expected: "Треки/альбомы",
+  },
+  {
+    group: "ui separators",
+    name: "repeated pipes are preserved",
+    input: "A||B",
+    expected: "A||B",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "ui separators",
+    name: "code-like tokens around a pipe are protected",
+    input: "button_primary|row_secondary.",
+    expected: "button_primary|row_secondary",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "ui separators",
+    name: "HTML-like tags around visible separators stay protected",
+    input: "<b>Треки</b>|<i>альбомы</i>.",
+    expected: "<b>Треки</b> | <i>альбомы</i>",
+  },
+
   // UI final period
   {
     group: "ui final period",
