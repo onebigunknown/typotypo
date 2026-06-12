@@ -187,6 +187,33 @@ const formatCases = [
     expected: "<b>Треки</b> | <i>альбомы</i>",
   },
 
+  // List markers
+  {
+    group: "list markers",
+    name: "bullet markers get one space after marker",
+    input: "•Треки\n•  Альбомы\n◦Плейлисты",
+    expected: "• Треки\n• Альбомы\n◦ Плейлисты",
+  },
+  {
+    group: "list markers",
+    name: "dash markers get one space after marker",
+    input: "—Треки\n—  Альбомы\n–Плейлисты",
+    expected: "— Треки\n— Альбомы\n— Плейлисты",
+  },
+  {
+    group: "list markers",
+    name: "hyphen markdown-like lists are not normalized",
+    input: "-Треки\n- Альбомы",
+    expected: "-Треки\n- Альбомы",
+  },
+  {
+    group: "list markers",
+    name: "inline em dashes are not treated as list markers",
+    input: "Музыка—это настроение.",
+    expected: "Музыка—это настроение",
+  },
+
+
   // UI final period
   {
     group: "ui final period",

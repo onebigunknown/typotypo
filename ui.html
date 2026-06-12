@@ -1,48 +1,112 @@
 <style>
+  :root {
+    color-scheme: light;
+    --text: #222;
+    --muted: #666;
+    --subtle: #888;
+    --border: #ddd;
+    --border-strong: #cfcfcf;
+    --surface: #fff;
+    --surface-muted: #fafafa;
+    --surface-soft: #f5f5f5;
+    --accent: #18a0fb;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
   body {
     margin: 0;
-    padding: 20px;
+    padding: 18px;
     font-family: Inter, sans-serif;
     font-size: 13px;
-    color: #222;
+    color: var(--text);
+    background: var(--surface);
   }
 
   h1 {
-    margin: 0 0 12px;
+    margin: 0;
     font-size: 18px;
+    line-height: 1.2;
   }
 
   p {
-    margin: 0 0 12px;
+    margin: 0;
     line-height: 1.4;
   }
 
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .eyebrow {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .status-card {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-muted);
+    color: var(--muted);
+  }
+
   .section {
-    margin: 16px 0;
+    margin: 14px 0;
   }
 
   .section-title {
     margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .settings-card,
+  .rule-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-muted);
+  }
+
+  .settings-card {
+    padding: 12px;
+  }
+
+  .settings-card-title,
+  .subsection-title {
+    margin: 0 0 8px;
     font-weight: 600;
+    color: #333;
   }
 
   .subsection-title {
-    margin: 12px 0 8px;
-    font-weight: 600;
+    margin-top: 12px;
     color: #444;
-  }
-
-  select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    background: white;
-    font: inherit;
   }
 
   .field {
     margin-bottom: 10px;
+  }
+
+  .field:last-child {
+    margin-bottom: 0;
   }
 
   .field-label {
@@ -51,26 +115,126 @@
     font-size: 12px;
   }
 
+  select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: white;
+    font: inherit;
+  }
+
   .hint {
     margin-top: 6px;
-    color: #666;
+    color: var(--muted);
     font-size: 12px;
+  }
+
+  .quote-details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-muted);
+  }
+
+  .quote-details summary,
+  .rule-group summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 11px 12px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    list-style: none;
+  }
+
+  .quote-details summary::-webkit-details-marker,
+  .rule-group summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .quote-details summary::after,
+  .rule-group summary::after {
+    content: "⌄";
+    color: var(--subtle);
+    font-size: 14px;
+    transform: rotate(-90deg);
+  }
+
+  .quote-details[open] summary::after,
+  .rule-group[open] summary::after {
+    transform: rotate(0deg);
+  }
+
+  .quote-content {
+    padding: 0 12px 12px;
+  }
+
+  .rule-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .rule-toolbar button {
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+
+  .rule-toolbar button.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .rule-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rule-group-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rule-group-description {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .rule-count {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #eee;
+    color: #666;
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .rules {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    padding: 0 8px 8px;
   }
 
   .rule {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 12px;
-    border: 1px solid #ddd;
+    padding: 9px 10px;
+    border: 1px solid transparent;
     border-radius: 8px;
-    background: #fafafa;
+    background: var(--surface);
+  }
+
+  .rule:hover {
+    border-color: var(--border);
   }
 
   .rule input {
@@ -78,45 +242,66 @@
   }
 
   .rule-title {
-    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
     font-weight: 600;
   }
 
   .rule-description {
     margin: 0;
-    color: #666;
+    color: var(--muted);
+    font-size: 12px;
   }
 
   .tag {
     display: inline-block;
-    margin-left: 6px;
     padding: 1px 5px;
     border-radius: 4px;
     background: #eee;
     color: #666;
     font-size: 11px;
     font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .protection-note {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    color: var(--muted);
+    font-size: 12px;
   }
 
   .actions {
+    position: sticky;
+    bottom: 0;
     display: flex;
     gap: 8px;
-    margin-top: 16px;
+    margin: 16px -18px -18px;
+    padding: 12px 18px 18px;
+    border-top: 1px solid var(--border);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92), #fff 35%);
   }
 
   button {
     padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
     background: white;
     font: inherit;
     cursor: pointer;
   }
 
   button.primary {
-    background: #18a0fb;
-    border-color: #18a0fb;
+    flex: 1;
+    background: var(--accent);
+    border-color: var(--accent);
     color: white;
+    font-weight: 600;
   }
 
   button:disabled {
@@ -125,274 +310,349 @@
   }
 
   #result {
-    margin-top: 12px;
-    color: #555;
+    margin: 12px 0 0;
+    color: var(--muted);
   }
 </style>
 
-<h1>Typography Formatter</h1>
 
-<p id="summary">Checking selection…</p>
+<div class="app-header">
+  <div>
+    <h1>Typography Formatter</h1>
+    <p class="eyebrow">Clean up UI copy while preserving protected syntax.</p>
+  </div>
+</div>
+
+<p id="summary" class="status-card">Checking selection…</p>
 
 <div class="section">
-  <div class="section-title">Language</div>
+  <div class="section-title">Basic settings</div>
 
-  <select id="languageMode">
-    <option value="auto">Auto-detect</option>
-    <option value="ru">Russian</option>
-    <option value="en">English</option>
-  </select>
+  <div class="settings-grid">
+    <div class="settings-card">
+      <div class="settings-card-title">Language</div>
+      <select id="languageMode">
+        <option value="auto">Auto-detect</option>
+        <option value="ru">Russian</option>
+        <option value="en">English</option>
+      </select>
+      <p class="hint">Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.</p>
+    </div>
 
-  <p class="hint">
-    Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.
-  </p>
+    <div class="settings-card">
+      <div class="settings-card-title">Non-breaking space style</div>
+      <select id="nonBreakingSpaceStyle">
+        <option value="regular">Regular non-breaking space</option>
+        <option value="narrow">Narrow non-breaking space</option>
+      </select>
+      <p class="hint">Used for number units, currencies, sizes, and large numbers. Word-based Russian pairs always use a regular non-breaking space.</p>
+    </div>
+  </div>
 </div>
 
 <div class="section">
-  <div class="section-title">Non-breaking space style</div>
+  <details class="quote-details">
+    <summary>Quote styles</summary>
+    <div class="quote-content">
+      <div class="subsection-title">Russian quotes</div>
 
-  <select id="nonBreakingSpaceStyle">
-    <option value="regular">Regular non-breaking space</option>
-    <option value="narrow">Narrow non-breaking space</option>
-  </select>
+      <div class="field">
+        <div class="field-label">First level quotes</div>
+        <select id="ruPrimaryQuoteStyle">
+          <option value="frenchGuillemets">French quotes « »</option>
+          <option value="germanLowHigh">German quotes „ “</option>
+          <option value="englishDouble">English double quotes “ ”</option>
+          <option value="programmerDouble">Programmer quotes " "</option>
+          <option value="englishSingle">English single quotes ‘ ’</option>
+          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+        </select>
+      </div>
 
-  <p class="hint">
-    Used for number units, currencies, sizes, and large numbers. Word-based Russian pairs always use a regular non-breaking space.
-  </p>
-</div>
+      <div class="field">
+        <div class="field-label">Second level quotes</div>
+        <select id="ruSecondaryQuoteStyle">
+          <option value="frenchGuillemets">French quotes « »</option>
+          <option value="germanLowHigh">German quotes „ “</option>
+          <option value="englishDouble">English double quotes “ ”</option>
+          <option value="programmerDouble">Programmer quotes " "</option>
+          <option value="englishSingle">English single quotes ‘ ’</option>
+          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+        </select>
+      </div>
 
-<div class="section">
-  <div class="section-title">Quote styles</div>
+      <div class="subsection-title">English quotes</div>
 
-  <div class="subsection-title">Russian quotes</div>
+      <div class="field">
+        <div class="field-label">First level quotes</div>
+        <select id="enPrimaryQuoteStyle">
+          <option value="frenchGuillemets">French quotes « »</option>
+          <option value="germanLowHigh">German quotes „ “</option>
+          <option value="englishDouble">English double quotes “ ”</option>
+          <option value="programmerDouble">Programmer quotes " "</option>
+          <option value="englishSingle">English single quotes ‘ ’</option>
+          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+        </select>
+      </div>
 
-  <div class="field">
-    <div class="field-label">First level quotes</div>
-    <select id="ruPrimaryQuoteStyle">
-      <option value="frenchGuillemets">French quotes « »</option>
-      <option value="germanLowHigh">German quotes „ “</option>
-      <option value="englishDouble">English double quotes “ ”</option>
-      <option value="programmerDouble">Programmer quotes " "</option>
-      <option value="englishSingle">English single quotes ‘ ’</option>
-      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-    </select>
-  </div>
+      <div class="field">
+        <div class="field-label">Second level quotes</div>
+        <select id="enSecondaryQuoteStyle">
+          <option value="frenchGuillemets">French quotes « »</option>
+          <option value="germanLowHigh">German quotes „ “</option>
+          <option value="englishDouble">English double quotes “ ”</option>
+          <option value="programmerDouble">Programmer quotes " "</option>
+          <option value="englishSingle">English single quotes ‘ ’</option>
+          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
+        </select>
+      </div>
 
-  <div class="field">
-    <div class="field-label">Second level quotes</div>
-    <select id="ruSecondaryQuoteStyle">
-      <option value="frenchGuillemets">French quotes « »</option>
-      <option value="germanLowHigh">German quotes „ “</option>
-      <option value="englishDouble">English double quotes “ ”</option>
-      <option value="programmerDouble">Programmer quotes " "</option>
-      <option value="englishSingle">English single quotes ‘ ’</option>
-      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-    </select>
-  </div>
-
-  <div class="subsection-title">English quotes</div>
-
-  <div class="field">
-    <div class="field-label">First level quotes</div>
-    <select id="enPrimaryQuoteStyle">
-      <option value="frenchGuillemets">French quotes « »</option>
-      <option value="germanLowHigh">German quotes „ “</option>
-      <option value="englishDouble">English double quotes “ ”</option>
-      <option value="programmerDouble">Programmer quotes " "</option>
-      <option value="englishSingle">English single quotes ‘ ’</option>
-      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-    </select>
-  </div>
-
-  <div class="field">
-    <div class="field-label">Second level quotes</div>
-    <select id="enSecondaryQuoteStyle">
-      <option value="frenchGuillemets">French quotes « »</option>
-      <option value="germanLowHigh">German quotes „ “</option>
-      <option value="englishDouble">English double quotes “ ”</option>
-      <option value="programmerDouble">Programmer quotes " "</option>
-      <option value="englishSingle">English single quotes ‘ ’</option>
-      <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-    </select>
-  </div>
-
-  <p class="hint">
-    Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.
-  </p>
+      <p class="hint">Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.</p>
+    </div>
+  </details>
 </div>
 
 <div class="section">
   <div class="section-title">Rules</div>
 
-  <div class="rules">
-    <label class="rule">
-      <input id="invisibleCopyArtifacts" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Invisible copy artifacts <span class="tag">All languages</span></div>
-        <p class="rule-description">Removes hidden characters that may appear after copying text from external sources.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="tabs" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Tabs <span class="tag">All languages</span></div>
-        <p class="rule-description">Replaces tab characters with regular spaces.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="manualLineBreaks" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Manual line breaks <span class="tag">All languages</span></div>
-        <p class="rule-description">Replaces single manual line breaks with spaces while preserving paragraph breaks.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="ellipsis" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Ellipsis <span class="tag">All languages</span></div>
-        <p class="rule-description">Replaces three dots (...) with a proper ellipsis character (…).</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="extraSpaces" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Extra spaces <span class="tag">All languages</span></div>
-        <p class="rule-description">Replaces multiple spaces with a single space.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="trimTextEdges" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Trim text edges <span class="tag">All languages</span></div>
-        <p class="rule-description">Removes spaces at the beginning and end of a text layer.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="spacingCleanup" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Spacing cleanup <span class="tag">All languages</span></div>
-        <p class="rule-description">Cleans spaces around punctuation, bracket spacing, repeated punctuation marks, and periods around closing quotes while preserving numbers, time, URLs, code-like strings, inline code, tags, and placeholders.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="percentSignNoSpace" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Percent sign <span class="tag">All languages</span></div>
-        <p class="rule-description">Removes spaces before the percent sign.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="numberUnitsNbsp" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Number units <span class="tag">All languages</span></div>
-        <p class="rule-description">Keeps numbers together with units, temperatures, currencies, and sizes using a non-breaking space.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="numberSigns" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Number signs <span class="tag">All languages</span></div>
-        <p class="rule-description">Keeps number and section signs together with the following number using a regular non-breaking space.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="specialSymbols" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Special symbols <span class="tag">All languages</span></div>
-        <p class="rule-description">Replaces text combinations like (C), (TM), +-, +/-, !=, ~=, &lt;=, &gt;=, number x number, short ruble signs, negative numbers, degrees, and arrows with typographic symbols.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="englishApostrophes" type="checkbox" checked />
-      <div>
-        <div class="rule-title">English apostrophes <span class="tag">English</span></div>
-        <p class="rule-description">Replaces straight apostrophes in English words, decades, and possessives with typographic apostrophes.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="englishQuotes" type="checkbox" checked />
-      <div>
-        <div class="rule-title">English quotes <span class="tag">English</span></div>
-        <p class="rule-description">Normalizes first- and second-level quotes, including straight single quotes, using the selected English quote styles.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianQuotes" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
-        <p class="rule-description">Normalizes first- and second-level quotes and punctuation around Russian quotes.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="numberRangeDash" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Number ranges <span class="tag">All languages</span></div>
-        <p class="rule-description">Uses an en dash without spaces in numeric and time ranges, for example 2020–2024 and 10:00–12:00.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianSentenceDash" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian sentence dash <span class="tag">Russian</span></div>
-        <p class="rule-description">Converts spaced hyphens, minus signs, and short dashes to an em dash with a non-breaking space before it.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianShortWordsNbsp" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian short words <span class="tag">Russian</span></div>
-        <p class="rule-description">Keeps Russian short words, particles, common abbreviations, and number-word pairs together using a regular non-breaking space.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianInitialsNbsp" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian initials <span class="tag">Russian</span></div>
-        <p class="rule-description">Keeps initials together with each other and with the surname using a regular non-breaking space.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianNumericAbbreviations" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian numeric abbreviations <span class="tag">Russian</span></div>
-        <p class="rule-description">Normalizes numeric abbreviations: тыс. with a period, млн/млрд/трлн without periods.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="russianLargeNumbers" type="checkbox" checked />
-      <div>
-        <div class="rule-title">Russian large numbers <span class="tag">Russian</span></div>
-        <p class="rule-description">Groups large numbers with a non-breaking space, for example 1 000 000.</p>
-      </div>
-    </label>
-
-    <label class="rule">
-      <input id="uiFinalPeriod" type="checkbox" checked />
-      <div>
-        <div class="rule-title">UI final period <span class="tag">Russian + English</span></div>
-        <p class="rule-description">Removes the final period at the end of short UI text while preserving common Russian and English abbreviations.</p>
-      </div>
-    </label>
+  <div class="rule-toolbar" aria-label="Rule shortcuts">
+    <button id="selectAllRules" type="button">Select all rules</button>
+    <button id="deselectAllRules" type="button">Deselect all</button>
+    <button id="resetDefaults" class="full-width" type="button">Reset to defaults</button>
   </div>
+
+  <div class="rule-groups">
+    <details class="rule-group" open>
+      <summary>
+        <span class="rule-group-label">
+          <span>Cleanup</span>
+          <span class="rule-group-description">Spacing, invisible artifacts, line breaks, punctuation.</span>
+        </span>
+        <span class="rule-count">7</span>
+      </summary>
+
+      <div class="rules">
+        <label class="rule">
+          <input id="invisibleCopyArtifacts" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Invisible copy artifacts <span class="tag">All</span></div>
+            <p class="rule-description">Removes hidden characters copied from external sources.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="tabs" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Tabs <span class="tag">All</span></div>
+            <p class="rule-description">Replaces tab characters with regular spaces.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="manualLineBreaks" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Manual line breaks <span class="tag">All</span></div>
+            <p class="rule-description">Replaces single manual line breaks with spaces while preserving paragraphs.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="ellipsis" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Ellipsis <span class="tag">All</span></div>
+            <p class="rule-description">Replaces three dots (...) with a proper ellipsis (…).</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="extraSpaces" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Extra spaces <span class="tag">All</span></div>
+            <p class="rule-description">Replaces multiple spaces with a single space.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="trimTextEdges" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Trim text edges <span class="tag">All</span></div>
+            <p class="rule-description">Removes spaces at the beginning and end of a text layer.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="spacingCleanup" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Spacing cleanup <span class="tag">All</span></div>
+            <p class="rule-description">Cleans punctuation, brackets, repeated marks, quote periods, UI separators, and list markers.</p>
+          </div>
+        </label>
+      </div>
+    </details>
+
+    <details class="rule-group" open>
+      <summary>
+        <span class="rule-group-label">
+          <span>Numbers and symbols</span>
+          <span class="rule-group-description">Units, currencies, signs, ranges, arrows, fractions.</span>
+        </span>
+        <span class="rule-count">5</span>
+      </summary>
+
+      <div class="rules">
+        <label class="rule">
+          <input id="percentSignNoSpace" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Percent sign <span class="tag">All</span></div>
+            <p class="rule-description">Removes spaces before the percent sign.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="numberUnitsNbsp" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Number units <span class="tag">All</span></div>
+            <p class="rule-description">Keeps numbers with units, temperatures, currencies, and sizes.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="numberSigns" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Number signs <span class="tag">All</span></div>
+            <p class="rule-description">Keeps № and § together with the following number.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="specialSymbols" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Special symbols <span class="tag">All</span></div>
+            <p class="rule-description">Normalizes ©, ™, ±, ≠, ≤, ≥, ₽, fractions, degrees, arrows, and multiplication signs.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="numberRangeDash" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Number ranges <span class="tag">All</span></div>
+            <p class="rule-description">Uses an en dash without spaces in numeric and time ranges.</p>
+          </div>
+        </label>
+      </div>
+    </details>
+
+    <details class="rule-group" open>
+      <summary>
+        <span class="rule-group-label">
+          <span>Quotes</span>
+          <span class="rule-group-description">Russian and English quote normalization.</span>
+        </span>
+        <span class="rule-count">3</span>
+      </summary>
+
+      <div class="rules">
+        <label class="rule">
+          <input id="englishApostrophes" type="checkbox" checked />
+          <div>
+            <div class="rule-title">English apostrophes <span class="tag">English</span></div>
+            <p class="rule-description">Replaces straight apostrophes in English words, decades, and possessives.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="englishQuotes" type="checkbox" checked />
+          <div>
+            <div class="rule-title">English quotes <span class="tag">English</span></div>
+            <p class="rule-description">Normalizes first- and second-level English quotes.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="russianQuotes" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
+            <p class="rule-description">Normalizes first- and second-level Russian quotes and punctuation around them.</p>
+          </div>
+        </label>
+      </div>
+    </details>
+
+    <details class="rule-group" open>
+      <summary>
+        <span class="rule-group-label">
+          <span>Russian typography</span>
+          <span class="rule-group-description">Dashes, short words, initials, abbreviations, large numbers.</span>
+        </span>
+        <span class="rule-count">5</span>
+      </summary>
+
+      <div class="rules">
+        <label class="rule">
+          <input id="russianSentenceDash" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian sentence dash <span class="tag">Russian</span></div>
+            <p class="rule-description">Converts spaced hyphens and short dashes to an em dash.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="russianShortWordsNbsp" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian short words <span class="tag">Russian</span></div>
+            <p class="rule-description">Keeps short words, particles, abbreviations, and number-word pairs together.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="russianInitialsNbsp" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian initials <span class="tag">Russian</span></div>
+            <p class="rule-description">Keeps initials together with each other and the surname.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="russianNumericAbbreviations" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian numeric abbreviations <span class="tag">Russian</span></div>
+            <p class="rule-description">Normalizes тыс., млн, млрд, and трлн.</p>
+          </div>
+        </label>
+
+        <label class="rule">
+          <input id="russianLargeNumbers" type="checkbox" checked />
+          <div>
+            <div class="rule-title">Russian large numbers <span class="tag">Russian</span></div>
+            <p class="rule-description">Groups large numbers with a non-breaking space.</p>
+          </div>
+        </label>
+      </div>
+    </details>
+
+    <details class="rule-group" open>
+      <summary>
+        <span class="rule-group-label">
+          <span>UI text</span>
+          <span class="rule-group-description">Final punctuation for short interface copy.</span>
+        </span>
+        <span class="rule-count">1</span>
+      </summary>
+
+      <div class="rules">
+        <label class="rule">
+          <input id="uiFinalPeriod" type="checkbox" checked />
+          <div>
+            <div class="rule-title">UI final period <span class="tag">Russian + English</span></div>
+            <p class="rule-description">Removes the final period at the end of short UI text while preserving abbreviations.</p>
+          </div>
+        </label>
+      </div>
+    </details>
+  </div>
+
+  <p class="protection-note">
+    Protected automatically: URLs, emails, inline code, code-like strings, placeholders, HTML tags, HTML/XML entities, and ICU message syntax.
+  </p>
 </div>
 
 <div class="actions">
@@ -407,6 +667,9 @@
   const result = document.getElementById("result");
   const applyButton = document.getElementById("apply");
   const closeButton = document.getElementById("close");
+  const selectAllRulesButton = document.getElementById("selectAllRules");
+  const deselectAllRulesButton = document.getElementById("deselectAllRules");
+  const resetDefaultsButton = document.getElementById("resetDefaults");
 
   const languageModeSelect = document.getElementById("languageMode");
   const nonBreakingSpaceStyleSelect = document.getElementById("nonBreakingSpaceStyle");
@@ -440,6 +703,72 @@
 
   let hasTextLayers = false;
   let isLoadingSettings = true;
+
+  function getRuleCheckboxes() {
+    return [
+      invisibleCopyArtifactsCheckbox,
+      tabsCheckbox,
+      manualLineBreaksCheckbox,
+      ellipsisCheckbox,
+      extraSpacesCheckbox,
+      trimTextEdgesCheckbox,
+      spacingCleanupCheckbox,
+      percentSignNoSpaceCheckbox,
+      numberUnitsNbspCheckbox,
+      numberSignsCheckbox,
+      specialSymbolsCheckbox,
+      englishApostrophesCheckbox,
+      englishQuotesCheckbox,
+      russianQuotesCheckbox,
+      numberRangeDashCheckbox,
+      russianSentenceDashCheckbox,
+      russianShortWordsNbspCheckbox,
+      russianInitialsNbspCheckbox,
+      russianNumericAbbreviationsCheckbox,
+      russianLargeNumbersCheckbox,
+      uiFinalPeriodCheckbox,
+    ];
+  }
+
+  const defaultSettings = {
+    languageMode: "auto",
+    options: {
+      nonBreakingSpaceStyle: "regular",
+      quoteOptions: {
+        ru: {
+          primaryQuoteStyle: "frenchGuillemets",
+          secondaryQuoteStyle: "germanLowHigh",
+        },
+        en: {
+          primaryQuoteStyle: "englishDouble",
+          secondaryQuoteStyle: "englishSingle",
+        },
+      },
+    },
+    enabledRules: {
+      invisibleCopyArtifacts: true,
+      tabs: true,
+      manualLineBreaks: true,
+      ellipsis: true,
+      extraSpaces: true,
+      trimTextEdges: true,
+      spacingCleanup: true,
+      percentSignNoSpace: true,
+      numberUnitsNbsp: true,
+      numberSigns: true,
+      specialSymbols: true,
+      englishApostrophes: true,
+      englishQuotes: true,
+      russianQuotes: true,
+      numberRangeDash: true,
+      russianSentenceDash: true,
+      russianShortWordsNbsp: true,
+      russianInitialsNbsp: true,
+      russianNumericAbbreviations: true,
+      russianLargeNumbers: true,
+      uiFinalPeriod: true,
+    },
+  };
 
   function getEnabledRules() {
     return {
@@ -686,6 +1015,27 @@
   russianNumericAbbreviationsCheckbox.onchange = handleSettingsChange;
   russianLargeNumbersCheckbox.onchange = handleSettingsChange;
   uiFinalPeriodCheckbox.onchange = handleSettingsChange;
+
+  selectAllRulesButton.onclick = () => {
+    getRuleCheckboxes().forEach((checkbox) => {
+      checkbox.checked = true;
+    });
+
+    handleSettingsChange();
+  };
+
+  deselectAllRulesButton.onclick = () => {
+    getRuleCheckboxes().forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+
+    handleSettingsChange();
+  };
+
+  resetDefaultsButton.onclick = () => {
+    applySettingsToUi(defaultSettings);
+    handleSettingsChange();
+  };
 
   applyButton.onclick = () => {
     parent.postMessage(

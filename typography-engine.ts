@@ -637,9 +637,42 @@ namespace TypotypoEngine {
 
     const normalizedLineEndings = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
+    function startsWithSupportedListMarker(line: string): boolean {
+      return /^[ \t\u00A0\u202F]*(?:[•‣▪◦—–]|-[ \t\u00A0\u202F])/.test(line);
+    }
+
     const formattedText = normalizedLineEndings.replace(
       /([^\n])[ \t\u00A0\u202F]*\n[ \t\u00A0\u202F]*([^\n])/g,
-      function (match: string, beforeBreak: string, afterBreak: string) {
+      function (
+        match: string,
+        beforeBreak: string,
+        afterBreak: string,
+        offset: number,
+        fullText: string
+      ) {
+        const newlineIndex = offset + match.indexOf("\n");
+        const currentLineStart = fullText.lastIndexOf("\n", offset) + 1;
+        const currentLine = fullText.slice(currentLineStart, newlineIndex);
+        const nextLineEnd = fullText.indexOf("\n", newlineIndex + 1);
+        const nextLine = fullText.slice(
+          newlineIndex + 1,
+          nextLineEnd === -1 ? fullText.length : nextLineEnd
+        );
+
+        if (
+          startsWithSupportedListMarker(currentLine) ||
+          startsWithSupportedListMarker(nextLine)
+        ) {
+          const normalized = beforeBreak + "\n" + afterBreak;
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+
         const normalized = beforeBreak + " " + afterBreak;
 
         if (match === normalized) {
@@ -660,6 +693,7 @@ namespace TypotypoEngine {
       replacementCount,
     };
   }
+
 
   function applyEllipsisRule(text: string): RuleResult {
     let formattedText = text;
@@ -950,6 +984,36 @@ namespace TypotypoEngine {
       };
     }
 
+    function applyListMarkerSpacingCleanup(input: string): RuleResult {
+      let markerReplacementCount = 0;
+
+      const formattedText = input.replace(
+        /(^|\n)([ \t\u00A0\u202F]*)([•‣▪◦—–])([ \t\u00A0\u202F]*)(?=\S)/g,
+        function (
+          match: string,
+          lineStart: string,
+          indentation: string,
+          marker: string,
+          _markerSpacing: string
+        ) {
+          const normalizedMarker = marker === "–" ? "—" : marker;
+          const normalized = lineStart + indentation + normalizedMarker + " ";
+
+          if (match === normalized) {
+            return match;
+          }
+
+          markerReplacementCount += 1;
+          return normalized;
+        }
+      );
+
+      return {
+        formattedText,
+        replacementCount: markerReplacementCount,
+      };
+    }
+
     let spacedText = "";
 
     for (let index = 0; index < normalizedText.length; index += 1) {
@@ -979,13 +1043,17 @@ namespace TypotypoEngine {
     const separatorSpacingResult = applyUiSeparatorSpacingCleanup(
       bracketSpacingResult.formattedText
     );
+    const listMarkerSpacingResult = applyListMarkerSpacingCleanup(
+      separatorSpacingResult.formattedText
+    );
 
     return {
-      formattedText: separatorSpacingResult.formattedText,
+      formattedText: listMarkerSpacingResult.formattedText,
       replacementCount:
         replacementCount +
         bracketSpacingResult.replacementCount +
-        separatorSpacingResult.replacementCount,
+        separatorSpacingResult.replacementCount +
+        listMarkerSpacingResult.replacementCount,
     };
   }
 
@@ -2012,7 +2080,7 @@ namespace TypotypoEngine {
       new RegExp(
         "(^|[^А-Яа-яЁёA-Za-z])(" +
           addressAbbreviations +
-          ")\.[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9№§])",
+          ")\\.[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9№§])",
         "giu"
       ),
       function (_match, prefix, abbreviation) {
