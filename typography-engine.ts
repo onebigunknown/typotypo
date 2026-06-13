@@ -1957,34 +1957,92 @@ namespace TypotypoEngine {
     const numberRangeRegexp =
       /(^|[^\d–—−-])(\d{1,4})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(\d{1,4})(?=$|[^\d–—−-])/g;
 
+    const monthNames =
+      "январь|февраль|март|апрель|май|июнь|июль|август|сентябрь|октябрь|ноябрь|декабрь";
+
+    const weekdayNames =
+      "понедельник|вторник|среда|четверг|пятница|суббота|воскресенье";
+
+    const monthRangeRegexp = new RegExp(
+      "(^|[^А-Яа-яЁё])(" +
+        monthNames +
+        ")[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(" +
+        monthNames +
+        ")(?=$|[^А-Яа-яЁё])",
+      "giu"
+    );
+
+    const weekdayRangeRegexp = new RegExp(
+      "(^|[^А-Яа-яЁё])(" +
+        weekdayNames +
+        ")[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*(" +
+        weekdayNames +
+        ")(?=$|[^А-Яа-яЁё])",
+      "giu"
+    );
+
+    const romanNumberRangeRegexp =
+      /(^|[^A-Za-zА-Яа-яЁё0-9])([IVXLCDM]{1,8})[ \t\u00A0\u202F]*[-–—−][ \t\u00A0\u202F]*([IVXLCDM]{1,8})(?=$|[^A-Za-zА-Яа-яЁё0-9])/g;
+
     let formattedText = text;
     let replacementCount = 0;
 
-    formattedText = formattedText.replace(
-      timeRangeRegexp,
-      function (match, prefix, startTime, endTime) {
-        const normalized = prefix + startTime + "–" + endTime;
+    function replaceRangeAndCount(
+      regexp: RegExp,
+      getNormalized: (...args: string[]) => string
+    ) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (...args: unknown[]) {
+          const stringArgs = args.map((arg) =>
+            typeof arg === "string" ? arg : ""
+          );
 
-        if (match === normalized) {
-          return match;
+          const match = stringArgs[0];
+          const normalized = getNormalized(...stringArgs);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
         }
+      );
+    }
 
-        replacementCount += 1;
-        return normalized;
+    replaceRangeAndCount(
+      timeRangeRegexp,
+      function (_match, prefix, startTime, endTime) {
+        return prefix + startTime + "–" + endTime;
       }
     );
 
-    formattedText = formattedText.replace(
+    replaceRangeAndCount(
       numberRangeRegexp,
-      function (match, prefix, startNumber, endNumber) {
-        const normalized = prefix + startNumber + "–" + endNumber;
+      function (_match, prefix, startNumber, endNumber) {
+        return prefix + startNumber + "–" + endNumber;
+      }
+    );
 
-        if (match === normalized) {
-          return match;
-        }
+    replaceRangeAndCount(
+      monthRangeRegexp,
+      function (_match, prefix, startMonth, endMonth) {
+        return prefix + startMonth + "–" + endMonth;
+      }
+    );
 
-        replacementCount += 1;
-        return normalized;
+    replaceRangeAndCount(
+      weekdayRangeRegexp,
+      function (_match, prefix, startWeekday, endWeekday) {
+        return prefix + startWeekday + "–" + endWeekday;
+      }
+    );
+
+    replaceRangeAndCount(
+      romanNumberRangeRegexp,
+      function (_match, prefix, startNumber, endNumber) {
+        return prefix + startNumber + "–" + endNumber;
       }
     );
 
@@ -2562,6 +2620,23 @@ namespace TypotypoEngine {
       });
     }
 
+    function isRomanNumeralRange(value: string): boolean {
+      return /^[IVXLCDM]{1,8}[-–—−][IVXLCDM]{1,8}$/.test(value);
+    }
+
+    function protectCodeLikeTokensByRegexp(regexp: RegExp) {
+      protectedText = protectedText.replace(regexp, function (match: string) {
+        if (isRomanNumeralRange(match)) {
+          return match;
+        }
+
+        const { protectedValue, trailingPunctuation } =
+          splitTrailingPunctuation(match);
+
+        return protectValue(protectedValue, trailingPunctuation);
+      });
+    }
+
     function protectHtmlLikeTags() {
       protectByRegexp(
         /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[A-Za-z_:][A-Za-z0-9:._-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'=<>`]+))?)*\s*\/?>/g
@@ -2628,8 +2703,8 @@ namespace TypotypoEngine {
     protectByRegexp(/\b(?:v\d+|\d+)(?:\.\d+){1,}(?:[-+][A-Za-z0-9._-]+)?\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+(?:\|[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+)+\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}\b/g);
-    protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
-    protectByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
+    protectCodeLikeTokensByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
+    protectCodeLikeTokensByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
     protectByRegexp(/\b(?=[A-Za-z0-9/]*[A-Za-z])[A-Za-z0-9]+(?:\/[A-Za-z0-9]+)+\b/g);
     protectByRegexp(/\b\d+\/\d+-[A-Za-z0-9_-]+\b/g);
     protectByRegexp(/\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g);
