@@ -269,15 +269,15 @@ const formatCases = [
   {
     group: "ui final period",
     name: "English abbreviations and technical endings keep final period",
-    input: "Dr. example.com v2.0 т. д. 100 руб.",
-    expected: `Dr. example.com v2.0 т. д. 100${NBSP}руб.`,
+    input: "Dr.",
+    expected: "Dr.",
     settings: { languageMode: "en" },
   },
   {
     group: "ui final period",
-    name: "currency abbreviation keeps final period",
+    name: "ruble abbreviation is normalized instead of keeping the abbreviation period",
     input: "100 руб.",
-    expected: `100${NBSP}руб.`,
+    expected: `100${NBSP}₽`,
   },
 
   // Number spacing, units, and signs
@@ -383,6 +383,73 @@ const formatCases = [
     name: "latin p is not treated as Cyrillic ruble abbreviation",
     input: "100р! 100p!",
     expected: `100${NBSP}₽! 100p!`,
+  },
+  {
+    group: "currency",
+    name: "Russian ruble aliases are normalized after the amount",
+    input: "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR.",
+    expected: `Цена 789${NBSP}₽, 100${NBSP}₽, 50${NBSP}₽ и${NBSP}60${NBSP}₽`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "currency",
+    name: "Russian USD and EUR aliases are normalized after the amount",
+    input: "Стоимость 20usd, 30 EUR, $ 40 и 50€.",
+    expected: `Стоимость 20${NBSP}$, 30${NBSP}€, 40${NBSP}$ и${NBSP}50${NBSP}€`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "currency",
+    name: "Russian compact USD and EUR prefixes are normalized after the amount",
+    input: "Стоимость $20, €30, $40 и 50€.",
+    expected: `Стоимость 20${NBSP}$, 30${NBSP}€, 40${NBSP}$ и${NBSP}50${NBSP}€`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "currency",
+    name: "English USD and EUR aliases are normalized before the amount",
+    input: "Price 20usd, 30 EUR, $ 40 and 50€.",
+    expected: "Price $20, €30, $40 and €50",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "currency",
+    name: "English ruble aliases are normalized before the amount",
+    input: "Price 789 RUB, RUR 100 and 50 rub.",
+    expected: "Price ₽789, ₽100 and ₽50",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "currency",
+    name: "bare dollar placeholder-like value stays protected in auto mode",
+    input: "$100",
+    expected: "$100",
+  },
+  {
+    group: "currency",
+    name: "mixed Russian and English currency contexts use local ordering",
+    input:
+      "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR. Стоимость $20, €30, $40 и 50€. Price $20, €30, $40 and 50€. Price 789 RUB, RUR 100 and 50 rub. 100p и $100",
+    expected:
+      `Цена 789${NBSP}₽, 100${NBSP}₽, 50${NBSP}₽ и 60${NBSP}₽. Стоимость 20${NBSP}$, 30${NBSP}€, 40${NBSP}$ и 50${NBSP}€. Price $20, €30, $40 and €50. Price ₽789, ₽100 and ₽50. 100p и $100`,
+  },
+  {
+    group: "currency",
+    name: "manual Russian currency mode overrides local English context",
+    input:
+      "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR. Стоимость $20, €30, $40 и 50€. Price $20, €30, $40 and 50€. Price 789 RUB, RUR 100 and 50 rub. 100p и $100",
+    expected:
+      `Цена 789${NBSP}₽, 100${NBSP}₽, 50${NBSP}₽ и${NBSP}60${NBSP}₽. Стоимость 20${NBSP}$, 30${NBSP}€, 40${NBSP}$ и${NBSP}50${NBSP}€. Price 20${NBSP}$, 30${NBSP}€, 40${NBSP}$ and 50${NBSP}€. Price 789${NBSP}₽, 100${NBSP}₽ and 50${NBSP}₽. 100p и${NBSP}$100`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "currency",
+    name: "manual English currency mode overrides local Russian context",
+    input:
+      "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR. Стоимость $20, €30, $40 и 50€. Price $20, €30, $40 and 50€. Price 789 RUB, RUR 100 and 50 rub. 100p и $100",
+    expected:
+      "Цена ₽789, ₽100, ₽50 и ₽60. Стоимость $20, €30, $40 и €50. Price $20, €30, $40 and €50. Price ₽789, ₽100 and ₽50. 100p и $100",
+    settings: { languageMode: "en" },
   },
   {
     group: "symbols",

@@ -1195,7 +1195,8 @@ namespace TypotypoEngine {
 
   function applySpecialSymbolsRule(
     text: string,
-    settings: ApplySettings
+    settings: ApplySettings,
+    language: LanguageCode
   ): RuleResult {
     let formattedText = text;
     let replacementCount = 0;
@@ -1216,6 +1217,141 @@ namespace TypotypoEngine {
       return number
         .replace(/^([+−–—-])[ \t\u00A0\u202F]+(?=\d)/, "$1")
         .replace(/^[-–—−]/, "−");
+    }
+
+    function resolveCurrencyLanguage(
+      rawCurrency: string,
+      symbol: "₽" | "$" | "€",
+      offset: number,
+      fullText: string
+    ): "ru" | "en" | null {
+      if (settings.languageMode === "ru" || settings.languageMode === "en") {
+        return settings.languageMode;
+      }
+
+      const contextWindow = 32;
+      const localContext =
+        fullText.slice(Math.max(0, offset - contextWindow), offset) +
+        " " +
+        fullText.slice(offset, Math.min(fullText.length, offset + contextWindow));
+
+      const cyrillicMatches = localContext.match(/[А-Яа-яЁё]/g) || [];
+      const latinMatches = localContext.match(/[A-Za-z]/g) || [];
+
+      if (cyrillicMatches.length > 0 && cyrillicMatches.length >= latinMatches.length) {
+        return "ru";
+      }
+
+      if (latinMatches.length > 0 && latinMatches.length > cyrillicMatches.length) {
+        return "en";
+      }
+
+      if (language === "ru" || language === "en") {
+        return language;
+      }
+
+      if (symbol === "₽" && /^(?:₽|р\.?|руб\.?|рублей)$/iu.test(rawCurrency)) {
+        return "ru";
+      }
+
+      return null;
+    }
+
+    function formatCurrencyAmount(
+      number: string,
+      symbol: "₽" | "$" | "€",
+      currencyLanguage: "ru" | "en"
+    ): string {
+      const normalizedNumber = normalizeSignedNumber(number);
+
+      if (currencyLanguage === "en") {
+        const sign = /^[+−]/.test(normalizedNumber)
+          ? normalizedNumber.charAt(0)
+          : "";
+        const unsignedNumber = sign
+          ? normalizedNumber.slice(1)
+          : normalizedNumber;
+
+        return sign + symbol + unsignedNumber;
+      }
+
+      return normalizedNumber + space + symbol;
+    }
+
+    function replaceCurrencySuffix(
+      regexp: RegExp,
+      symbol: "₽" | "$" | "€"
+    ) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (
+          match: string,
+          prefix: string,
+          number: string,
+          rawCurrency: string,
+          offset: number,
+          fullText: string
+        ) {
+          const currencyLanguage = resolveCurrencyLanguage(
+            rawCurrency,
+            symbol,
+            offset,
+            fullText
+          );
+
+          if (!currencyLanguage) {
+            return match;
+          }
+
+          const normalized =
+            prefix + formatCurrencyAmount(number, symbol, currencyLanguage);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+      );
+    }
+
+    function replaceCurrencyPrefix(
+      regexp: RegExp,
+      symbol: "₽" | "$" | "€"
+    ) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (
+          match: string,
+          prefix: string,
+          rawCurrency: string,
+          number: string,
+          offset: number,
+          fullText: string
+        ) {
+          const currencyLanguage = resolveCurrencyLanguage(
+            rawCurrency,
+            symbol,
+            offset,
+            fullText
+          );
+
+          if (!currencyLanguage) {
+            return match;
+          }
+
+          const normalized =
+            prefix + formatCurrencyAmount(number, symbol, currencyLanguage);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+      );
     }
 
     replaceAndCount(/\([cс]\)/giu, "©");
@@ -1280,34 +1416,74 @@ namespace TypotypoEngine {
       }
     );
 
-    formattedText = formattedText.replace(
-      /(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р\.)(?=$|[ \t\n\r,;:!?…)]|[»”’\uE100])/giu,
-      function (match: string, prefix: string, number: string) {
-        const normalizedNumber = normalizeSignedNumber(number);
-        const normalized = prefix + normalizedNumber + space + "₽";
+    const currencyPrefixBoundary = `(^|[ \t\u00A0\u202F([{«„“"'\uE101])`;
+    const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
+    const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*\\d+(?:[,.]\\d+)?)`;
 
-        if (match === normalized) {
-          return match;
-        }
-
-        replacementCount += 1;
-        return normalized;
-      }
+    replaceCurrencySuffix(
+      new RegExp(
+        currencyPrefixBoundary +
+          currencyNumber +
+          `[ \t\u00A0\u202F]*(₽|р\\.?|руб\\.?|рублей|RUB|RUR)` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "₽"
     );
 
-    formattedText = formattedText.replace(
-      /(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:р)(?=$|[ \t\n\r,.;:!?…)]|[»”’\uE100])/giu,
-      function (match: string, prefix: string, number: string) {
-        const normalizedNumber = normalizeSignedNumber(number);
-        const normalized = prefix + normalizedNumber + space + "₽";
+    replaceCurrencyPrefix(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
+          currencyNumber +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "₽"
+    );
 
-        if (match === normalized) {
-          return match;
-        }
+    replaceCurrencySuffix(
+      new RegExp(
+        currencyPrefixBoundary +
+          currencyNumber +
+          `[ \t\u00A0\u202F]*(\\$|USD)` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "$"
+    );
 
-        replacementCount += 1;
-        return normalized;
-      }
+    replaceCurrencyPrefix(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(\\$|USD)[ \t\u00A0\u202F]*` +
+          currencyNumber +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "$"
+    );
+
+    replaceCurrencySuffix(
+      new RegExp(
+        currencyPrefixBoundary +
+          currencyNumber +
+          `[ \t\u00A0\u202F]*(€|EUR)` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "€"
+    );
+
+    replaceCurrencyPrefix(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(€|EUR)[ \t\u00A0\u202F]*` +
+          currencyNumber +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "€"
     );
 
     formattedText = formattedText.replace(
@@ -2749,12 +2925,40 @@ namespace TypotypoEngine {
       protectedText = result + protectedText.slice(lastIndex);
     }
 
+    function hasCurrencyContext(textFragment: string): boolean {
+      return /(?:цена|стоимость|стоить|стоит|стоили|тариф|подписк|скидк|плат[её]ж|оплат|за|от|до|price|cost|costs|subscription|discount|plan|payment|from|to)/iu.test(
+        textFragment
+      );
+    }
+
+    function protectDollarPlaceholders() {
+      protectedText = protectedText.replace(
+        /\$\d+\b/g,
+        function (match: string, offset: number, fullText: string) {
+          const contextWindow = 32;
+          const localContext =
+            fullText.slice(Math.max(0, offset - contextWindow), offset) +
+            " " +
+            fullText.slice(
+              offset + match.length,
+              Math.min(fullText.length, offset + match.length + contextWindow)
+            );
+
+          if (hasCurrencyContext(localContext)) {
+            return match;
+          }
+
+          return protectValue(match);
+        }
+      );
+    }
+
     protectByRegexp(/`[^`\n]+`/g);
     protectHtmlLikeTags();
     protectBalancedCurlyBraceFragments();
     protectExactByRegexp(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g);
     protectByRegexp(/%(?:\d+\$)?[@sdif]/g);
-    protectByRegexp(/\$\d+\b/g);
+    protectDollarPlaceholders();
 
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
