@@ -764,7 +764,7 @@ namespace TypotypoEngine {
     }
 
     normalizedText = normalizedText.replace(
-      /[ \t\u00A0\u202F]+([,.;:!?])/g,
+      /[ \t\u00A0\u202F]+([,.…;:!?])/g,
       function (match: string, punctuation: string) {
         if (match === punctuation) {
           return match;
@@ -922,7 +922,7 @@ namespace TypotypoEngine {
       );
 
       output = output.replace(
-        /([А-Яа-яЁё0-9»”’)\].!?])([([])(?=[^ \t\n\r\u00A0\u202F)\]])/g,
+        /([А-Яа-яЁё0-9»“”’")\].!?])([([])(?=[^ \t\n\r\u00A0\u202F)\]])/g,
         function (
           match: string,
           beforeBracket: string,
@@ -951,6 +951,61 @@ namespace TypotypoEngine {
       return {
         formattedText: output,
         replacementCount: bracketReplacementCount,
+      };
+    }
+
+    function applyEnclosureSpacingCleanup(input: string): RuleResult {
+      let enclosureReplacementCount = 0;
+
+      function replaceAndCount(
+        value: string,
+        regexp: RegExp,
+        replacer: (...args: string[]) => string
+      ): string {
+        return value.replace(regexp, function (...args: unknown[]) {
+          const stringArgs = args.map((arg) =>
+            typeof arg === "string" ? arg : ""
+          );
+
+          const match = stringArgs[0];
+          const normalized = replacer(...stringArgs);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          enclosureReplacementCount += 1;
+          return normalized;
+        });
+      }
+
+      let output = replaceAndCount(
+        input,
+        /([«„“‘‚"([])[ \t\u00A0\u202F]+(?=\S)/g,
+        function (_match: string, openingSymbol: string) {
+          return openingSymbol;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /(„[^„“\n]*?)[ \t\u00A0\u202F]+“/g,
+        function (_match: string, quoteContentBeforeClosing: string) {
+          return quoteContentBeforeClosing + "“";
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /[ \t\u00A0\u202F]+([»”’"\])])/g,
+        function (_match: string, closingSymbol: string) {
+          return closingSymbol;
+        }
+      );
+
+      return {
+        formattedText: output,
+        replacementCount: enclosureReplacementCount,
       };
     }
 
@@ -1040,8 +1095,14 @@ namespace TypotypoEngine {
     }
 
     const bracketSpacingResult = applyBracketSpacingCleanup(spacedText);
-    const separatorSpacingResult = applyUiSeparatorSpacingCleanup(
+    const enclosureSpacingResult = applyEnclosureSpacingCleanup(
       bracketSpacingResult.formattedText
+    );
+    const secondBracketSpacingResult = applyBracketSpacingCleanup(
+      enclosureSpacingResult.formattedText
+    );
+    const separatorSpacingResult = applyUiSeparatorSpacingCleanup(
+      secondBracketSpacingResult.formattedText
     );
     const listMarkerSpacingResult = applyListMarkerSpacingCleanup(
       separatorSpacingResult.formattedText
@@ -1052,6 +1113,8 @@ namespace TypotypoEngine {
       replacementCount:
         replacementCount +
         bracketSpacingResult.replacementCount +
+        enclosureSpacingResult.replacementCount +
+        secondBracketSpacingResult.replacementCount +
         separatorSpacingResult.replacementCount +
         listMarkerSpacingResult.replacementCount,
     };

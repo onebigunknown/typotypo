@@ -140,6 +140,39 @@ const formatCases = [
     expected: "Версия 2(10), значение 5(6)",
   },
 
+  {
+    group: "spacing cleanup",
+    name: "spaces inside Russian quotes and brackets are removed",
+    input: "« текст » ( тест ) [ ещё ].",
+    expected: "«текст» (тест) [ещё]",
+  },
+  {
+    group: "spacing cleanup",
+    name: "spaces inside straight quotes are cleaned before Russian quote normalization",
+    input: "\" текст \".",
+    expected: "«текст»",
+  },
+  {
+    group: "spacing cleanup",
+    name: "space before ellipsis is removed",
+    input: "Подождите … Готово .",
+    expected: "Подождите… Готово",
+  },
+  {
+    group: "spacing cleanup",
+    name: "English quote and bracket inner spacing is cleaned",
+    input: "Hello “ text ” and ( more ).",
+    expected: "Hello “text” and (more)",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "spacing cleanup",
+    name: "English feet and inches notation is preserved",
+    input: "5' 11\"",
+    expected: "5' 11\"",
+    settings: { languageMode: "en" },
+  },
+
   // UI separators
   {
     group: "ui separators",
