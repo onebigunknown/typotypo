@@ -353,6 +353,28 @@ const formatCases = [
     settings: { languageMode: "ru" },
   },
 
+  {
+    group: "russian nbsp",
+    name: "expanded short words are glued",
+    input: "будто сейчас, ведь правда, ото всех.",
+    expected: `будто${NBSP}сейчас, ведь${NBSP}правда, ото${NBSP}всех`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "legal entity abbreviations are glued to names",
+    input: 'ООО "Ромашка", ПАО Сбер и ИП Иванов.',
+    expected: `ООО${NBSP}"Ромашка", ПАО${NBSP}Сбер и${NBSP}ИП${NBSP}Иванов`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "expanded address abbreviations are glued",
+    input: "пгт. Лесной, корп. 2, литер А, эт. 5.",
+    expected: `пгт.${NBSP}Лесной, корп.${NBSP}2, литер${NBSP}А, эт.${NBSP}5`,
+    settings: { languageMode: "ru" },
+  },
+
   // Special symbols
   {
     group: "symbols",
