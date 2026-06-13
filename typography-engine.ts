@@ -1229,11 +1229,50 @@ namespace TypotypoEngine {
         return settings.languageMode;
       }
 
-      const contextWindow = 32;
-      const localContext =
-        fullText.slice(Math.max(0, offset - contextWindow), offset) +
-        " " +
-        fullText.slice(offset, Math.min(fullText.length, offset + contextWindow));
+      function isSentenceBoundaryAt(index: number): boolean {
+        const character = fullText[index];
+
+        if (character === "\n" || character === "\r") {
+          return true;
+        }
+
+        if (character !== "." && character !== "!" && character !== "?") {
+          return false;
+        }
+
+        const previousCharacter = index > 0 ? fullText[index - 1] : "";
+        const nextCharacter = fullText[index + 1] || "";
+
+        if (/\d/.test(previousCharacter) && /\d/.test(nextCharacter)) {
+          return false;
+        }
+
+        return true;
+      }
+
+      function getCurrencyLocalContext(): string {
+        const contextWindow = 48;
+        let contextStart = Math.max(0, offset - contextWindow);
+        let contextEnd = Math.min(fullText.length, offset + contextWindow);
+
+        for (let index = offset - 1; index >= contextStart; index -= 1) {
+          if (isSentenceBoundaryAt(index)) {
+            contextStart = index + 1;
+            break;
+          }
+        }
+
+        for (let index = offset; index < contextEnd; index += 1) {
+          if (isSentenceBoundaryAt(index)) {
+            contextEnd = index;
+            break;
+          }
+        }
+
+        return fullText.slice(contextStart, contextEnd);
+      }
+
+      const localContext = getCurrencyLocalContext();
 
       const cyrillicMatches = localContext.match(/[А-Яа-яЁё]/g) || [];
       const latinMatches = localContext.match(/[A-Za-z]/g) || [];
@@ -1257,25 +1296,66 @@ namespace TypotypoEngine {
       return null;
     }
 
+    function normalizeCurrencyDecimalSeparator(
+      number: string,
+      currencyLanguage: "ru" | "en"
+    ): string {
+      const normalizedNumber = normalizeSignedNumber(number);
+      const decimalSeparator = currencyLanguage === "ru" ? "," : ".";
+
+      return normalizedNumber.replace(
+        /([,.])(\d{1,2})$/,
+        decimalSeparator + "$2"
+      );
+    }
+
+    function splitSignedNumber(number: string): {
+      sign: string;
+      unsignedNumber: string;
+    } {
+      const sign = /^[+−]/.test(number) ? number.charAt(0) : "";
+      const unsignedNumber = sign ? number.slice(1) : number;
+
+      return { sign, unsignedNumber };
+    }
+
     function formatCurrencyAmount(
       number: string,
       symbol: "₽" | "$" | "€",
       currencyLanguage: "ru" | "en"
     ): string {
-      const normalizedNumber = normalizeSignedNumber(number);
+      const normalizedNumber = normalizeCurrencyDecimalSeparator(
+        number,
+        currencyLanguage
+      );
 
       if (currencyLanguage === "en") {
-        const sign = /^[+−]/.test(normalizedNumber)
-          ? normalizedNumber.charAt(0)
-          : "";
-        const unsignedNumber = sign
-          ? normalizedNumber.slice(1)
-          : normalizedNumber;
+        const { sign, unsignedNumber } = splitSignedNumber(normalizedNumber);
 
         return sign + symbol + unsignedNumber;
       }
 
       return normalizedNumber + space + symbol;
+    }
+
+    function formatRubleKopeckAmount(
+      rubles: string,
+      kopecks: string,
+      currencyLanguage: "ru" | "en"
+    ): string {
+      const normalizedRubles = normalizeSignedNumber(rubles).replace(
+        /[,.]\d+$/,
+        ""
+      );
+      const normalizedKopecks = kopecks.padStart(2, "0");
+
+      if (currencyLanguage === "en") {
+        const { sign, unsignedNumber } = splitSignedNumber(normalizedRubles);
+
+        return sign + "₽" + unsignedNumber + "." + normalizedKopecks;
+      }
+
+      return normalizedRubles + "," + normalizedKopecks + space + "₽";
     }
 
     function replaceCurrencySuffix(
@@ -1354,6 +1434,125 @@ namespace TypotypoEngine {
       );
     }
 
+    function replaceCurrencyPrefixFractionalFirst(
+      regexp: RegExp,
+      symbol: "₽" | "$" | "€"
+    ) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (
+          match: string,
+          prefix: string,
+          rawCurrency: string,
+          number: string,
+          offset: number,
+          fullText: string
+        ) {
+          const currencyLanguage = resolveCurrencyLanguage(
+            rawCurrency,
+            symbol,
+            offset,
+            fullText
+          );
+
+          if (!currencyLanguage) {
+            return match;
+          }
+
+          const normalized =
+            prefix + formatCurrencyAmount(number, symbol, currencyLanguage);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+      );
+    }
+
+    function replaceRubleKopecks(regexp: RegExp) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (
+          match: string,
+          prefix: string,
+          rubles: string,
+          rawCurrency: string,
+          kopecks: string,
+          terminalPeriod: string,
+          offset: number,
+          fullText: string
+        ) {
+          const currencyLanguage = resolveCurrencyLanguage(
+            rawCurrency,
+            "₽",
+            offset,
+            fullText
+          );
+
+          if (!currencyLanguage) {
+            return match;
+          }
+
+          const amount = formatRubleKopeckAmount(
+            rubles,
+            kopecks,
+            currencyLanguage
+          );
+          const characterAfterMatch = fullText.slice(offset + match.length);
+          const shouldKeepSentencePeriod =
+            terminalPeriod === "." &&
+            /^[ \t\u00A0\u202F]+[А-ЯЁA-Z]/.test(characterAfterMatch);
+          const normalized =
+            prefix + amount + (shouldKeepSentencePeriod ? "." : "");
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+      );
+    }
+
+    function repairSplitRubleFractionalAmounts(regexp: RegExp) {
+      formattedText = formattedText.replace(
+        regexp,
+        function (
+          match: string,
+          prefix: string,
+          rubles: string,
+          kopecks: string,
+          offset: number,
+          fullText: string
+        ) {
+          const currencyLanguage = resolveCurrencyLanguage(
+            "₽",
+            "₽",
+            offset,
+            fullText
+          );
+
+          if (!currencyLanguage) {
+            return match;
+          }
+
+          const normalized =
+            prefix + formatRubleKopeckAmount(rubles, kopecks, currencyLanguage);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          replacementCount += 1;
+          return normalized;
+        }
+      );
+    }
+
     replaceAndCount(/\([cс]\)/giu, "©");
     replaceAndCount(/\((tm|тм)\)/giu, "™");
     replaceAndCount(/\([rр]\)/giu, "®");
@@ -1420,6 +1619,58 @@ namespace TypotypoEngine {
     const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
     const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*\\d+(?:[,.]\\d+)?)`;
 
+    replaceCurrencyPrefixFractionalFirst(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
+          `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "₽"
+    );
+
+    replaceCurrencyPrefixFractionalFirst(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(\\$|USD)[ \t\u00A0\u202F]*` +
+          `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "$"
+    );
+
+    replaceCurrencyPrefixFractionalFirst(
+      new RegExp(
+        currencyPrefixBoundary +
+          `(€|EUR)[ \t\u00A0\u202F]*` +
+          `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+          currencySuffixBoundary,
+        "giu"
+      ),
+      "€"
+    );
+
+    repairSplitRubleFractionalAmounts(
+      new RegExp(
+        currencyPrefixBoundary +
+          `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+          currencySuffixBoundary,
+        "giu"
+      )
+    );
+
+    replaceRubleKopecks(
+      new RegExp(
+        currencyPrefixBoundary +
+          currencyNumber +
+          `[ \t\u00A0\u202F]*(₽|р\\.?|руб\\.?|рублей|RUB|RUR)[ \t\u00A0\u202F]+(\\d{1,2})[ \t\u00A0\u202F]*(?:коп|копеек|копейки|копейка)(\\.)?` +
+          currencySuffixBoundary,
+        "giu"
+      )
+    );
+
     replaceCurrencySuffix(
       new RegExp(
         currencyPrefixBoundary +
@@ -1484,6 +1735,15 @@ namespace TypotypoEngine {
         "giu"
       ),
       "€"
+    );
+
+    repairSplitRubleFractionalAmounts(
+      new RegExp(
+        currencyPrefixBoundary +
+          `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+          currencySuffixBoundary,
+        "giu"
+      )
     );
 
     formattedText = formattedText.replace(
@@ -2967,7 +3227,7 @@ namespace TypotypoEngine {
     protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
 
     protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>]*)?/gi);
-    protectByRegexp(/\b(?:v\d+|\d+)(?:\.\d+){1,}(?:[-+][A-Za-z0-9._-]+)?\b/g);
+    protectByRegexp(/\b(?:v\d+(?:\.\d+){1,}|\d+(?:\.\d+){2,})(?:[-+][A-Za-z0-9._-]+)?\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+(?:\|[A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+)+\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}\b/g);
     protectCodeLikeTokensByRegexp(/\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b/g);
@@ -3005,6 +3265,111 @@ namespace TypotypoEngine {
     return restoredText;
   }
 
+
+  function repairSplitRubleFractionalAmountsAfterAllRules(
+    text: string,
+    settings: ApplySettings,
+    language: LanguageCode
+  ): RuleResult {
+    const space = getConfiguredNbsp(settings);
+    let replacementCount = 0;
+
+    function isSentenceBoundaryAt(index: number, fullText: string): boolean {
+      const character = fullText[index];
+
+      if (character === "\n" || character === "\r") {
+        return true;
+      }
+
+      if (character !== "." && character !== "!" && character !== "?") {
+        return false;
+      }
+
+      const previousCharacter = index > 0 ? fullText[index - 1] : "";
+      const nextCharacter = fullText[index + 1] || "";
+
+      if (/\d/.test(previousCharacter) && /\d/.test(nextCharacter)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function resolveRepairLanguage(offset: number, fullText: string): "ru" | "en" {
+      if (settings.languageMode === "ru" || settings.languageMode === "en") {
+        return settings.languageMode;
+      }
+
+      const contextWindow = 48;
+      let contextStart = Math.max(0, offset - contextWindow);
+      let contextEnd = Math.min(fullText.length, offset + contextWindow);
+
+      for (let index = offset - 1; index >= contextStart; index -= 1) {
+        if (isSentenceBoundaryAt(index, fullText)) {
+          contextStart = index + 1;
+          break;
+        }
+      }
+
+      for (let index = offset; index < contextEnd; index += 1) {
+        if (isSentenceBoundaryAt(index, fullText)) {
+          contextEnd = index;
+          break;
+        }
+      }
+
+      const localContext = fullText.slice(contextStart, contextEnd);
+      const cyrillicCount = (localContext.match(/[А-Яа-яЁё]/g) || []).length;
+      const latinCount = (localContext.match(/[A-Za-z]/g) || []).length;
+
+      if (cyrillicCount > 0 && cyrillicCount >= latinCount) {
+        return "ru";
+      }
+
+      if (latinCount > 0 && latinCount > cyrillicCount) {
+        return "en";
+      }
+
+      if (language === "en") {
+        return "en";
+      }
+
+      return "ru";
+    }
+
+    const formattedText = text.replace(
+      /(^|[ \t\u00A0\u202F([{«„“"'\uE101])([+−]?\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\d{1,2})(?=$|[ \t\n\r,.;:!?…)\]}»”’\uE100])/gu,
+      function (
+        match: string,
+        prefix: string,
+        rubles: string,
+        kopecks: string,
+        offset: number,
+        fullText: string
+      ) {
+        const repairLanguage = resolveRepairLanguage(offset, fullText);
+        const isNegative = rubles.startsWith("−");
+        const unsignedRubles = isNegative ? rubles.slice(1) : rubles;
+        const normalized =
+          repairLanguage === "en"
+            ? prefix + (isNegative ? "−" : "") + "₽" + unsignedRubles + "." + kopecks
+            : prefix + rubles + "," + kopecks + space + "₽";
+
+        if (match === normalized) {
+          return match;
+        }
+
+        replacementCount += 1;
+        return normalized;
+      }
+    );
+
+    return {
+      formattedText,
+      replacementCount,
+    };
+  }
+
   export function applyRulesToText(
     text: string,
     settings: ApplySettings,
@@ -3030,6 +3395,17 @@ namespace TypotypoEngine {
 
       formattedText = result.formattedText;
       replacementCount += result.replacementCount;
+    }
+
+    if (settings.enabledRules.specialSymbols) {
+      const splitRubleRepairResult = repairSplitRubleFractionalAmountsAfterAllRules(
+        formattedText,
+        settings,
+        language
+      );
+
+      formattedText = splitRubleRepairResult.formattedText;
+      replacementCount += splitRubleRepairResult.replacementCount;
     }
 
     return {
