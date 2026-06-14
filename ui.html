@@ -483,7 +483,7 @@
           <input id="spacingCleanup" type="checkbox" checked />
           <div>
             <div class="rule-title">Spacing cleanup <span class="tag">All</span></div>
-            <p class="rule-description">Cleans punctuation, brackets, repeated marks, quote periods, UI separators, and list markers.</p>
+            <p class="rule-description">Cleans punctuation, brackets, repeated marks, quote periods, and UI separators.</p>
           </div>
         </label>
       </div>
@@ -702,6 +702,8 @@
   const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
 
   let hasTextLayers = false;
+  let currentTargetScope = "selection";
+  let currentAvailableTextNodeCount = 0;
   let isLoadingSettings = true;
 
   function getRuleCheckboxes() {
@@ -912,6 +914,7 @@
 
   function updateApplyButtonState() {
     applyButton.disabled = isLoadingSettings || !hasTextLayers || !hasEnabledRules();
+    applyButton.textContent = currentTargetScope === "currentPage" ? "Apply to current page" : "Apply formatting";
   }
 
   function saveCurrentSettings() {
@@ -940,6 +943,32 @@
     return `Detected layers — Russian: ${languageStats.ru}, English: ${languageStats.en}, Unknown: ${languageStats.unknown}.`;
   }
 
+  function formatSkippedDetails(message) {
+    const parts = [];
+
+    if (message.skippedHiddenNodeCount) {
+      parts.push(`hidden: ${message.skippedHiddenNodeCount}`);
+    }
+
+    if (message.skippedLockedNodeCount) {
+      parts.push(`locked: ${message.skippedLockedNodeCount}`);
+    }
+
+    if (message.skippedEmptyNodeCount) {
+      parts.push(`empty: ${message.skippedEmptyNodeCount}`);
+    }
+
+    if (message.errorNodeCount) {
+      parts.push(`errors: ${message.errorNodeCount}`);
+    }
+
+    return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+  }
+
+  function formatTargetScope(targetScope) {
+    return targetScope === "currentPage" ? "Current page" : "Selection";
+  }
+
   window.onmessage = (event) => {
     const message = event.data.pluginMessage;
 
@@ -956,31 +985,50 @@
 
     if (message.type === "selection-info") {
       result.textContent = "";
+      currentTargetScope = message.targetScope || "selection";
+      currentAvailableTextNodeCount = message.availableTextNodeCount || 0;
+      hasTextLayers = currentAvailableTextNodeCount > 0;
 
-      if (message.selectedCount === 0) {
-        hasTextLayers = false;
-        summary.textContent = "Nothing selected. Select one or more text layers.";
+      const skippedDetails = formatSkippedDetails(message);
+
+      if (currentTargetScope === "currentPage") {
+        if (message.textNodeCount === 0) {
+          summary.textContent = "Nothing selected. Current page has no text layers.";
+          updateApplyButtonState();
+          return;
+        }
+
+        summary.textContent =
+          `Nothing selected. Current page text layers: ${message.textNodeCount}. ` +
+          `Ready to apply to ${message.availableTextNodeCount} visible editable layer(s)` +
+          `${skippedDetails}.`;
         updateApplyButtonState();
         return;
       }
 
       if (message.textNodeCount === 0) {
-        hasTextLayers = false;
         summary.textContent = `Selected layers: ${message.selectedCount}. Text layers: 0.`;
         updateApplyButtonState();
         return;
       }
 
-      hasTextLayers = true;
-      summary.textContent = `Selected layers: ${message.selectedCount}. Text layers: ${message.textNodeCount}.`;
+      summary.textContent =
+        `Selected layers: ${message.selectedCount}. Text layers: ${message.textNodeCount}. ` +
+        `Ready to apply to ${message.availableTextNodeCount}` +
+        `${skippedDetails}.`;
       updateApplyButtonState();
     }
 
     if (message.type === "apply-result") {
+      const skippedDetails = formatSkippedDetails(message);
+
       result.textContent =
-        `Updated ${message.changedNodeCount} text layer(s). ` +
+        `${formatTargetScope(message.targetScope)} · ` +
+        `Text layers: ${message.totalTextNodeCount}. ` +
+        `Changed: ${message.changedNodeCount}. ` +
+        `Unchanged: ${message.unchangedNodeCount}. ` +
+        `Skipped: ${message.skippedNodeCount}${skippedDetails}. ` +
         `Replacements: ${message.totalReplacementCount}. ` +
-        `Skipped layers: ${message.skippedNodeCount}. ` +
         `Rules skipped by language: ${message.skippedRuleCount}. ` +
         formatLanguageStats(message.languageStats);
     }
@@ -1038,6 +1086,16 @@
   };
 
   applyButton.onclick = () => {
+    if (currentTargetScope === "currentPage") {
+      const shouldApplyToPage = window.confirm(
+        `Nothing is selected. Typograph all visible editable text layers on this page (${currentAvailableTextNodeCount} layer(s))?`
+      );
+
+      if (!shouldApplyToPage) {
+        return;
+      }
+    }
+
     parent.postMessage(
       {
         pluginMessage: {

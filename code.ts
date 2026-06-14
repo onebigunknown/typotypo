@@ -10,6 +10,23 @@ figma.showUI(__html__, {
 
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 
+type TargetScope = "selection" | "currentPage";
+type PreflightSkipReason = "hidden" | "locked" | "empty";
+
+type TextNodeTarget = {
+  targetScope: TargetScope;
+  selectedCount: number;
+  textNodes: TextNode[];
+};
+
+type TextNodeAvailabilitySummary = {
+  totalTextNodeCount: number;
+  availableTextNodeCount: number;
+  skippedHiddenNodeCount: number;
+  skippedLockedNodeCount: number;
+  skippedEmptyNodeCount: number;
+};
+
 async function loadSettings(): Promise<ApplySettings> {
   try {
     const storedSettings = await figma.clientStorage.getAsync(
@@ -25,18 +42,79 @@ async function loadSettings(): Promise<ApplySettings> {
 
 async function saveSettings(settings: ApplySettings) {
   try {
-    await figma.clientStorage.setAsync(SETTINGS_STORAGE_KEY, settings);
+    await figma.clientStorage.setAsync(
+      SETTINGS_STORAGE_KEY,
+      TypotypoEngine.normalizeSettings(settings)
+    );
   } catch (error) {
     console.error("Could not save settings:", error);
   }
 }
 
-function findTextNodesInSelection(): TextNode[] {
+function isNodeHiddenBySelfOrParent(node: BaseNode): boolean {
+  let currentNode: BaseNode | null = node;
+
+  while (currentNode) {
+    if ("visible" in currentNode && currentNode.visible === false) {
+      return true;
+    }
+
+    currentNode = currentNode.parent;
+  }
+
+  return false;
+}
+
+function isNodeLockedBySelfOrParent(node: BaseNode): boolean {
+  let currentNode: BaseNode | null = node;
+
+  while (currentNode) {
+    if ("locked" in currentNode && currentNode.locked === true) {
+      return true;
+    }
+
+    currentNode = currentNode.parent;
+  }
+
+  return false;
+}
+
+function getTextNodePreflightSkipReason(
+  node: TextNode
+): PreflightSkipReason | null {
+  if (isNodeHiddenBySelfOrParent(node)) {
+    return "hidden";
+  }
+
+  if (isNodeLockedBySelfOrParent(node)) {
+    return "locked";
+  }
+
+  if (node.characters.trim().length === 0) {
+    return "empty";
+  }
+
+  return null;
+}
+
+function collectTextNodesFromSceneNodeRoots(
+  roots: readonly SceneNode[]
+): TextNode[] {
   const textNodes: TextNode[] = [];
+  const seenNodeIds = new Set<string>();
+
+  function addTextNode(node: TextNode) {
+    if (seenNodeIds.has(node.id)) {
+      return;
+    }
+
+    seenNodeIds.add(node.id);
+    textNodes.push(node);
+  }
 
   function walk(node: SceneNode) {
     if (node.type === "TEXT") {
-      textNodes.push(node);
+      addTextNode(node as TextNode);
       return;
     }
 
@@ -47,20 +125,79 @@ function findTextNodesInSelection(): TextNode[] {
     }
   }
 
-  for (const node of figma.currentPage.selection) {
+  for (const node of roots) {
     walk(node);
   }
 
   return textNodes;
 }
 
+function resolveTextNodeTarget(): TextNodeTarget {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    return {
+      targetScope: "currentPage",
+      selectedCount: 0,
+      textNodes: collectTextNodesFromSceneNodeRoots(figma.currentPage.children),
+    };
+  }
+
+  return {
+    targetScope: "selection",
+    selectedCount: selection.length,
+    textNodes: collectTextNodesFromSceneNodeRoots(selection),
+  };
+}
+
+function summarizeTextNodeAvailability(
+  textNodes: TextNode[]
+): TextNodeAvailabilitySummary {
+  const summary: TextNodeAvailabilitySummary = {
+    totalTextNodeCount: textNodes.length,
+    availableTextNodeCount: 0,
+    skippedHiddenNodeCount: 0,
+    skippedLockedNodeCount: 0,
+    skippedEmptyNodeCount: 0,
+  };
+
+  for (const node of textNodes) {
+    const skipReason = getTextNodePreflightSkipReason(node);
+
+    if (skipReason === "hidden") {
+      summary.skippedHiddenNodeCount += 1;
+      continue;
+    }
+
+    if (skipReason === "locked") {
+      summary.skippedLockedNodeCount += 1;
+      continue;
+    }
+
+    if (skipReason === "empty") {
+      summary.skippedEmptyNodeCount += 1;
+      continue;
+    }
+
+    summary.availableTextNodeCount += 1;
+  }
+
+  return summary;
+}
+
 function sendSelectionInfo() {
-  const selectedTextNodes = findTextNodesInSelection();
+  const target = resolveTextNodeTarget();
+  const availabilitySummary = summarizeTextNodeAvailability(target.textNodes);
 
   figma.ui.postMessage({
     type: "selection-info",
-    selectedCount: figma.currentPage.selection.length,
-    textNodeCount: selectedTextNodes.length,
+    targetScope: target.targetScope,
+    selectedCount: target.selectedCount,
+    textNodeCount: availabilitySummary.totalTextNodeCount,
+    availableTextNodeCount: availabilitySummary.availableTextNodeCount,
+    skippedHiddenNodeCount: availabilitySummary.skippedHiddenNodeCount,
+    skippedLockedNodeCount: availabilitySummary.skippedLockedNodeCount,
+    skippedEmptyNodeCount: availabilitySummary.skippedEmptyNodeCount,
   });
 }
 
@@ -118,14 +255,25 @@ function findNextMatchingCharacter(
   let bestMatch: { originalIndex: number; formattedIndex: number } | null = null;
   let bestDistance = Infinity;
 
-  for (let currentOriginalIndex = originalIndex; currentOriginalIndex < maxOriginalIndex; currentOriginalIndex++) {
-    for (let currentFormattedIndex = formattedIndex; currentFormattedIndex < maxFormattedIndex; currentFormattedIndex++) {
-      if (originalText[currentOriginalIndex] !== formattedText[currentFormattedIndex]) {
+  for (
+    let currentOriginalIndex = originalIndex;
+    currentOriginalIndex < maxOriginalIndex;
+    currentOriginalIndex++
+  ) {
+    for (
+      let currentFormattedIndex = formattedIndex;
+      currentFormattedIndex < maxFormattedIndex;
+      currentFormattedIndex++
+    ) {
+      if (
+        originalText[currentOriginalIndex] !== formattedText[currentFormattedIndex]
+      ) {
         continue;
       }
 
       const distance =
-        currentOriginalIndex - originalIndex + currentFormattedIndex - formattedIndex;
+        currentOriginalIndex - originalIndex +
+        currentFormattedIndex - formattedIndex;
 
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -167,8 +315,12 @@ function mapFormattedCharactersToOriginalCharacters(
       formattedIndex
     );
 
-    const nextOriginalIndex = nextMatch ? nextMatch.originalIndex : originalText.length;
-    const nextFormattedIndex = nextMatch ? nextMatch.formattedIndex : formattedText.length;
+    const nextOriginalIndex = nextMatch
+      ? nextMatch.originalIndex
+      : originalText.length;
+    const nextFormattedIndex = nextMatch
+      ? nextMatch.formattedIndex
+      : formattedText.length;
 
     const styleSourceIndex = Math.max(
       0,
@@ -321,31 +473,17 @@ async function loadFontsFromStyleSnapshots(styles: CharacterStyleSnapshot[]) {
   await Promise.all(uniqueFonts.map((font) => figma.loadFontAsync(font)));
 }
 
-async function updateTextNodeCharactersPreservingStyles(
-  node: TextNode,
-  formattedText: string
-) {
-  const originalText = node.characters;
-  const originalStyles = getTextStyleSnapshots(node);
-
-  await loadFontsForTextNode(node);
-  await loadFontsFromStyleSnapshots(originalStyles);
-
-  node.characters = formattedText;
-  applyStyleSnapshotsToFormattedText(node, originalText, formattedText, originalStyles);
-}
-
 async function loadFontsForTextNode(node: TextNode) {
   const fonts: FontName[] = [];
 
   function addFont(fontName: FontName | typeof figma.mixed) {
     if (fontName !== figma.mixed) {
-      fonts.push(fontName);
+      fonts.push(fontName as FontName);
     }
   }
 
   if (node.fontName !== figma.mixed) {
-    addFont(node.fontName);
+    addFont(node.fontName as FontName);
   } else {
     for (let i = 0; i < node.characters.length; i++) {
       addFont(node.getRangeFontName(i, i + 1));
@@ -359,13 +497,36 @@ async function loadFontsForTextNode(node: TextNode) {
   await Promise.all(uniqueFonts.map((font) => figma.loadFontAsync(font)));
 }
 
+async function updateTextNodeCharactersPreservingStyles(
+  node: TextNode,
+  formattedText: string
+) {
+  const originalText = node.characters;
+  const originalStyles = getTextStyleSnapshots(node);
+
+  await loadFontsForTextNode(node);
+  await loadFontsFromStyleSnapshots(originalStyles);
+
+  node.characters = formattedText;
+  applyStyleSnapshotsToFormattedText(
+    node,
+    originalText,
+    formattedText,
+    originalStyles
+  );
+}
+
 async function applyTypographyRules(settings: ApplySettings) {
   const safeSettings = TypotypoEngine.normalizeSettings(settings);
-  const selectedTextNodes = findTextNodesInSelection();
+  const target = resolveTextNodeTarget();
 
   let changedNodeCount = 0;
+  let unchangedNodeCount = 0;
   let totalReplacementCount = 0;
-  let skippedNodeCount = 0;
+  let skippedHiddenNodeCount = 0;
+  let skippedLockedNodeCount = 0;
+  let skippedEmptyNodeCount = 0;
+  let errorNodeCount = 0;
   let skippedRuleCount = 0;
 
   const languageStats: LanguageStats = {
@@ -374,42 +535,88 @@ async function applyTypographyRules(settings: ApplySettings) {
     unknown: 0,
   };
 
-  for (const node of selectedTextNodes) {
-    const originalText = node.characters;
-    const language = TypotypoEngine.resolveLanguage(originalText, safeSettings.languageMode);
+  for (const node of target.textNodes) {
+    const skipReason = getTextNodePreflightSkipReason(node);
 
-    languageStats[language] += 1;
+    if (skipReason === "hidden") {
+      skippedHiddenNodeCount += 1;
+      continue;
+    }
 
-    const result = TypotypoEngine.applyRulesToText(originalText, safeSettings, language);
+    if (skipReason === "locked") {
+      skippedLockedNodeCount += 1;
+      continue;
+    }
 
-    skippedRuleCount += result.skippedRuleCount;
-
-    if (result.replacementCount === 0 || result.formattedText === originalText) {
+    if (skipReason === "empty") {
+      skippedEmptyNodeCount += 1;
       continue;
     }
 
     try {
-      await updateTextNodeCharactersPreservingStyles(node, result.formattedText);
+      const originalText = node.characters;
+      const language = TypotypoEngine.resolveLanguage(
+        originalText,
+        safeSettings.languageMode
+      );
+
+      languageStats[language] += 1;
+
+      const result = TypotypoEngine.applyRulesToText(
+        originalText,
+        safeSettings,
+        language
+      );
+
+      skippedRuleCount += result.skippedRuleCount;
+
+      if (
+        result.replacementCount === 0 ||
+        result.formattedText === originalText
+      ) {
+        unchangedNodeCount += 1;
+        continue;
+      }
+
+      await updateTextNodeCharactersPreservingStyles(
+        node,
+        result.formattedText
+      );
 
       changedNodeCount += 1;
       totalReplacementCount += result.replacementCount;
     } catch (error) {
       console.error("Could not update text node:", error);
-      skippedNodeCount += 1;
+      errorNodeCount += 1;
     }
   }
 
+  const skippedNodeCount =
+    skippedHiddenNodeCount +
+    skippedLockedNodeCount +
+    skippedEmptyNodeCount +
+    errorNodeCount;
+
   figma.ui.postMessage({
     type: "apply-result",
+    targetScope: target.targetScope,
+    selectedCount: target.selectedCount,
+    totalTextNodeCount: target.textNodes.length,
     changedNodeCount,
+    unchangedNodeCount,
     totalReplacementCount,
     skippedNodeCount,
+    skippedHiddenNodeCount,
+    skippedLockedNodeCount,
+    skippedEmptyNodeCount,
+    errorNodeCount,
     skippedRuleCount,
     languageStats,
   });
 
   figma.notify(
-    `Updated ${changedNodeCount} text layer${changedNodeCount === 1 ? "" : "s"}`
+    `Updated ${changedNodeCount} text layer${changedNodeCount === 1 ? "" : "s"}` +
+      (skippedNodeCount > 0 ? ` · Skipped ${skippedNodeCount}` : "")
   );
 
   sendSelectionInfo();
@@ -432,7 +639,7 @@ figma.on("selectionchange", () => {
 
 figma.ui.onmessage = async (message) => {
   if (message.type === "save-settings") {
-    await saveSettings(TypotypoEngine.normalizeSettings(message.settings));
+    await saveSettings(message.settings);
   }
 
   if (message.type === "apply") {
@@ -448,4 +655,3 @@ figma.ui.onmessage = async (message) => {
 };
 
 initializePlugin();
-
