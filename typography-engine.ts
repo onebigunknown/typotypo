@@ -1069,6 +1069,92 @@ namespace TypotypoEngine {
       };
     }
 
+    function applyHyphenInsideWordsCleanup(input: string): RuleResult {
+      let hyphenReplacementCount = 0;
+      let output = input;
+
+      function replaceAndCount(
+        regexp: RegExp,
+        replacer: (...args: string[]) => string
+      ) {
+        output = output.replace(regexp, function (...args: unknown[]) {
+          const stringArgs = args.map((arg) =>
+            typeof arg === "string" ? arg : ""
+          );
+
+          const match = stringArgs[0];
+          const normalized = replacer(...stringArgs);
+
+          if (match === normalized) {
+            return match;
+          }
+
+          hyphenReplacementCount += 1;
+          return normalized;
+        });
+      }
+
+      let previousOutput = "";
+
+      while (previousOutput !== output) {
+        previousOutput = output;
+        replaceAndCount(
+          /([A-Za-zА-Яа-яЁё])[‐‑‒–−]([A-Za-zА-Яа-яЁё])/g,
+          function (_match, leftLetter, rightLetter) {
+            return leftLetter + "-" + rightLetter;
+          }
+        );
+      }
+
+      const commonHyphenatedWordParts = [
+        "арт",
+        "аудио",
+        "веб",
+        "видео",
+        "инди",
+        "мини",
+        "медиа",
+        "онлайн",
+        "офлайн",
+        "поп",
+        "пост",
+        "рок",
+        "смарт",
+        "супер",
+        "хип",
+        "хоп",
+        "экс",
+        "кое",
+        "ка",
+        "либо",
+        "нибудь",
+        "таки",
+        "то",
+      ];
+
+      replaceAndCount(
+        /([A-Za-zА-Яа-яЁё]+)—([A-Za-zА-Яа-яЁё]+)/g,
+        function (match, leftWord, rightWord) {
+          const normalizedLeftWord = leftWord.toLowerCase();
+          const normalizedRightWord = rightWord.toLowerCase();
+
+          if (
+            !commonHyphenatedWordParts.includes(normalizedLeftWord) &&
+            !commonHyphenatedWordParts.includes(normalizedRightWord)
+          ) {
+            return match;
+          }
+
+          return leftWord + "-" + rightWord;
+        }
+      );
+
+      return {
+        formattedText: output,
+        replacementCount: hyphenReplacementCount,
+      };
+    }
+
     let spacedText = "";
 
     for (let index = 0; index < normalizedText.length; index += 1) {
@@ -1107,16 +1193,20 @@ namespace TypotypoEngine {
     const listMarkerSpacingResult = applyListMarkerSpacingCleanup(
       separatorSpacingResult.formattedText
     );
+    const hyphenInsideWordsResult = applyHyphenInsideWordsCleanup(
+      listMarkerSpacingResult.formattedText
+    );
 
     return {
-      formattedText: listMarkerSpacingResult.formattedText,
+      formattedText: hyphenInsideWordsResult.formattedText,
       replacementCount:
         replacementCount +
         bracketSpacingResult.replacementCount +
         enclosureSpacingResult.replacementCount +
         secondBracketSpacingResult.replacementCount +
         separatorSpacingResult.replacementCount +
-        listMarkerSpacingResult.replacementCount,
+        listMarkerSpacingResult.replacementCount +
+        hyphenInsideWordsResult.replacementCount,
     };
   }
 
@@ -2557,9 +2647,29 @@ namespace TypotypoEngine {
 
     let replacementCount = 0;
 
-    const formattedText = text.replace(
+    let formattedText = text.replace(
       regexp,
       function (match, leftChar, _leftSpace, _rightSpace, rightChar) {
+        const isNumberRange = /\d/.test(leftChar) && /\d/.test(rightChar);
+
+        if (isNumberRange) {
+          return match;
+        }
+
+        const normalized = leftChar + "\u00A0— " + rightChar;
+
+        if (match === normalized) {
+          return match;
+        }
+
+        replacementCount += 1;
+        return normalized;
+      }
+    );
+
+    formattedText = formattedText.replace(
+      /([А-Яа-яЁёA-Za-z0-9»”’")\].!?…])—([А-Яа-яЁёA-Za-z0-9«„“"([])/g,
+      function (match, leftChar, rightChar) {
         const isNumberRange = /\d/.test(leftChar) && /\d/.test(rightChar);
 
         if (isNumberRange) {

@@ -243,7 +243,7 @@ const formatCases = [
     group: "list markers",
     name: "inline em dashes are not treated as list markers",
     input: "Музыка—это настроение.",
-    expected: "Музыка—это настроение",
+    expected: `Музыка${NBSP}— это${NBSP}настроение`,
   },
 
 
@@ -612,6 +612,21 @@ const formatCases = [
     expected: `Музыка${NBSP}— настроение`,
     settings: { languageMode: "ru" },
   },
+
+  {
+    group: "ranges and dashes",
+    name: "glued Russian sentence em dash gets spaces",
+    input: "Музыка—это настроение.",
+    expected: `Музыка${NBSP}— это${NBSP}настроение`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "ranges and dashes",
+    name: "glued em dash in common hyphenated particle becomes hyphen",
+    input: "как—то и кое—как.",
+    expected: `как-то и${NBSP}кое-как`,
+    settings: { languageMode: "ru" },
+  },
   {
     group: "ranges and dashes",
     name: "minus sign before number is normalized",
@@ -750,6 +765,32 @@ const formatCases = [
     input: "You have {count, plural, one {# track} other {# tracks}}.",
     expected: "You have {count, plural, one {# track} other {# tracks}}",
     settings: { languageMode: "auto" },
+  },
+
+  // Word hyphens
+  {
+    group: "word hyphens",
+    name: "dash-like characters inside Russian words become hyphens",
+    input: "поп–музыка, онлайн—радио, рок−н−ролл.",
+    expected: "поп-музыка, онлайн-радио, рок-н-ролл",
+  },
+  {
+    group: "word hyphens",
+    name: "non-breaking and figure hyphens inside words become regular hyphens",
+    input: "инди‑рок и пост‒панк.",
+    expected: `инди-рок и${NBSP}пост-панк`,
+  },
+  {
+    group: "word hyphens",
+    name: "numeric and named ranges stay as en dash ranges",
+    input: "2020–2024, январь–март, XI–XII.",
+    expected: "2020–2024, январь–март, XI–XII",
+  },
+  {
+    group: "word hyphens",
+    name: "sentence dash stays an em dash with non-breaking space",
+    input: "Музыка — это жизнь.",
+    expected: `Музыка${NBSP}— это${NBSP}жизнь`,
   },
 ];
 
