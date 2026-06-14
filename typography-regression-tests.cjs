@@ -406,10 +406,17 @@ const formatCases = [
     input: "100р! 100p!",
     expected: `100${NBSP}₽! 100p!`,
   },
+
   {
     group: "currency",
-    name: "Russian ruble aliases are normalized after the amount",
-    input: "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR.",
+    name: "ruble abbreviation period is preserved before next sentence",
+    input: "Цена 100р. Музыка. Цена 100 р. Музыка. Цена 100 руб. Музыка.",
+    expected: `Цена 100${NBSP}₽. Музыка. Цена 100${NBSP}₽. Музыка. Цена 100${NBSP}₽. Музыка`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "currency",
+    name: "Russian ruble aliases are normalized after the amount",    input: "Цена 789 руб., 100 рублей, 50 RUB и 60 RUR.",
     expected: `Цена 789${NBSP}₽, 100${NBSP}₽, 50${NBSP}₽ и${NBSP}60${NBSP}₽`,
     settings: { languageMode: "ru" },
   },
@@ -733,7 +740,7 @@ const formatCases = [
     group: "protection",
     name: "entities can sit next to formatted visible text",
     input: "Цена&nbsp;100р. Скидка&nbsp;1/2.",
-    expected: `Цена&nbsp;100${NBSP}₽ Скидка&nbsp;½`,
+    expected: `Цена&nbsp;100${NBSP}₽. Скидка&nbsp;½`,
   },
   {
     group: "icu protection",

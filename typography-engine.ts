@@ -1473,8 +1473,15 @@ namespace TypotypoEngine {
             return match;
           }
 
+          const characterAfterMatch = fullText.slice(offset + match.length);
+          const shouldKeepSentencePeriod =
+            /^(?:р\.|руб\.)$/iu.test(rawCurrency) &&
+            /^[ \t\u00A0\u202F]+[А-ЯЁA-Z]/.test(characterAfterMatch);
+
           const normalized =
-            prefix + formatCurrencyAmount(number, symbol, currencyLanguage);
+            prefix +
+            formatCurrencyAmount(number, symbol, currencyLanguage) +
+            (shouldKeepSentencePeriod ? "." : "");
 
           if (match === normalized) {
             return match;
