@@ -330,6 +330,15 @@
 
   <div class="settings-grid">
     <div class="settings-card">
+      <div class="settings-card-title">Interface language</div>
+      <select id="uiLanguageMode">
+        <option value="ru">Russian</option>
+        <option value="en">English</option>
+      </select>
+      <p class="hint">The first launch uses the language reported by Figma. Your manual choice is saved.</p>
+    </div>
+
+    <div class="settings-card">
       <div class="settings-card-title">Language</div>
       <select id="languageMode">
         <option value="auto">Auto-detect</option>
@@ -671,6 +680,7 @@
   const deselectAllRulesButton = document.getElementById("deselectAllRules");
   const resetDefaultsButton = document.getElementById("resetDefaults");
 
+  const uiLanguageModeSelect = document.getElementById("uiLanguageMode");
   const languageModeSelect = document.getElementById("languageMode");
   const nonBreakingSpaceStyleSelect = document.getElementById("nonBreakingSpaceStyle");
 
@@ -701,36 +711,15 @@
   const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
   const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
 
+  const UI_LANGUAGE_STORAGE_KEY = "typotypoUiLanguage";
+
   let hasTextLayers = false;
   let currentTargetScope = "selection";
   let currentAvailableTextNodeCount = 0;
+  let currentUiLanguage = "en";
   let isLoadingSettings = true;
-
-  function getRuleCheckboxes() {
-    return [
-      invisibleCopyArtifactsCheckbox,
-      tabsCheckbox,
-      manualLineBreaksCheckbox,
-      ellipsisCheckbox,
-      extraSpacesCheckbox,
-      trimTextEdgesCheckbox,
-      spacingCleanupCheckbox,
-      percentSignNoSpaceCheckbox,
-      numberUnitsNbspCheckbox,
-      numberSignsCheckbox,
-      specialSymbolsCheckbox,
-      englishApostrophesCheckbox,
-      englishQuotesCheckbox,
-      russianQuotesCheckbox,
-      numberRangeDashCheckbox,
-      russianSentenceDashCheckbox,
-      russianShortWordsNbspCheckbox,
-      russianInitialsNbspCheckbox,
-      russianNumericAbbreviationsCheckbox,
-      russianLargeNumbersCheckbox,
-      uiFinalPeriodCheckbox,
-    ];
-  }
+  let lastSelectionInfoMessage = null;
+  let lastApplyResultMessage = null;
 
   const defaultSettings = {
     languageMode: "auto",
@@ -771,6 +760,502 @@
       uiFinalPeriod: true,
     },
   };
+
+  const i18n = {
+    en: {
+      appTitle: "Typography Formatter",
+      eyebrow: "Clean up UI copy while preserving protected syntax.",
+      checkingSelection: "Checking selection…",
+      basicSettings: "Basic settings",
+      interfaceLanguage: "Interface language",
+      interfaceLanguageHint: "The first launch uses the language reported by Figma. Your manual choice is saved.",
+      uiLanguageRu: "Russian",
+      uiLanguageEn: "English",
+      textLanguage: "Text language",
+      textLanguageHint: "Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.",
+      autoDetect: "Auto-detect",
+      russian: "Russian",
+      english: "English",
+      nbspStyle: "Non-breaking space style",
+      nbspHint: "Used for number units, currencies, sizes, and large numbers. Word-based Russian pairs always use a regular non-breaking space.",
+      nbspRegular: "Regular non-breaking space",
+      nbspNarrow: "Narrow non-breaking space",
+      quoteStyles: "Quote styles",
+      russianQuotesHeading: "Russian quotes",
+      englishQuotesHeading: "English quotes",
+      firstLevelQuotes: "First level quotes",
+      secondLevelQuotes: "Second level quotes",
+      quoteDefaultsHint: "Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.",
+      frenchGuillemets: "French quotes « »",
+      germanLowHigh: "German quotes „ “",
+      englishDouble: "English double quotes “ ”",
+      programmerDouble: "Programmer quotes \" \"",
+      englishSingle: "English single quotes ‘ ’",
+      englishSingleReversed: "English single reversed ‚ ‘",
+      rules: "Rules",
+      selectAllRules: "Select all rules",
+      deselectAllRules: "Deselect all",
+      resetDefaults: "Reset to defaults",
+      allTag: "All",
+      russianTag: "Russian",
+      englishTag: "English",
+      ruEnTag: "Russian + English",
+      groups: {
+        cleanup: ["Cleanup", "Spacing, invisible artifacts, line breaks, punctuation."],
+        numbers: ["Numbers and symbols", "Units, currencies, signs, ranges, arrows, fractions."],
+        quotes: ["Quotes", "Russian and English quote normalization."],
+        russianTypography: ["Russian typography", "Dashes, short words, initials, abbreviations, large numbers."],
+        uiText: ["UI text", "Final punctuation for short interface copy."],
+      },
+      ruleTitles: {
+        invisibleCopyArtifacts: "Invisible copy artifacts",
+        tabs: "Tabs",
+        manualLineBreaks: "Manual line breaks",
+        ellipsis: "Ellipsis",
+        extraSpaces: "Extra spaces",
+        trimTextEdges: "Trim text edges",
+        spacingCleanup: "Spacing cleanup",
+        percentSignNoSpace: "Percent sign",
+        numberUnitsNbsp: "Number units",
+        numberSigns: "Number signs",
+        specialSymbols: "Special symbols",
+        englishApostrophes: "English apostrophes",
+        englishQuotes: "English quotes",
+        russianQuotes: "Russian quotes",
+        numberRangeDash: "Number ranges",
+        russianSentenceDash: "Russian sentence dash",
+        russianShortWordsNbsp: "Russian short words",
+        russianInitialsNbsp: "Russian initials",
+        russianNumericAbbreviations: "Russian numeric abbreviations",
+        russianLargeNumbers: "Russian large numbers",
+        uiFinalPeriod: "UI final period",
+      },
+      ruleDescriptions: {
+        invisibleCopyArtifacts: "Removes hidden characters copied from external sources.",
+        tabs: "Replaces tab characters with regular spaces.",
+        manualLineBreaks: "Replaces single manual line breaks with spaces while preserving paragraphs.",
+        ellipsis: "Replaces three dots (...) with a proper ellipsis (…).",
+        extraSpaces: "Replaces multiple spaces with a single space.",
+        trimTextEdges: "Removes spaces at the beginning and end of a text layer.",
+        spacingCleanup: "Cleans punctuation, brackets, repeated marks, quote periods, and UI separators.",
+        percentSignNoSpace: "Removes spaces before the percent sign.",
+        numberUnitsNbsp: "Keeps numbers with units, temperatures, currencies, and sizes.",
+        numberSigns: "Keeps № and § together with the following number.",
+        specialSymbols: "Normalizes ©, ™, ±, ≠, ≤, ≥, ₽, fractions, degrees, arrows, and multiplication signs.",
+        englishApostrophes: "Replaces straight apostrophes in English words, decades, and possessives.",
+        englishQuotes: "Normalizes first- and second-level English quotes.",
+        russianQuotes: "Normalizes first- and second-level Russian quotes and punctuation around them.",
+        numberRangeDash: "Uses an en dash without spaces in numeric and time ranges.",
+        russianSentenceDash: "Converts spaced hyphens and short dashes to an em dash.",
+        russianShortWordsNbsp: "Keeps short words, particles, abbreviations, and number-word pairs together.",
+        russianInitialsNbsp: "Keeps initials together with each other and the surname.",
+        russianNumericAbbreviations: "Normalizes тыс., млн, млрд, and трлн.",
+        russianLargeNumbers: "Groups large numbers with a non-breaking space.",
+        uiFinalPeriod: "Removes the final period at the end of short UI text while preserving abbreviations.",
+      },
+      protectionNote: "Protected automatically: URLs, emails, inline code, code-like strings, placeholders, HTML tags, HTML/XML entities, and ICU message syntax.",
+      applyFormatting: "Apply formatting",
+      applyToCurrentPage: "Apply to current page",
+      close: "Close",
+      nothingSelectedNoText: "Nothing selected. Current page has no text layers.",
+      nothingSelectedPageTextLayers: "Nothing selected. Current page text layers: {textNodeCount}. Ready to apply to {availableTextNodeCount} visible editable layer(s){skippedDetails}.",
+      selectedNoText: "Selected layers: {selectedCount}. Text layers: 0.",
+      selectedTextLayers: "Selected layers: {selectedCount}. Text layers: {textNodeCount}. Ready to apply to {availableTextNodeCount}{skippedDetails}.",
+      skippedHidden: "hidden",
+      skippedLocked: "locked",
+      skippedEmpty: "empty",
+      skippedErrors: "errors",
+      currentPage: "Current page",
+      selection: "Selection",
+      textLayers: "Text layers",
+      changed: "Changed",
+      unchanged: "Unchanged",
+      skipped: "Skipped",
+      replacements: "Replacements",
+      rulesSkippedByLanguage: "Rules skipped by language",
+      detectedLayers: "Detected layers — Russian: {ru}, English: {en}, Unknown: {unknown}.",
+      confirmCurrentPage: "Nothing is selected. Typograph all visible editable text layers on this page ({count} layer(s))?",
+    },
+    ru: {
+      appTitle: "Типограф",
+      eyebrow: "Приводит интерфейсный текст в порядок и сохраняет защищённый синтаксис.",
+      checkingSelection: "Проверяем выделение…",
+      basicSettings: "Основные настройки",
+      interfaceLanguage: "Язык интерфейса",
+      interfaceLanguageHint: "При первом запуске используется язык из Figma. Ручной выбор сохраняется.",
+      uiLanguageRu: "Русский",
+      uiLanguageEn: "Английский",
+      textLanguage: "Язык текста",
+      textLanguageHint: "Автоопределение смотрит на доминирующий алфавит в каждом текстовом слое. Для коротких смешанных строк лучше выбрать русский или английский вручную.",
+      autoDetect: "Автоопределение",
+      russian: "Русский",
+      english: "Английский",
+      nbspStyle: "Тип неразрывного пробела",
+      nbspHint: "Используется для единиц измерения, валют, размеров и больших чисел. Русские словесные связки всегда используют обычный неразрывный пробел.",
+      nbspRegular: "Обычный неразрывный пробел",
+      nbspNarrow: "Узкий неразрывный пробел",
+      quoteStyles: "Стили кавычек",
+      russianQuotesHeading: "Русские кавычки",
+      englishQuotesHeading: "Английские кавычки",
+      firstLevelQuotes: "Кавычки первого уровня",
+      secondLevelQuotes: "Кавычки второго уровня",
+      quoteDefaultsHint: "По умолчанию: русский — « » и „ “, английский — “ ” и ‘ ’.",
+      frenchGuillemets: "Французские кавычки « »",
+      germanLowHigh: "Немецкие кавычки „ “",
+      englishDouble: "Английские двойные кавычки “ ”",
+      programmerDouble: "Прямые кавычки \" \"",
+      englishSingle: "Английские одинарные кавычки ‘ ’",
+      englishSingleReversed: "Английские одинарные обратные ‚ ‘",
+      rules: "Правила",
+      selectAllRules: "Выбрать все правила",
+      deselectAllRules: "Снять выбор",
+      resetDefaults: "Сбросить к настройкам по умолчанию",
+      allTag: "Все",
+      russianTag: "Русский",
+      englishTag: "Английский",
+      ruEnTag: "Русский + английский",
+      groups: {
+        cleanup: ["Очистка", "Пробелы, невидимые символы, переносы строк, пунктуация."],
+        numbers: ["Числа и символы", "Единицы, валюты, знаки, диапазоны, стрелки, дроби."],
+        quotes: ["Кавычки", "Нормализация русских и английских кавычек."],
+        russianTypography: ["Русская типографика", "Тире, короткие слова, инициалы, сокращения, большие числа."],
+        uiText: ["Интерфейсный текст", "Финальная точка в коротких интерфейсных текстах."],
+      },
+      ruleTitles: {
+        invisibleCopyArtifacts: "Невидимые артефакты копирования",
+        tabs: "Табы",
+        manualLineBreaks: "Ручные переносы строк",
+        ellipsis: "Многоточие",
+        extraSpaces: "Лишние пробелы",
+        trimTextEdges: "Пробелы по краям",
+        spacingCleanup: "Очистка пробелов",
+        percentSignNoSpace: "Знак процента",
+        numberUnitsNbsp: "Единицы измерения",
+        numberSigns: "Знаки номера и параграфа",
+        specialSymbols: "Специальные символы",
+        englishApostrophes: "Английские апострофы",
+        englishQuotes: "Английские кавычки",
+        russianQuotes: "Русские кавычки",
+        numberRangeDash: "Числовые диапазоны",
+        russianSentenceDash: "Тире в русском тексте",
+        russianShortWordsNbsp: "Короткие русские слова",
+        russianInitialsNbsp: "Русские инициалы",
+        russianNumericAbbreviations: "Русские числовые сокращения",
+        russianLargeNumbers: "Большие числа",
+        uiFinalPeriod: "Финальная точка в UI",
+      },
+      ruleDescriptions: {
+        invisibleCopyArtifacts: "Удаляет скрытые символы, скопированные из внешних источников.",
+        tabs: "Заменяет табы обычными пробелами.",
+        manualLineBreaks: "Заменяет одиночные ручные переносы строк пробелами и сохраняет абзацы.",
+        ellipsis: "Заменяет три точки (...) на настоящее многоточие (…).",
+        extraSpaces: "Заменяет несколько пробелов одним.",
+        trimTextEdges: "Удаляет пробелы в начале и конце текстового слоя.",
+        spacingCleanup: "Чистит пунктуацию, скобки, повторы знаков, точки у кавычек и UI-разделители.",
+        percentSignNoSpace: "Убирает пробел перед знаком процента.",
+        numberUnitsNbsp: "Склеивает числа с единицами, температурой, валютами и размерами.",
+        numberSigns: "Склеивает № и § со следующим числом.",
+        specialSymbols: "Нормализует ©, ™, ±, ≠, ≤, ≥, ₽, дроби, градусы, стрелки и знак умножения.",
+        englishApostrophes: "Заменяет прямые апострофы в английских словах, десятилетиях и притяжательных формах.",
+        englishQuotes: "Нормализует английские кавычки первого и второго уровня.",
+        russianQuotes: "Нормализует русские кавычки первого и второго уровня и пунктуацию вокруг них.",
+        numberRangeDash: "Использует короткое тире без пробелов в числовых и временных диапазонах.",
+        russianSentenceDash: "Заменяет дефисы и короткие тире с пробелами на длинное тире.",
+        russianShortWordsNbsp: "Склеивает короткие слова, частицы, сокращения и пары число + слово.",
+        russianInitialsNbsp: "Склеивает инициалы между собой и с фамилией.",
+        russianNumericAbbreviations: "Нормализует тыс., млн, млрд и трлн.",
+        russianLargeNumbers: "Разбивает большие числа неразрывным пробелом.",
+        uiFinalPeriod: "Убирает финальную точку в коротком интерфейсном тексте и сохраняет сокращения.",
+      },
+      protectionNote: "Автоматически защищаются: URL, почты, inline-код, строки, похожие на код, плейсхолдеры, HTML-теги, HTML/XML-сущности и ICU-синтаксис.",
+      applyFormatting: "Типографировать",
+      applyToCurrentPage: "Типографировать страницу",
+      close: "Закрыть",
+      nothingSelectedNoText: "Ничего не выделено. На текущей странице нет текстовых слоёв.",
+      nothingSelectedPageTextLayers: "Ничего не выделено. Текстовых слоёв на странице: {textNodeCount}. Готово к обработке: {availableTextNodeCount}{skippedDetails}.",
+      selectedNoText: "Выделено слоёв: {selectedCount}. Текстовых слоёв: 0.",
+      selectedTextLayers: "Выделено слоёв: {selectedCount}. Текстовых слоёв: {textNodeCount}. Готово к обработке: {availableTextNodeCount}{skippedDetails}.",
+      skippedHidden: "скрыто",
+      skippedLocked: "заблокировано",
+      skippedEmpty: "пусто",
+      skippedErrors: "ошибки",
+      currentPage: "Текущая страница",
+      selection: "Выделение",
+      textLayers: "Текстовых слоёв",
+      changed: "Изменено",
+      unchanged: "Без изменений",
+      skipped: "Пропущено",
+      replacements: "Замен",
+      rulesSkippedByLanguage: "Правил пропущено по языку",
+      detectedLayers: "Определённые слои — русский: {ru}, английский: {en}, неизвестный: {unknown}.",
+      confirmCurrentPage: "Ничего не выделено. Типографировать все видимые редактируемые текстовые слои на этой странице ({count})?",
+    },
+  };
+
+  function t(key) {
+    const dictionary = i18n[currentUiLanguage] || i18n.en;
+    return dictionary[key] !== undefined ? dictionary[key] : i18n.en[key] || key;
+  }
+
+  function interpolate(template, values) {
+    return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
+  }
+
+  function normalizeUiLanguage(value) {
+    return value === "ru" || value === "en" ? value : null;
+  }
+
+  function loadUiLanguageFromLocalStorage() {
+    try {
+      return normalizeUiLanguage(localStorage.getItem(UI_LANGUAGE_STORAGE_KEY));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function saveUiLanguageToLocalStorage(value) {
+    const normalizedValue = normalizeUiLanguage(value);
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalizedValue);
+    } catch (error) {
+      // Figma may restrict localStorage in some environments.
+      // Client storage remains the fallback.
+    }
+  }
+
+  function getDetectedUiLanguage() {
+    const languages = [];
+
+    if (Array.isArray(navigator.languages)) {
+      languages.push(...navigator.languages);
+    }
+
+    if (navigator.language) {
+      languages.push(navigator.language);
+    }
+
+    return languages.some((language) => String(language).toLowerCase().startsWith("ru"))
+      ? "ru"
+      : "en";
+  }
+
+  function resolveUiLanguage(value) {
+    return normalizeUiLanguage(value) || getDetectedUiLanguage();
+  }
+
+  function setTextContent(element, value) {
+    if (element) {
+      element.textContent = value;
+    }
+  }
+
+  function setSelectOptionText(select, value, text) {
+    const option = select ? select.querySelector(`option[value="${value}"]`) : null;
+
+    if (option) {
+      option.textContent = text;
+    }
+  }
+
+  function setRuleCopy(checkbox, title, tag, description) {
+    const rule = checkbox.closest(".rule");
+
+    if (!rule) {
+      return;
+    }
+
+    const titleElement = rule.querySelector(".rule-title");
+    const descriptionElement = rule.querySelector(".rule-description");
+
+    if (titleElement) {
+      titleElement.innerHTML = `${title} <span class="tag">${tag}</span>`;
+    }
+
+    if (descriptionElement) {
+      descriptionElement.textContent = description;
+    }
+  }
+
+  function setRuleGroupCopy(groupIndex, title, description) {
+    const group = document.querySelectorAll(".rule-group")[groupIndex];
+
+    if (!group) {
+      return;
+    }
+
+    const labelParts = group.querySelectorAll(".rule-group-label span");
+
+    if (labelParts[0]) {
+      labelParts[0].textContent = title;
+    }
+
+    if (labelParts[1]) {
+      labelParts[1].textContent = description;
+    }
+  }
+
+  function applyQuoteOptionTranslations(select) {
+    setSelectOptionText(select, "frenchGuillemets", t("frenchGuillemets"));
+    setSelectOptionText(select, "germanLowHigh", t("germanLowHigh"));
+    setSelectOptionText(select, "englishDouble", t("englishDouble"));
+    setSelectOptionText(select, "programmerDouble", t("programmerDouble"));
+    setSelectOptionText(select, "englishSingle", t("englishSingle"));
+    setSelectOptionText(select, "englishSingleReversed", t("englishSingleReversed"));
+  }
+
+  function applyInterfaceLanguage() {
+    document.documentElement.lang = currentUiLanguage;
+
+    setTextContent(document.querySelector("h1"), t("appTitle"));
+    setTextContent(document.querySelector(".eyebrow"), t("eyebrow"));
+    setTextContent(document.querySelectorAll(".section-title")[0], t("basicSettings"));
+    setTextContent(document.querySelectorAll(".section-title")[1], t("rules"));
+
+    const settingsCards = document.querySelectorAll(".settings-card");
+    setTextContent(settingsCards[0]?.querySelector(".settings-card-title"), t("interfaceLanguage"));
+    setTextContent(settingsCards[0]?.querySelector(".hint"), t("interfaceLanguageHint"));
+    setTextContent(settingsCards[1]?.querySelector(".settings-card-title"), t("textLanguage"));
+    setTextContent(settingsCards[1]?.querySelector(".hint"), t("textLanguageHint"));
+    setTextContent(settingsCards[2]?.querySelector(".settings-card-title"), t("nbspStyle"));
+    setTextContent(settingsCards[2]?.querySelector(".hint"), t("nbspHint"));
+
+    setSelectOptionText(uiLanguageModeSelect, "ru", t("uiLanguageRu"));
+    setSelectOptionText(uiLanguageModeSelect, "en", t("uiLanguageEn"));
+    setSelectOptionText(languageModeSelect, "auto", t("autoDetect"));
+    setSelectOptionText(languageModeSelect, "ru", t("russian"));
+    setSelectOptionText(languageModeSelect, "en", t("english"));
+    setSelectOptionText(nonBreakingSpaceStyleSelect, "regular", t("nbspRegular"));
+    setSelectOptionText(nonBreakingSpaceStyleSelect, "narrow", t("nbspNarrow"));
+
+    setTextContent(document.querySelector(".quote-details summary"), t("quoteStyles"));
+    const subsectionTitles = document.querySelectorAll(".subsection-title");
+    setTextContent(subsectionTitles[0], t("russianQuotesHeading"));
+    setTextContent(subsectionTitles[1], t("englishQuotesHeading"));
+    document.querySelectorAll(".field-label").forEach((label, index) => {
+      label.textContent = index % 2 === 0 ? t("firstLevelQuotes") : t("secondLevelQuotes");
+    });
+
+    applyQuoteOptionTranslations(ruPrimaryQuoteStyleSelect);
+    applyQuoteOptionTranslations(ruSecondaryQuoteStyleSelect);
+    applyQuoteOptionTranslations(enPrimaryQuoteStyleSelect);
+    applyQuoteOptionTranslations(enSecondaryQuoteStyleSelect);
+    setTextContent(document.querySelector(".quote-content .hint"), t("quoteDefaultsHint"));
+
+    selectAllRulesButton.textContent = t("selectAllRules");
+    deselectAllRulesButton.textContent = t("deselectAllRules");
+    resetDefaultsButton.textContent = t("resetDefaults");
+
+    const groups = t("groups");
+    setRuleGroupCopy(0, groups.cleanup[0], groups.cleanup[1]);
+    setRuleGroupCopy(1, groups.numbers[0], groups.numbers[1]);
+    setRuleGroupCopy(2, groups.quotes[0], groups.quotes[1]);
+    setRuleGroupCopy(3, groups.russianTypography[0], groups.russianTypography[1]);
+    setRuleGroupCopy(4, groups.uiText[0], groups.uiText[1]);
+
+    const allTag = t("allTag");
+    const russianTag = t("russianTag");
+    const englishTag = t("englishTag");
+    const ruEnTag = t("ruEnTag");
+    const titles = t("ruleTitles");
+    const descriptions = t("ruleDescriptions");
+
+    setRuleCopy(invisibleCopyArtifactsCheckbox, titles.invisibleCopyArtifacts, allTag, descriptions.invisibleCopyArtifacts);
+    setRuleCopy(tabsCheckbox, titles.tabs, allTag, descriptions.tabs);
+    setRuleCopy(manualLineBreaksCheckbox, titles.manualLineBreaks, allTag, descriptions.manualLineBreaks);
+    setRuleCopy(ellipsisCheckbox, titles.ellipsis, allTag, descriptions.ellipsis);
+    setRuleCopy(extraSpacesCheckbox, titles.extraSpaces, allTag, descriptions.extraSpaces);
+    setRuleCopy(trimTextEdgesCheckbox, titles.trimTextEdges, allTag, descriptions.trimTextEdges);
+    setRuleCopy(spacingCleanupCheckbox, titles.spacingCleanup, allTag, descriptions.spacingCleanup);
+    setRuleCopy(percentSignNoSpaceCheckbox, titles.percentSignNoSpace, allTag, descriptions.percentSignNoSpace);
+    setRuleCopy(numberUnitsNbspCheckbox, titles.numberUnitsNbsp, allTag, descriptions.numberUnitsNbsp);
+    setRuleCopy(numberSignsCheckbox, titles.numberSigns, allTag, descriptions.numberSigns);
+    setRuleCopy(specialSymbolsCheckbox, titles.specialSymbols, allTag, descriptions.specialSymbols);
+    setRuleCopy(englishApostrophesCheckbox, titles.englishApostrophes, englishTag, descriptions.englishApostrophes);
+    setRuleCopy(englishQuotesCheckbox, titles.englishQuotes, englishTag, descriptions.englishQuotes);
+    setRuleCopy(russianQuotesCheckbox, titles.russianQuotes, russianTag, descriptions.russianQuotes);
+    setRuleCopy(numberRangeDashCheckbox, titles.numberRangeDash, allTag, descriptions.numberRangeDash);
+    setRuleCopy(russianSentenceDashCheckbox, titles.russianSentenceDash, russianTag, descriptions.russianSentenceDash);
+    setRuleCopy(russianShortWordsNbspCheckbox, titles.russianShortWordsNbsp, russianTag, descriptions.russianShortWordsNbsp);
+    setRuleCopy(russianInitialsNbspCheckbox, titles.russianInitialsNbsp, russianTag, descriptions.russianInitialsNbsp);
+    setRuleCopy(russianNumericAbbreviationsCheckbox, titles.russianNumericAbbreviations, russianTag, descriptions.russianNumericAbbreviations);
+    setRuleCopy(russianLargeNumbersCheckbox, titles.russianLargeNumbers, russianTag, descriptions.russianLargeNumbers);
+    setRuleCopy(uiFinalPeriodCheckbox, titles.uiFinalPeriod, ruEnTag, descriptions.uiFinalPeriod);
+
+    setTextContent(document.querySelector(".protection-note"), t("protectionNote"));
+    closeButton.textContent = t("close");
+
+    if (!lastSelectionInfoMessage) {
+      summary.textContent = t("checkingSelection");
+    }
+
+    if (lastSelectionInfoMessage) {
+      renderSelectionInfo(lastSelectionInfoMessage);
+    }
+
+    if (lastApplyResultMessage) {
+      renderApplyResult(lastApplyResultMessage);
+    }
+
+    updateApplyButtonState();
+  }
+
+  function saveCurrentUiSettings() {
+    saveUiLanguageToLocalStorage(currentUiLanguage);
+
+    if (isLoadingSettings) {
+      return;
+    }
+
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "save-ui-settings",
+          uiSettings: {
+            uiLanguage: currentUiLanguage,
+          },
+        },
+      },
+      "*"
+    );
+  }
+
+  function handleUiLanguageChange() {
+    currentUiLanguage = resolveUiLanguage(uiLanguageModeSelect.value);
+    uiLanguageModeSelect.value = currentUiLanguage;
+    saveCurrentUiSettings();
+    applyInterfaceLanguage();
+  }
+
+  function getRuleCheckboxes() {
+    return [
+      invisibleCopyArtifactsCheckbox,
+      tabsCheckbox,
+      manualLineBreaksCheckbox,
+      ellipsisCheckbox,
+      extraSpacesCheckbox,
+      trimTextEdgesCheckbox,
+      spacingCleanupCheckbox,
+      percentSignNoSpaceCheckbox,
+      numberUnitsNbspCheckbox,
+      numberSignsCheckbox,
+      specialSymbolsCheckbox,
+      englishApostrophesCheckbox,
+      englishQuotesCheckbox,
+      russianQuotesCheckbox,
+      numberRangeDashCheckbox,
+      russianSentenceDashCheckbox,
+      russianShortWordsNbspCheckbox,
+      russianInitialsNbspCheckbox,
+      russianNumericAbbreviationsCheckbox,
+      russianLargeNumbersCheckbox,
+      uiFinalPeriodCheckbox,
+    ];
+  }
 
   function getEnabledRules() {
     return {
@@ -914,7 +1399,7 @@
 
   function updateApplyButtonState() {
     applyButton.disabled = isLoadingSettings || !hasTextLayers || !hasEnabledRules();
-    applyButton.textContent = currentTargetScope === "currentPage" ? "Apply to current page" : "Apply formatting";
+    applyButton.textContent = currentTargetScope === "currentPage" ? t("applyToCurrentPage") : t("applyFormatting");
   }
 
   function saveCurrentSettings() {
@@ -935,38 +1420,97 @@
 
   function handleSettingsChange() {
     result.textContent = "";
+    lastApplyResultMessage = null;
     updateApplyButtonState();
     saveCurrentSettings();
   }
 
   function formatLanguageStats(languageStats) {
-    return `Detected layers — Russian: ${languageStats.ru}, English: ${languageStats.en}, Unknown: ${languageStats.unknown}.`;
+    return interpolate(t("detectedLayers"), {
+      ru: languageStats.ru,
+      en: languageStats.en,
+      unknown: languageStats.unknown,
+    });
   }
 
   function formatSkippedDetails(message) {
     const parts = [];
 
     if (message.skippedHiddenNodeCount) {
-      parts.push(`hidden: ${message.skippedHiddenNodeCount}`);
+      parts.push(`${t("skippedHidden")}: ${message.skippedHiddenNodeCount}`);
     }
 
     if (message.skippedLockedNodeCount) {
-      parts.push(`locked: ${message.skippedLockedNodeCount}`);
+      parts.push(`${t("skippedLocked")}: ${message.skippedLockedNodeCount}`);
     }
 
     if (message.skippedEmptyNodeCount) {
-      parts.push(`empty: ${message.skippedEmptyNodeCount}`);
+      parts.push(`${t("skippedEmpty")}: ${message.skippedEmptyNodeCount}`);
     }
 
     if (message.errorNodeCount) {
-      parts.push(`errors: ${message.errorNodeCount}`);
+      parts.push(`${t("skippedErrors")}: ${message.errorNodeCount}`);
     }
 
     return parts.length > 0 ? ` (${parts.join(", ")})` : "";
   }
 
   function formatTargetScope(targetScope) {
-    return targetScope === "currentPage" ? "Current page" : "Selection";
+    return targetScope === "currentPage" ? t("currentPage") : t("selection");
+  }
+
+  function renderSelectionInfo(message) {
+    currentTargetScope = message.targetScope || "selection";
+    currentAvailableTextNodeCount = message.availableTextNodeCount || 0;
+    hasTextLayers = currentAvailableTextNodeCount > 0;
+
+    const skippedDetails = formatSkippedDetails(message);
+
+    if (currentTargetScope === "currentPage") {
+      if (message.textNodeCount === 0) {
+        summary.textContent = t("nothingSelectedNoText");
+        updateApplyButtonState();
+        return;
+      }
+
+      summary.textContent = interpolate(t("nothingSelectedPageTextLayers"), {
+        textNodeCount: message.textNodeCount,
+        availableTextNodeCount: message.availableTextNodeCount,
+        skippedDetails,
+      });
+      updateApplyButtonState();
+      return;
+    }
+
+    if (message.textNodeCount === 0) {
+      summary.textContent = interpolate(t("selectedNoText"), {
+        selectedCount: message.selectedCount,
+      });
+      updateApplyButtonState();
+      return;
+    }
+
+    summary.textContent = interpolate(t("selectedTextLayers"), {
+      selectedCount: message.selectedCount,
+      textNodeCount: message.textNodeCount,
+      availableTextNodeCount: message.availableTextNodeCount,
+      skippedDetails,
+    });
+    updateApplyButtonState();
+  }
+
+  function renderApplyResult(message) {
+    const skippedDetails = formatSkippedDetails(message);
+
+    result.textContent =
+      `${formatTargetScope(message.targetScope)} · ` +
+      `${t("textLayers")}: ${message.totalTextNodeCount}. ` +
+      `${t("changed")}: ${message.changedNodeCount}. ` +
+      `${t("unchanged")}: ${message.unchangedNodeCount}. ` +
+      `${t("skipped")}: ${message.skippedNodeCount}${skippedDetails}. ` +
+      `${t("replacements")}: ${message.totalReplacementCount}. ` +
+      `${t("rulesSkippedByLanguage")}: ${message.skippedRuleCount}. ` +
+      formatLanguageStats(message.languageStats);
   }
 
   window.onmessage = (event) => {
@@ -977,63 +1521,39 @@
     }
 
     if (message.type === "settings-loaded") {
+      const uiSettings = message.uiSettings || {};
+      const savedUiLanguage = normalizeUiLanguage(uiSettings.uiLanguage);
+      const localUiLanguage = loadUiLanguageFromLocalStorage();
+
+      currentUiLanguage = localUiLanguage || savedUiLanguage || getDetectedUiLanguage();
+      uiLanguageModeSelect.value = currentUiLanguage;
+
       applySettingsToUi(message.settings);
+      applyInterfaceLanguage();
 
       isLoadingSettings = false;
+
+      if (currentUiLanguage !== savedUiLanguage) {
+        saveCurrentUiSettings();
+      }
+
       updateApplyButtonState();
     }
 
     if (message.type === "selection-info") {
       result.textContent = "";
-      currentTargetScope = message.targetScope || "selection";
-      currentAvailableTextNodeCount = message.availableTextNodeCount || 0;
-      hasTextLayers = currentAvailableTextNodeCount > 0;
-
-      const skippedDetails = formatSkippedDetails(message);
-
-      if (currentTargetScope === "currentPage") {
-        if (message.textNodeCount === 0) {
-          summary.textContent = "Nothing selected. Current page has no text layers.";
-          updateApplyButtonState();
-          return;
-        }
-
-        summary.textContent =
-          `Nothing selected. Current page text layers: ${message.textNodeCount}. ` +
-          `Ready to apply to ${message.availableTextNodeCount} visible editable layer(s)` +
-          `${skippedDetails}.`;
-        updateApplyButtonState();
-        return;
-      }
-
-      if (message.textNodeCount === 0) {
-        summary.textContent = `Selected layers: ${message.selectedCount}. Text layers: 0.`;
-        updateApplyButtonState();
-        return;
-      }
-
-      summary.textContent =
-        `Selected layers: ${message.selectedCount}. Text layers: ${message.textNodeCount}. ` +
-        `Ready to apply to ${message.availableTextNodeCount}` +
-        `${skippedDetails}.`;
-      updateApplyButtonState();
+      lastApplyResultMessage = null;
+      lastSelectionInfoMessage = message;
+      renderSelectionInfo(message);
     }
 
     if (message.type === "apply-result") {
-      const skippedDetails = formatSkippedDetails(message);
-
-      result.textContent =
-        `${formatTargetScope(message.targetScope)} · ` +
-        `Text layers: ${message.totalTextNodeCount}. ` +
-        `Changed: ${message.changedNodeCount}. ` +
-        `Unchanged: ${message.unchangedNodeCount}. ` +
-        `Skipped: ${message.skippedNodeCount}${skippedDetails}. ` +
-        `Replacements: ${message.totalReplacementCount}. ` +
-        `Rules skipped by language: ${message.skippedRuleCount}. ` +
-        formatLanguageStats(message.languageStats);
+      lastApplyResultMessage = message;
+      renderApplyResult(message);
     }
   };
 
+  uiLanguageModeSelect.onchange = handleUiLanguageChange;
   languageModeSelect.onchange = handleSettingsChange;
   nonBreakingSpaceStyleSelect.onchange = handleSettingsChange;
 
@@ -1088,7 +1608,7 @@
   applyButton.onclick = () => {
     if (currentTargetScope === "currentPage") {
       const shouldApplyToPage = window.confirm(
-        `Nothing is selected. Typograph all visible editable text layers on this page (${currentAvailableTextNodeCount} layer(s))?`
+        interpolate(t("confirmCurrentPage"), { count: currentAvailableTextNodeCount })
       );
 
       if (!shouldApplyToPage) {
@@ -1101,6 +1621,9 @@
         pluginMessage: {
           type: "apply",
           settings: getSettings(),
+          uiSettings: {
+            uiLanguage: currentUiLanguage,
+          },
         },
       },
       "*"
@@ -1108,13 +1631,21 @@
   };
 
   closeButton.onclick = () => {
+    saveUiLanguageToLocalStorage(currentUiLanguage);
+
     parent.postMessage(
       {
         pluginMessage: {
           type: "close",
+          settings: getSettings(),
+          uiSettings: {
+            uiLanguage: currentUiLanguage,
+          },
         },
       },
       "*"
     );
   };
+
+  applyInterfaceLanguage();
 </script>
