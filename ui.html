@@ -332,10 +332,11 @@
     <div class="settings-card">
       <div class="settings-card-title">Interface language</div>
       <select id="uiLanguageMode">
+        <option value="auto">Auto, from Figma</option>
         <option value="ru">Russian</option>
         <option value="en">English</option>
       </select>
-      <p class="hint">The first launch uses the language reported by Figma. Your manual choice is saved.</p>
+      <p class="hint">Auto uses the language reported by the Figma plugin UI environment. You can override it here.</p>
     </div>
 
     <div class="settings-card">
@@ -711,12 +712,11 @@
   const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
   const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
 
-  const UI_LANGUAGE_STORAGE_KEY = "typotypoUiLanguage";
-
   let hasTextLayers = false;
   let currentTargetScope = "selection";
   let currentAvailableTextNodeCount = 0;
   let currentUiLanguage = "en";
+  let currentUiLanguageMode = "auto";
   let isLoadingSettings = true;
   let lastSelectionInfoMessage = null;
   let lastApplyResultMessage = null;
@@ -768,7 +768,8 @@
       checkingSelection: "Checking selection…",
       basicSettings: "Basic settings",
       interfaceLanguage: "Interface language",
-      interfaceLanguageHint: "The first launch uses the language reported by Figma. Your manual choice is saved.",
+      interfaceLanguageHint: "Auto uses the language reported by the Figma plugin UI environment. You can override it here.",
+      uiLanguageAuto: "Auto, from Figma",
       uiLanguageRu: "Russian",
       uiLanguageEn: "English",
       textLanguage: "Text language",
@@ -864,6 +865,7 @@
       skippedHidden: "hidden",
       skippedLocked: "locked",
       skippedEmpty: "empty",
+      skippedNonEditable: "non-editable",
       skippedErrors: "errors",
       currentPage: "Current page",
       selection: "Selection",
@@ -882,7 +884,8 @@
       checkingSelection: "Проверяем выделение…",
       basicSettings: "Основные настройки",
       interfaceLanguage: "Язык интерфейса",
-      interfaceLanguageHint: "При первом запуске используется язык из Figma. Ручной выбор сохраняется.",
+      interfaceLanguageHint: "Авто использует язык, который сообщает среда UI плагина Figma. Здесь можно выбрать язык вручную.",
+      uiLanguageAuto: "Авто, как в Figma",
       uiLanguageRu: "Русский",
       uiLanguageEn: "Английский",
       textLanguage: "Язык текста",
@@ -978,6 +981,7 @@
       skippedHidden: "скрыто",
       skippedLocked: "заблокировано",
       skippedEmpty: "пусто",
+      skippedNonEditable: "нельзя изменить",
       skippedErrors: "ошибки",
       currentPage: "Текущая страница",
       selection: "Выделение",
@@ -1001,31 +1005,8 @@
     return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
   }
 
-  function normalizeUiLanguage(value) {
-    return value === "ru" || value === "en" ? value : null;
-  }
-
-  function loadUiLanguageFromLocalStorage() {
-    try {
-      return normalizeUiLanguage(localStorage.getItem(UI_LANGUAGE_STORAGE_KEY));
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function saveUiLanguageToLocalStorage(value) {
-    const normalizedValue = normalizeUiLanguage(value);
-
-    if (!normalizedValue) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalizedValue);
-    } catch (error) {
-      // Figma may restrict localStorage in some environments.
-      // Client storage remains the fallback.
-    }
+  function normalizeUiLanguageMode(value) {
+    return value === "ru" || value === "en" || value === "auto" ? value : "auto";
   }
 
   function getDetectedUiLanguage() {
@@ -1044,8 +1025,8 @@
       : "en";
   }
 
-  function resolveUiLanguage(value) {
-    return normalizeUiLanguage(value) || getDetectedUiLanguage();
+  function resolveUiLanguage(mode) {
+    return mode === "ru" || mode === "en" ? mode : getDetectedUiLanguage();
   }
 
   function setTextContent(element, value) {
@@ -1124,6 +1105,7 @@
     setTextContent(settingsCards[2]?.querySelector(".settings-card-title"), t("nbspStyle"));
     setTextContent(settingsCards[2]?.querySelector(".hint"), t("nbspHint"));
 
+    setSelectOptionText(uiLanguageModeSelect, "auto", t("uiLanguageAuto"));
     setSelectOptionText(uiLanguageModeSelect, "ru", t("uiLanguageRu"));
     setSelectOptionText(uiLanguageModeSelect, "en", t("uiLanguageEn"));
     setSelectOptionText(languageModeSelect, "auto", t("autoDetect"));
@@ -1205,8 +1187,6 @@
   }
 
   function saveCurrentUiSettings() {
-    saveUiLanguageToLocalStorage(currentUiLanguage);
-
     if (isLoadingSettings) {
       return;
     }
@@ -1216,7 +1196,7 @@
         pluginMessage: {
           type: "save-ui-settings",
           uiSettings: {
-            uiLanguage: currentUiLanguage,
+            uiLanguageMode: currentUiLanguageMode,
           },
         },
       },
@@ -1225,10 +1205,10 @@
   }
 
   function handleUiLanguageChange() {
-    currentUiLanguage = resolveUiLanguage(uiLanguageModeSelect.value);
-    uiLanguageModeSelect.value = currentUiLanguage;
-    saveCurrentUiSettings();
+    currentUiLanguageMode = normalizeUiLanguageMode(uiLanguageModeSelect.value);
+    currentUiLanguage = resolveUiLanguage(currentUiLanguageMode);
     applyInterfaceLanguage();
+    saveCurrentUiSettings();
   }
 
   function getRuleCheckboxes() {
@@ -1448,6 +1428,10 @@
       parts.push(`${t("skippedEmpty")}: ${message.skippedEmptyNodeCount}`);
     }
 
+    if (message.skippedNonEditableNodeCount) {
+      parts.push(`${t("skippedNonEditable")}: ${message.skippedNonEditableNodeCount}`);
+    }
+
     if (message.errorNodeCount) {
       parts.push(`${t("skippedErrors")}: ${message.errorNodeCount}`);
     }
@@ -1522,21 +1506,14 @@
 
     if (message.type === "settings-loaded") {
       const uiSettings = message.uiSettings || {};
-      const savedUiLanguage = normalizeUiLanguage(uiSettings.uiLanguage);
-      const localUiLanguage = loadUiLanguageFromLocalStorage();
-
-      currentUiLanguage = localUiLanguage || savedUiLanguage || getDetectedUiLanguage();
-      uiLanguageModeSelect.value = currentUiLanguage;
+      currentUiLanguageMode = normalizeUiLanguageMode(uiSettings.uiLanguageMode);
+      currentUiLanguage = resolveUiLanguage(currentUiLanguageMode);
+      uiLanguageModeSelect.value = currentUiLanguageMode;
 
       applySettingsToUi(message.settings);
       applyInterfaceLanguage();
 
       isLoadingSettings = false;
-
-      if (currentUiLanguage !== savedUiLanguage) {
-        saveCurrentUiSettings();
-      }
-
       updateApplyButtonState();
     }
 
@@ -1621,9 +1598,6 @@
         pluginMessage: {
           type: "apply",
           settings: getSettings(),
-          uiSettings: {
-            uiLanguage: currentUiLanguage,
-          },
         },
       },
       "*"
@@ -1631,16 +1605,10 @@
   };
 
   closeButton.onclick = () => {
-    saveUiLanguageToLocalStorage(currentUiLanguage);
-
     parent.postMessage(
       {
         pluginMessage: {
           type: "close",
-          settings: getSettings(),
-          uiSettings: {
-            uiLanguage: currentUiLanguage,
-          },
         },
       },
       "*"
