@@ -386,6 +386,7 @@ figma.showUI(__html__, {
     height: 1180,
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
+const UI_SETTINGS_STORAGE_KEY = "typotypoInterfaceSettings";
 async function loadSettings() {
     try {
         const storedSettings = await figma.clientStorage.getAsync(SETTINGS_STORAGE_KEY);
@@ -402,6 +403,40 @@ async function saveSettings(settings) {
     }
     catch (error) {
         console.error("Could not save settings:", error);
+    }
+}
+function normalizeUiSettings(value) {
+    var _a;
+    if (!value || typeof value !== "object") {
+        return {};
+    }
+    const rawSettings = value;
+    const rawLanguage = (_a = rawSettings.uiLanguage) !== null && _a !== void 0 ? _a : rawSettings.uiLanguageMode;
+    if (rawLanguage === "ru" || rawLanguage === "en") {
+        return { uiLanguage: rawLanguage };
+    }
+    return {};
+}
+async function loadUiSettings() {
+    try {
+        const storedUiSettings = await figma.clientStorage.getAsync(UI_SETTINGS_STORAGE_KEY);
+        return normalizeUiSettings(storedUiSettings);
+    }
+    catch (error) {
+        console.error("Could not load UI settings:", error);
+        return {};
+    }
+}
+async function saveUiSettings(uiSettings) {
+    try {
+        const safeUiSettings = normalizeUiSettings(uiSettings);
+        if (!safeUiSettings.uiLanguage) {
+            return;
+        }
+        await figma.clientStorage.setAsync(UI_SETTINGS_STORAGE_KEY, safeUiSettings);
+    }
+    catch (error) {
+        console.error("Could not save UI settings:", error);
     }
 }
 function isNodeHiddenBySelfOrParent(node) {
@@ -700,6 +735,19 @@ async function updateTextNodeCharactersPreservingStyles(node, formattedText) {
     node.characters = formattedText;
     applyStyleSnapshotsToFormattedText(node, originalText, formattedText, originalStyles);
 }
+function isProbablyNonEditableError(error) {
+    const message = String(error instanceof Error ? error.message : error !== null && error !== void 0 ? error : "").toLowerCase();
+    return (message.includes("read only") ||
+        message.includes("readonly") ||
+        message.includes("not editable") ||
+        message.includes("non-editable") ||
+        message.includes("cannot edit") ||
+        message.includes("can't edit") ||
+        message.includes("cannot write") ||
+        message.includes("can't write") ||
+        message.includes("instance") ||
+        message.includes("component"));
+}
 async function applyTypographyRules(settings) {
     const safeSettings = TypotypoEngine.normalizeSettings(settings);
     const target = resolveTextNodeTarget();
@@ -709,6 +757,7 @@ async function applyTypographyRules(settings) {
     let skippedHiddenNodeCount = 0;
     let skippedLockedNodeCount = 0;
     let skippedEmptyNodeCount = 0;
+    let skippedNonEditableNodeCount = 0;
     let errorNodeCount = 0;
     let skippedRuleCount = 0;
     const languageStats = {
@@ -747,12 +796,18 @@ async function applyTypographyRules(settings) {
         }
         catch (error) {
             console.error("Could not update text node:", error);
-            errorNodeCount += 1;
+            if (isProbablyNonEditableError(error)) {
+                skippedNonEditableNodeCount += 1;
+            }
+            else {
+                errorNodeCount += 1;
+            }
         }
     }
     const skippedNodeCount = skippedHiddenNodeCount +
         skippedLockedNodeCount +
         skippedEmptyNodeCount +
+        skippedNonEditableNodeCount +
         errorNodeCount;
     figma.ui.postMessage({
         type: "apply-result",
@@ -766,6 +821,7 @@ async function applyTypographyRules(settings) {
         skippedHiddenNodeCount,
         skippedLockedNodeCount,
         skippedEmptyNodeCount,
+        skippedNonEditableNodeCount,
         errorNodeCount,
         skippedRuleCount,
         languageStats,
@@ -775,10 +831,14 @@ async function applyTypographyRules(settings) {
     sendSelectionInfo();
 }
 async function initializePlugin() {
-    const settings = await loadSettings();
+    const [settings, uiSettings] = await Promise.all([
+        loadSettings(),
+        loadUiSettings(),
+    ]);
     figma.ui.postMessage({
         type: "settings-loaded",
         settings,
+        uiSettings,
     });
     sendSelectionInfo();
 }
@@ -789,12 +849,19 @@ figma.ui.onmessage = async (message) => {
     if (message.type === "save-settings") {
         await saveSettings(message.settings);
     }
+    if (message.type === "save-ui-settings") {
+        await saveUiSettings(message.uiSettings);
+    }
     if (message.type === "apply") {
         const safeSettings = TypotypoEngine.normalizeSettings(message.settings);
-        await saveSettings(safeSettings);
+        await Promise.all([
+            saveSettings(safeSettings),
+            saveUiSettings(message.uiSettings),
+        ]);
         await applyTypographyRules(safeSettings);
     }
     if (message.type === "close") {
+        await saveUiSettings(message.uiSettings);
         figma.closePlugin();
     }
 };

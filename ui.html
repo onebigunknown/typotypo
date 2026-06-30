@@ -332,11 +332,10 @@
     <div class="settings-card">
       <div class="settings-card-title">Interface language</div>
       <select id="uiLanguageMode">
-        <option value="auto">Auto, from Figma</option>
         <option value="ru">Russian</option>
         <option value="en">English</option>
       </select>
-      <p class="hint">Auto uses the language reported by the Figma plugin UI environment. You can override it here.</p>
+      <p class="hint">Detected automatically on first launch. Your choice is saved after that.</p>
     </div>
 
     <div class="settings-card">
@@ -712,11 +711,12 @@
   const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
   const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
 
+  const UI_LANGUAGE_STORAGE_KEY = "typotypoInterfaceLanguage";
+
   let hasTextLayers = false;
   let currentTargetScope = "selection";
   let currentAvailableTextNodeCount = 0;
-  let currentUiLanguage = "en";
-  let currentUiLanguageMode = "auto";
+  let currentUiLanguage = readStoredUiLanguage() || getDetectedUiLanguage();
   let isLoadingSettings = true;
   let lastSelectionInfoMessage = null;
   let lastApplyResultMessage = null;
@@ -768,8 +768,7 @@
       checkingSelection: "Checking selection…",
       basicSettings: "Basic settings",
       interfaceLanguage: "Interface language",
-      interfaceLanguageHint: "Auto uses the language reported by the Figma plugin UI environment. You can override it here.",
-      uiLanguageAuto: "Auto, from Figma",
+      interfaceLanguageHint: "Detected automatically on first launch. Your choice is saved after that.",
       uiLanguageRu: "Russian",
       uiLanguageEn: "English",
       textLanguage: "Text language",
@@ -884,8 +883,7 @@
       checkingSelection: "Проверяем выделение…",
       basicSettings: "Основные настройки",
       interfaceLanguage: "Язык интерфейса",
-      interfaceLanguageHint: "Авто использует язык, который сообщает среда UI плагина Figma. Здесь можно выбрать язык вручную.",
-      uiLanguageAuto: "Авто, как в Figma",
+      interfaceLanguageHint: "При первом запуске определяется автоматически. Дальше выбор сохраняется.",
       uiLanguageRu: "Русский",
       uiLanguageEn: "Английский",
       textLanguage: "Язык текста",
@@ -1005,8 +1003,8 @@
     return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
   }
 
-  function normalizeUiLanguageMode(value) {
-    return value === "ru" || value === "en" || value === "auto" ? value : "auto";
+  function normalizeUiLanguage(value) {
+    return value === "ru" || value === "en" ? value : null;
   }
 
   function getDetectedUiLanguage() {
@@ -1025,8 +1023,26 @@
       : "en";
   }
 
-  function resolveUiLanguage(mode) {
-    return mode === "ru" || mode === "en" ? mode : getDetectedUiLanguage();
+  function readStoredUiLanguage() {
+    try {
+      return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeStoredUiLanguage(language) {
+    try {
+      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language);
+    } catch (error) {
+      // Figma plugin UI can still work without localStorage; code.ts also stores this setting.
+    }
+  }
+
+  function getUiSettings() {
+    return {
+      uiLanguage: currentUiLanguage,
+    };
   }
 
   function setTextContent(element, value) {
@@ -1105,7 +1121,6 @@
     setTextContent(settingsCards[2]?.querySelector(".settings-card-title"), t("nbspStyle"));
     setTextContent(settingsCards[2]?.querySelector(".hint"), t("nbspHint"));
 
-    setSelectOptionText(uiLanguageModeSelect, "auto", t("uiLanguageAuto"));
     setSelectOptionText(uiLanguageModeSelect, "ru", t("uiLanguageRu"));
     setSelectOptionText(uiLanguageModeSelect, "en", t("uiLanguageEn"));
     setSelectOptionText(languageModeSelect, "auto", t("autoDetect"));
@@ -1187,17 +1202,13 @@
   }
 
   function saveCurrentUiSettings() {
-    if (isLoadingSettings) {
-      return;
-    }
+    writeStoredUiLanguage(currentUiLanguage);
 
     parent.postMessage(
       {
         pluginMessage: {
           type: "save-ui-settings",
-          uiSettings: {
-            uiLanguageMode: currentUiLanguageMode,
-          },
+          uiSettings: getUiSettings(),
         },
       },
       "*"
@@ -1205,10 +1216,10 @@
   }
 
   function handleUiLanguageChange() {
-    currentUiLanguageMode = normalizeUiLanguageMode(uiLanguageModeSelect.value);
-    currentUiLanguage = resolveUiLanguage(currentUiLanguageMode);
-    applyInterfaceLanguage();
+    currentUiLanguage = normalizeUiLanguage(uiLanguageModeSelect.value) || getDetectedUiLanguage();
+    uiLanguageModeSelect.value = currentUiLanguage;
     saveCurrentUiSettings();
+    applyInterfaceLanguage();
   }
 
   function getRuleCheckboxes() {
@@ -1506,14 +1517,19 @@
 
     if (message.type === "settings-loaded") {
       const uiSettings = message.uiSettings || {};
-      currentUiLanguageMode = normalizeUiLanguageMode(uiSettings.uiLanguageMode);
-      currentUiLanguage = resolveUiLanguage(currentUiLanguageMode);
-      uiLanguageModeSelect.value = currentUiLanguageMode;
+      const storedUiLanguage = readStoredUiLanguage();
+      const pluginStoredUiLanguage = normalizeUiLanguage(uiSettings.uiLanguage);
+
+      currentUiLanguage =
+        storedUiLanguage || pluginStoredUiLanguage || currentUiLanguage || getDetectedUiLanguage();
+      uiLanguageModeSelect.value = currentUiLanguage;
+      writeStoredUiLanguage(currentUiLanguage);
 
       applySettingsToUi(message.settings);
       applyInterfaceLanguage();
 
       isLoadingSettings = false;
+      saveCurrentUiSettings();
       updateApplyButtonState();
     }
 
@@ -1598,6 +1614,7 @@
         pluginMessage: {
           type: "apply",
           settings: getSettings(),
+          uiSettings: getUiSettings(),
         },
       },
       "*"
@@ -1609,11 +1626,13 @@
       {
         pluginMessage: {
           type: "close",
+          uiSettings: getUiSettings(),
         },
       },
       "*"
     );
   };
 
+  uiLanguageModeSelect.value = currentUiLanguage;
   applyInterfaceLanguage();
 </script>
