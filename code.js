@@ -1,7 +1,9 @@
+// WORD_JOINER_PATCH_20260701
 var TypotypoEngine;
 (function (TypotypoEngine) {
     const REGULAR_NBSP = "\u00A0";
     const NARROW_NBSP = "\u202F";
+    const WORD_JOINER = "\u2060";
     TypotypoEngine.DEFAULT_SETTINGS = {
         languageMode: "auto",
         options: {
@@ -182,7 +184,7 @@ var TypotypoEngine;
     }
     function protectSegments(text) {
         const segments = [];
-        const protectedPattern = /https?:\/\/[^\s<>()]+|www\.[^\s<>()]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|`[^`]*`|<[^>]+>|&[#A-Za-z0-9]+;|\{[^{}]*\}|\b[A-Za-z][A-Za-z0-9]*(?:[._/-][A-Za-z0-9]+){2,}\b/g;
+        const protectedPattern = /ГОСТ\s+\d+(?:\.\d+)*(?:[-–—]\d+)?|[А-ЯЁA-Z]{2,}\.[0-9.]+\s+ТУ|ТУ\s+\d+(?:[-–—]\d+)+|https?:\/\/[^\s<>()]+|www\.[^\s<>()]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|`[^`]*`|<[^>]+>|&[#A-Za-z0-9]+;|\{[^{}]*\}|\b[A-Za-z][A-Za-z0-9]*(?:[._/-][A-Za-z0-9]+){2,}\b/g;
         const protectedValue = text.replace(protectedPattern, (value) => {
             const token = `\uE000${segments.length}\uE001`;
             segments.push({ token, value });
@@ -264,7 +266,17 @@ var TypotypoEngine;
             .replace(/(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(млн|млрд|трлн)\.?(?=\s|$|[,.!?:;)])/gi, (_match, number, abbreviation) => `${number}${nbsp}${abbreviation}`);
     }
     function normalizeRussianLargeNumbers(text, nbsp) {
-        return text.replace(/\b\d{5,}\b/g, (value) => value.replace(/\B(?=(\d{3})+(?!\d))/g, nbsp));
+        const groupSeparator = `${WORD_JOINER}${nbsp}${WORD_JOINER}`;
+        function formatLargeNumber(value) {
+            const digitsOnly = value.replace(/[\s\u00A0\u202F\u2060]/g, "");
+            if (!/^\d{5,}$/.test(digitsOnly)) {
+                return value;
+            }
+            return digitsOnly.replace(/\B(?=(\d{3})+(?!\d))/g, groupSeparator);
+        }
+        return text
+            .replace(/\b\d{1,3}(?:[\s\u00A0\u202F\u2060]+\d{3})+\b/g, formatLargeNumber)
+            .replace(/\b\d{5,}\b/g, formatLargeNumber);
     }
     function normalizeEnglishApostrophes(text) {
         return text
@@ -331,14 +343,23 @@ var TypotypoEngine;
         return text.replace(/\b([А-ЯЁ])\.\s*([А-ЯЁ])\.\s*([А-ЯЁ][а-яё]+)/g, `$1.${REGULAR_NBSP}$2.${REGULAR_NBSP}$3`);
     }
     function normalizeRussianShortWords(text) {
-        const shortWords = "а|в|во|и|к|ко|с|со|у|о|об|обо|от|до|из|за|на|не|но|по|под|над|при|про|для|без|или|же|ли|бы";
-        const shortWordPattern = new RegExp(`(^|[\\s([{«„“])(${shortWords})\\s+([А-Яа-яЁёA-Za-z0-9])`, "gi");
+        const leadingShortWords = "а|без|безо|в|во|вне|вот|всё|где|да|даже|для|до|если|есть|ещё|за|и|из|изо|из-за|из-под|или|иль|к|ко|как|либо|между|на|над|надо|не|ни|но|об|обо|около|оно|от|перед|по|по-за|по-над|под|подо|после|при|про|ради|с|со|сквозь|так|также|там|тем|то|того|тоже|туда|у|хоть|хотя|чего|через|что|чтоб|чтобы|это";
+        const shortWordPattern = new RegExp(`(^|[\s([{«„“])(${leadingShortWords})[ \t\u00A0\u202F]+([А-Яа-яЁёA-Za-z0-9])`, "gi");
         return text
-            .replace(/\bт\.\s*е\./gi, `т.${REGULAR_NBSP}е.`)
-            .replace(/\bт\.\s*к\./gi, `т.${REGULAR_NBSP}к.`)
-            .replace(/\bт\.\s*д\./gi, `т.${REGULAR_NBSP}д.`)
-            .replace(/\bт\.\s*п\./gi, `т.${REGULAR_NBSP}п.`)
-            .replace(/\bв\s+т\.\s*ч\./gi, `в${REGULAR_NBSP}т.${REGULAR_NBSP}ч.`)
+            .replace(/и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]+д\./gi, `и${REGULAR_NBSP}т.${REGULAR_NBSP}д.`)
+            .replace(/т\.[ \t\u00A0\u202F]+е\./gi, `т.${REGULAR_NBSP}е.`)
+            .replace(/т\.[ \t\u00A0\u202F]+к\./gi, `т.${REGULAR_NBSP}к.`)
+            .replace(/т\.[ \t\u00A0\u202F]+д\./gi, `т.${REGULAR_NBSP}д.`)
+            .replace(/т\.[ \t\u00A0\u202F]+п\./gi, `т.${REGULAR_NBSP}п.`)
+            .replace(/в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]+ч\./gi, `в${REGULAR_NBSP}т.${REGULAR_NBSP}ч.`)
+            .replace(/а\.[ \t\u00A0\u202F]+е\./gi, `а.${REGULAR_NBSP}е.`)
+            .replace(/н\.[ \t\u00A0\u202F]+э\./gi, `н.${REGULAR_NBSP}э.`)
+            .replace(/до[ \t\u00A0\u202F]+н\.[ \t\u00A0\u202F]+э\./gi, `до${REGULAR_NBSP}н.${REGULAR_NBSP}э.`)
+            .replace(/(^|[\s([{«„“])(г-н|г-жа|г-да|тов\.)[ \t\u00A0\u202F]+(?=[А-ЯЁA-Z])/g, `$1$2${REGULAR_NBSP}`)
+            .replace(/(^|[\s([{«„“])(г\.|ул\.|пр-т|просп\.|пер\.|пл\.|о-в|о-ва|р-н|обл\.|с\.|д\.)[ \t\u00A0\u202F]+(?=[А-ЯЁA-Z])/g, `$1$2${REGULAR_NBSP}`)
+            .replace(/(^|[\s([{«„“])(гл\.|рис\.|табл\.|стр\.|с\.|п\.|ч\.|разд\.|подп\.)[ \t\u00A0\u202F]+(?=[0-9IVXLCDM])/gi, `$1$2${REGULAR_NBSP}`)
+            .replace(/(\d{3,4})[ \t\u00A0\u202F]+(г\.|гг\.|год|года|году|годом|лет)(?=$|[\s,.;:!?)]|\uE000)/gi, `$1${REGULAR_NBSP}$2`)
+            .replace(/([А-Яа-яЁёA-Za-z0-9])[ \t\u00A0\u202F]+(бы|ли|же)(?=$|[^А-Яа-яЁёA-Za-z0-9])/gi, `$1${REGULAR_NBSP}$2`)
             .replace(shortWordPattern, (_match, prefix, word, next) => `${prefix}${word}${REGULAR_NBSP}${next}`);
     }
     function normalizeSpacing(text) {
@@ -359,7 +380,11 @@ var TypotypoEngine;
         return text.replace(/[ \t]{2,}/g, " ");
     }
     function trimTextEdges(text) {
-        return text.trim();
+        return text
+            .split("\n")
+            .map((line) => line.replace(/^[ \t\u00A0\u202F]+/g, "").replace(/[ \t\u00A0\u202F]+$/g, ""))
+            .join("\n")
+            .trim();
     }
     function removeUiFinalPeriod(text) {
         const trimmedRight = text.replace(/[ \t\u00A0\u202F]+$/g, "");
