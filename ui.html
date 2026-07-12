@@ -1,1638 +1,3560 @@
 <style>
   :root {
     color-scheme: light;
-    --text: #222;
-    --muted: #666;
-    --subtle: #888;
-    --border: #ddd;
-    --border-strong: #cfcfcf;
-    --surface: #fff;
-    --surface-muted: #fafafa;
-    --surface-soft: #f5f5f5;
-    --accent: #18a0fb;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-soft: #fafafa;
+    --text: #111111;
+    --muted: #8a8a8a;
+    --line: #111111;
+    --line-soft: #e3e3e3;
+    --control-on-bg: #111111;
+    --control-on-text: #ffffff;
+    --control-off-bg: #ffffff;
+    --control-off-dot: #111111;
+    --highlight-bg: #111111;
+    --highlight-text: #ffffff;
+    --button-bg: #111111;
+    --button-text: #ffffff;
+    --button-disabled-bg: #ffffff;
+    --button-disabled-text: #8a8a8a;
+    --disabled-number: #c7c7c7;
+    --shadow: 0 18px 50px -12px rgba(20, 20, 40, 0.18);
+    --font-ui: Helvetica, Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --w: 420px;
+    --h: 640px;
+    --border: 2px;
+    --topbar-h: 40px;
+    --footer-h: 48px;
+    --compact-h: 65px;
+    --settings-spacer-h: 245px;
+    --row-h: 40px;
+    --reset-h: 38px;
+    --px: 14px;
   }
 
-  * {
-    box-sizing: border-box;
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #2c2c2c;
+    --surface: #2c2c2c;
+    --surface-soft: #303030;
+    --text: #f5f5f5;
+    --muted: #8a8a8a;
+    --line: #5c5c5c;
+    --line-soft: #3d3d3d;
+    --control-on-bg: #f5f5f5;
+    --control-on-text: #111111;
+    --control-off-bg: #2c2c2c;
+    --control-off-dot: #8a8a8a;
+    --highlight-bg: #111111;
+    --highlight-text: #ffffff;
+    --button-bg: #f5f5f5;
+    --button-text: #111111;
+    --button-disabled-bg: #2c2c2c;
+    --button-disabled-text: #8a8a8a;
+    --disabled-number: #5c5c5c;
+    --shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.45);
   }
 
-  body {
+  * { box-sizing: border-box; }
+
+  html, body {
+    width: var(--w);
+    height: var(--h);
     margin: 0;
-    padding: 18px;
-    font-family: Inter, sans-serif;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  body, button, input, select {
+    font-family: var(--font-ui);
     font-size: 13px;
+    line-height: 1;
+    font-weight: 400;
     color: var(--text);
-    background: var(--surface);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
   }
 
-  h1 {
-    margin: 0;
-    font-size: 18px;
-    line-height: 1.2;
+  button {
+    appearance: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
   }
 
-  p {
-    margin: 0;
-    line-height: 1.4;
+  .app {
+    position: relative;
+    width: var(--w);
+    height: var(--h);
+    overflow: hidden;
+    background: var(--bg);
+    border: var(--border) solid var(--line);
+    box-shadow: var(--shadow);
   }
 
-  .app-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-
-  .eyebrow {
-    margin-top: 4px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .status-card {
-    margin-bottom: 14px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-muted);
-    color: var(--muted);
-  }
-
-  .section {
-    margin: 14px 0;
-  }
-
-  .section-title {
-    margin-bottom: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    color: #555;
-  }
-
-  .settings-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .settings-card,
-  .rule-group {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-muted);
-  }
-
-  .settings-card {
-    padding: 12px;
-  }
-
-  .settings-card-title,
-  .subsection-title {
-    margin: 0 0 8px;
-    font-weight: 600;
-    color: #333;
-  }
-
-  .subsection-title {
-    margin-top: 12px;
-    color: #444;
-  }
-
-  .field {
-    margin-bottom: 10px;
-  }
-
-  .field:last-child {
-    margin-bottom: 0;
-  }
-
-  .field-label {
-    margin-bottom: 4px;
-    color: #555;
-    font-size: 12px;
-  }
-
-  select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--border-strong);
-    border-radius: 7px;
-    background: white;
-    font: inherit;
-  }
-
-  .hint {
-    margin-top: 6px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .quote-details {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-muted);
-  }
-
-  .quote-details summary,
-  .rule-group summary {
+  .topbar {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: var(--topbar-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 11px 12px;
-    cursor: pointer;
-    user-select: none;
-    font-weight: 600;
-    list-style: none;
+    gap: 16px;
+    padding: 0 var(--px);
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
   }
 
-  .quote-details summary::-webkit-details-marker,
-  .rule-group summary::-webkit-details-marker {
+  .brand {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 400;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .scope {
+    max-width: 250px;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 400;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .content {
+    position: absolute;
+    inset: var(--topbar-h) 0 var(--footer-h) 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .format-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .format-area.is-compact { display: none; }
+
+  .format-inner,
+  .hero {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .hero { padding: 12px var(--px); }
+
+  .hero-number,
+  .result-number,
+  .progress-number {
+    display: block;
+    font-size: 220px;
+    line-height: 209px;
+    letter-spacing: -4.4px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .hero-number[data-digits="4"],
+  .result-number[data-digits="4"],
+  .progress-number[data-digits="4"] {
+    font-size: 164px;
+    line-height: 164px;
+    letter-spacing: -3.2px;
+  }
+
+  .hero-number[data-digits="5"],
+  .result-number[data-digits="5"],
+  .progress-number[data-digits="5"] {
+    font-size: 132px;
+    line-height: 132px;
+    letter-spacing: -2.6px;
+  }
+
+
+
+  .hero-number.is-muted,
+  .compact-number.is-muted,
+  .result-number.is-muted {
+    color: var(--disabled-number);
+  }
+
+  .hero-label,
+  .result-label,
+  .progress-label {
+    max-width: 360px;
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.15;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .hero .summary-rows,
+  .result-screen .summary-rows {
+    position: absolute;
+    left: var(--px);
+    right: var(--px);
+    bottom: 12px;
+  }
+
+  .compact-summary {
+    display: none;
+    flex: 0 0 var(--compact-h);
+    align-items: baseline;
+    gap: 8px;
+    min-height: var(--compact-h);
+    padding: 11px var(--px) 0;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .compact-summary.is-visible { display: flex; }
+
+  /* v12: make the compact layout depend on the app state too, not only on JS classes.
+     In the real Figma plugin the rules panel can be open while the old hero area is still present;
+     these selectors force the Figma reference layout: compact summary + rules/settings rows. */
+  .app[data-view="main"][data-panel="rules"] .format-area,
+  .app[data-view="main"][data-panel="settings"] .format-area {
     display: none;
   }
 
-  .quote-details summary::after,
-  .rule-group summary::after {
-    content: "⌄";
-    color: var(--subtle);
-    font-size: 14px;
-    transform: rotate(-90deg);
-  }
-
-  .quote-details[open] summary::after,
-  .rule-group[open] summary::after {
-    transform: rotate(0deg);
-  }
-
-  .quote-content {
-    padding: 0 12px 12px;
-  }
-
-  .rule-toolbar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-
-  .rule-toolbar button {
-    padding: 7px 8px;
-    font-size: 12px;
-  }
-
-  .rule-toolbar button.full-width {
-    grid-column: 1 / -1;
-  }
-
-  .rule-groups {
+  .app[data-view="main"][data-panel="rules"] .compact-summary,
+  .app[data-view="main"][data-panel="settings"] .compact-summary {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
   }
 
-  .rule-group-label {
+  .app[data-view="applying"] .format-area,
+  .app[data-view="result"] .format-area,
+  .app[data-view="applying"] .compact-summary {
+    display: none !important;
+  }
+
+  .app[data-view="result"][data-panel="rules"] .result-screen,
+  .app[data-view="result"][data-panel="settings"] .result-screen {
+    display: none !important;
+  }
+
+  .app[data-view="result"][data-panel="rules"] .compact-summary,
+  .app[data-view="result"][data-panel="settings"] .compact-summary {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
   }
 
-  .rule-group-description {
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 400;
+  .compact-number {
+    font-size: 40px;
+    line-height: 40px;
+    letter-spacing: -1.6px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  .rule-count {
-    flex: 0 0 auto;
-    margin-left: auto;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: #eee;
-    color: #666;
+  .compact-label {
+    align-self: baseline;
+    padding-top: 0;
     font-size: 11px;
-    font-weight: 500;
-  }
-
-  .rules {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 0 8px 8px;
-  }
-
-  .rule {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 9px 10px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: var(--surface);
-  }
-
-  .rule:hover {
-    border-color: var(--border);
-  }
-
-  .rule input {
-    margin-top: 2px;
-  }
-
-  .rule-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 3px;
-    font-weight: 600;
-  }
-
-  .rule-description {
-    margin: 0;
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .tag {
-    display: inline-block;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: #eee;
-    color: #666;
-    font-size: 11px;
+    line-height: 1;
     font-weight: 400;
     white-space: nowrap;
   }
 
-  .protection-note {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border: 1px dashed var(--border-strong);
-    border-radius: 10px;
-    background: var(--surface-soft);
-    color: var(--muted);
-    font-size: 12px;
+  .progress-screen,
+  .result-screen {
+    display: none;
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px var(--px);
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
   }
 
-  .actions {
-    position: sticky;
-    bottom: 0;
+  .progress-screen.is-visible,
+  .result-screen.is-visible { display: block; }
+
+  .progress-track {
+    position: absolute;
+    left: var(--px);
+    right: var(--px);
+    bottom: 12px;
+    height: 1px;
+    background: var(--line-soft);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    width: 0%;
+    height: 100%;
+    background: var(--line);
+    transition: width 140ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .summary-rows {
     display: flex;
-    gap: 8px;
-    margin: 16px -18px -18px;
-    padding: 12px 18px 18px;
-    border-top: 1px solid var(--border);
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92), #fff 35%);
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 400;
   }
 
-  button {
-    padding: 8px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 7px;
-    background: white;
-    font: inherit;
-    cursor: pointer;
+  .summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 7px;
+    row-gap: 4px;
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
   }
 
-  button.primary {
-    flex: 1;
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-    font-weight: 600;
+  .summary-token {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
   }
 
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
+  .summary-item { white-space: nowrap; }
+  .summary-separator { color: var(--muted); }
+
+  .rows {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface);
   }
 
-  #result {
-    margin: 12px 0 0;
+  .app[data-panel="main"] .rows { flex: 0 0 calc(var(--row-h) * 2); }
+
+  .app[data-panel="rules"] .rows { flex: 1 1 auto; }
+
+  .app[data-panel="rules"][data-rules-mode="closed"] .rows {
+    padding-top: 203px;
+  }
+
+  .app[data-panel="rules"][data-rules-mode="closed"] .rows::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 203px;
+    border-bottom: 1px solid var(--line);
+    pointer-events: none;
+  }
+
+  .app[data-panel="rules"][data-rules-mode="group"] #settingsToggle {
+    display: none;
+  }
+
+  .app[data-panel="settings"] .rows {
+    flex: 1 1 auto;
+    padding-top: var(--settings-spacer-h);
+  }
+
+  .app[data-panel="settings"] .rows::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: var(--settings-spacer-h);
+    border-bottom: 1px solid var(--line);
+    pointer-events: none;
+  }
+
+  .nav-row {
+    position: relative;
+    flex: 0 0 var(--row-h);
+    width: 100%;
+    height: var(--row-h);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 0;
+    padding: 0 var(--px);
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface);
+    text-align: left;
+  }
+
+  .nav-row[aria-expanded="true"] {
+    border-bottom-color: var(--line);
+  }
+
+  .app[data-panel="settings"] #settingsToggle,
+  .app[data-panel="settings"] #rulesToggle { background: var(--surface); }
+
+  .app[data-panel="settings"] #settingsToggle {
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+    background: var(--surface-soft);
+  }
+
+  .nav-row > .chevron { display: none; }
+
+  .nav-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-meta {
+    justify-self: end;
+    margin-left: 12px;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .panel {
+    display: none;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .panel.is-open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #rulesPanel.is-open { flex: 1 1 auto; }
+  #settingsPanel.is-open { flex: 0 0 auto; }
+
+  .panel-inner,
+  .panel-scroll {
+    min-height: 0;
+    width: 100%;
+  }
+
+  .panel-inner { flex: 1 1 auto; }
+  .panel-scroll {
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+
+
+  /* v18: rules/settings content scrolls as one stack, so Settings is reachable after long rule groups. */
+  .app[data-panel="rules"] .rows,
+  .app[data-panel="settings"] .rows {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .app[data-panel="rules"] #rulesPanel.is-open,
+  .app[data-panel="settings"] #settingsPanel.is-open {
+    flex: 0 0 auto;
+  }
+
+  .app[data-panel="rules"] #rulesPanel .panel-scroll,
+  .app[data-panel="settings"] #settingsPanel .panel-scroll {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app[data-panel="rules"][data-rules-mode="group"] #settingsToggle {
+    display: grid;
+  }
+
+  .app[data-panel="rules"] #rulesToggle,
+  .app[data-panel="settings"] #rulesToggle {
+    border-top: 1px solid var(--line);
+  }
+
+  .rule-groups { width: 100%; }
+
+  .group { border-bottom: 1px solid var(--line-soft); }
+
+  .group-button {
+    width: 100%;
+    height: var(--row-h);
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) minmax(26px, max-content) 40px;
+    align-items: center;
+    padding: 0 var(--px);
+    text-align: left;
+    background: var(--surface);
+  }
+
+  .group.is-open > .group-button { background: var(--surface-soft); }
+
+  .group-button .chevron {
+    width: 16px;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+  }
+
+  .group.is-open > .group-button .chevron { transform: rotate(90deg); }
+
+  .group-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 400;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .group.is-open > .group-button .group-title { font-weight: 700; }
+
+  .group.is-disabled > .group-button .chevron,
+  .group.is-disabled > .group-button .group-title,
+  .group.is-disabled > .group-button .group-count { color: var(--muted); }
+
+  .group-count {
+    min-width: 26px;
+    padding-left: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .switch {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    width: 30px;
+    height: 17px;
+    margin-left: 10px;
+    padding: 1px 3px;
+    border: 1px solid var(--line);
+    background: var(--control-off-bg);
+  }
+
+  .switch::before {
+    content: "";
+    display: block;
+    width: 9px;
+    height: 9px;
+    background: var(--control-off-dot);
+  }
+
+  .switch.is-on {
+    justify-content: flex-end;
+    border-color: var(--control-on-bg);
+    background: var(--control-on-bg);
+  }
+
+  .switch.is-on::before { background: var(--control-on-text); }
+  .switch.is-off { justify-content: flex-start; }
+  .switch.is-mixed { justify-content: center; }
+
+  .group-content { display: none; }
+  .group.is-open > .group-content { display: block; }
+
+  .group-content-inner { padding: 2px 0 12px; }
+
+  .rule-list { width: 100%; }
+
+  .rule {
+    position: relative;
+    width: 100%;
+    min-height: 50px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    align-items: start;
+    gap: 12px;
+    padding: 10px var(--px) 8px 30px;
+    border-bottom: 0;
+    background: var(--surface);
+  }
+
+  .rule > div:first-child { min-width: 0; }
+
+  .rule-name {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.08;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rule-tag { display: none; }
+
+  .rule-desc {
+    min-width: 0;
+    margin-top: 4px;
     color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+    white-space: nowrap;
   }
+
+  .example-highlight {
+    display: inline-block;
+    min-width: 0;
+    padding: 0 2px;
+    background: var(--highlight-bg);
+    color: var(--highlight-text);
+  }
+
+  .example-strong { color: var(--text); }
+
+  .switch-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rule > .switch { margin-top: 1px; }
+
+  .rule.is-disabled .rule-name,
+  .rule.is-disabled .rule-desc { color: var(--muted); }
+
+  .quote-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 var(--px) 8px 46px;
+  }
+
+  .quote-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 22px;
+  }
+
+  .quote-setting-label {
+    flex: 0 0 56px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .quote-options {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .quote-option {
+    height: 22px;
+    min-width: 34px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-left: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .quote-option:first-child { border-left: 1px solid var(--line); }
+  .quote-option.is-active { background: var(--control-on-bg); color: var(--control-on-text); border-color: var(--control-on-bg); }
+
+  .quote-settings-note {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .settings-groups { width: 100%; }
+
+  .setting-row {
+    height: var(--row-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 var(--px);
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface);
+  }
+
+  .setting-label {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .segments {
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    height: 22px;
+  }
+
+  .segment {
+    min-width: 34px;
+    height: 22px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-left: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .segment:first-child { border-left: 1px solid var(--line); }
+  .segment.is-active { background: var(--control-on-bg); color: var(--control-on-text); border-color: var(--control-on-bg); }
+
+  .settings-reset-row {
+    height: var(--reset-h);
+    display: grid;
+    grid-template-columns: minmax(0, 253px) max-content;
+    align-items: center;
+    gap: 23px;
+    padding: 0 var(--px);
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface);
+  }
+
+  .settings-note {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .link-button {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 400;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+  }
+
+  .footer {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: var(--footer-h);
+    z-index: 5;
+  }
+
+  .primary-action {
+    width: 100%;
+    height: var(--footer-h);
+    border-top: 1px solid var(--line);
+    background: var(--button-bg);
+    color: var(--button-text);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .primary-action:disabled {
+    background: var(--button-disabled-bg);
+    color: var(--button-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .is-hidden { display: none !important; }
+
+  .nav-row:focus,
+  .group-button:focus,
+  .rule:focus-within,
+  .segment:focus,
+  .quote-option:focus,
+  .link-button:focus,
+  .primary-action:focus { outline: none; }
+
+  .nav-row:focus-visible,
+  .group-button:focus-visible,
+  .rule:focus-within,
+  .segment:focus-visible,
+  .quote-option:focus-visible,
+  .link-button:focus-visible,
+  .primary-action:focus-visible {
+    outline: 1px solid var(--text);
+    outline-offset: -1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+
+  /* v19: left vertical navigation. Format / Rules / Settings are stable side tabs. */
+  :root { --side-w: 46px; }
+
+  .side-tabs {
+    position: absolute;
+    inset: 0 auto var(--footer-h) 0;
+    z-index: 10;
+    width: var(--side-w);
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .side-tab {
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .side-tab:last-child { border-bottom: 0; }
+  .side-tab span {
+    display: block;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+  }
+
+  .side-tab.is-active {
+    background: var(--button-bg);
+    color: var(--button-text);
+  }
+
+  .topbar {
+    left: var(--side-w);
+    right: 0;
+    width: auto;
+  }
+
+  .content {
+    inset: 0 0 var(--footer-h) var(--side-w);
+    padding-top: var(--topbar-h);
+  }
+
+  .footer {
+    left: var(--side-w);
+    right: 0;
+    width: auto;
+  }
+
+  .app[data-panel="main"] .rows { display: none !important; }
+  .app[data-panel="main"] .format-area { display: block; }
+
+  .app[data-panel="rules"] .format-area,
+  .app[data-panel="settings"] .format-area,
+  .app[data-view="result"] .format-area { display: none !important; }
+
+  .app[data-panel="rules"] .compact-summary,
+  .app[data-panel="settings"] .compact-summary { display: flex !important; }
+
+  .app[data-panel="main"] .compact-summary,
+  .app[data-view="result"][data-panel="main"] .compact-summary { display: none !important; }
+
+  .app[data-panel="rules"] .rows,
+  .app[data-panel="settings"] .rows {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: 0 !important;
+    scrollbar-width: thin;
+  }
+
+  .app[data-panel="rules"] .rows::before,
+  .app[data-panel="settings"] .rows::before,
+  .app[data-panel="rules"][data-rules-mode="closed"] .rows::before { display: none !important; }
+
+  .app[data-panel="rules"] #rulesToggle,
+  .app[data-panel="settings"] #settingsToggle {
+    display: grid !important;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .app[data-panel="rules"] #settingsToggle,
+  .app[data-panel="rules"] #settingsPanel,
+  .app[data-panel="settings"] #rulesToggle,
+  .app[data-panel="settings"] #rulesPanel { display: none !important; }
+
+  .app[data-panel="rules"] #rulesPanel.is-open,
+  .app[data-panel="settings"] #settingsPanel.is-open {
+    display: flex !important;
+    flex: 0 0 auto;
+  }
+
+  .app[data-panel="rules"] #rulesPanel .panel-scroll,
+  .app[data-panel="settings"] #settingsPanel .panel-scroll {
+    height: auto;
+    overflow: visible;
+  }
+
+  .progress-screen { display: none !important; }
+
+  .app[data-view="result"][data-panel="main"] .result-screen {
+    display: block !important;
+    flex: 1 1 auto;
+  }
+
+  .nav-row:focus-visible,
+  .side-tab:focus-visible,
+  .group-button:focus-visible,
+  .rule:focus-within,
+  .segment:focus-visible,
+  .quote-option:focus-visible,
+  .link-button:focus-visible,
+  .primary-action:focus-visible {
+    outline: 1px solid var(--text);
+    outline-offset: -1px;
+  }
+
+
+
+  /* v20: stable left navigation layout. Format keeps header; Rules/Settings no longer show layer summary. */
+  :root { --side-w: 46px; }
+
+  .app {
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+  }
+
+  .side-tabs {
+    inset: 0 auto 0 0 !important;
+    grid-template-rows: 1fr 1fr 1fr;
+    z-index: 30;
+  }
+
+  .side-tab {
+    font-weight: 400 !important;
+  }
+
+  .side-tab span {
+    writing-mode: vertical-rl;
+    transform: none !important;
+    white-space: nowrap;
+  }
+
+  .side-tab.is-active {
+    font-weight: 700 !important;
+  }
+
+  .topbar {
+    left: var(--side-w) !important;
+    right: 0 !important;
+    width: auto !important;
+    z-index: 20;
+  }
+
+  .content {
+    inset: var(--topbar-h) 0 var(--footer-h) var(--side-w) !important;
+    padding-top: 0 !important;
+    width: auto;
+  }
+
+  .footer {
+    left: var(--side-w) !important;
+    right: 0 !important;
+    width: auto !important;
+    z-index: 25;
+  }
+
+  .primary-action {
+    border-radius: 0 0 10px 0;
+  }
+
+  .format-area {
+    border-top: 0;
+  }
+
+  .hero {
+    padding: 14px var(--px) 12px;
+  }
+
+  .hero-number,
+  .result-number,
+  .progress-number {
+    font-size: 176px;
+    line-height: 166px;
+    letter-spacing: -3.5px;
+  }
+
+  .hero-number[data-digits="4"],
+  .result-number[data-digits="4"],
+  .progress-number[data-digits="4"] {
+    font-size: 128px;
+    line-height: 122px;
+    letter-spacing: -2.5px;
+  }
+
+  .hero-number[data-digits="5"],
+  .result-number[data-digits="5"],
+  .progress-number[data-digits="5"] {
+    font-size: 96px;
+    line-height: 94px;
+    letter-spacing: -1.9px;
+  }
+
+  .hero-label,
+  .result-label,
+  .progress-label {
+    max-width: calc(var(--w) - var(--side-w) - var(--px) * 2);
+  }
+
+  .app[data-panel="rules"] .format-area,
+  .app[data-panel="settings"] .format-area,
+  .app[data-panel="rules"] .compact-summary,
+  .app[data-panel="settings"] .compact-summary,
+  .app[data-view="result"][data-panel="rules"] .compact-summary,
+  .app[data-view="result"][data-panel="settings"] .compact-summary {
+    display: none !important;
+  }
+
+  .app[data-panel="rules"] .rows,
+  .app[data-panel="settings"] .rows {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: 0 !important;
+    border-top: 1px solid var(--line);
+  }
+
+  .app[data-panel="rules"] #rulesToggle,
+  .app[data-panel="settings"] #settingsToggle {
+    border-top: 0 !important;
+  }
+
+  .app[data-panel="rules"] #settingsToggle,
+  .app[data-panel="settings"] #rulesToggle {
+    display: none !important;
+  }
+
+  .app[data-panel="rules"] #settingsPanel,
+  .app[data-panel="settings"] #rulesPanel {
+    display: none !important;
+  }
+
+  .app[data-panel="rules"] #rulesPanel.is-open,
+  .app[data-panel="settings"] #settingsPanel.is-open {
+    display: flex !important;
+    flex: 0 0 auto;
+  }
+
+  .app[data-panel="rules"] #rulesPanel .panel-scroll,
+  .app[data-panel="settings"] #settingsPanel .panel-scroll {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app[data-panel="settings"] .rows::before,
+  .app[data-panel="rules"] .rows::before {
+    display: none !important;
+  }
+
+  .settings-groups,
+  .settings-reset-row {
+    max-width: 100%;
+  }
+
+  .setting-row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: 12px;
+  }
+
+  .segments {
+    max-width: 100%;
+  }
+
+  .settings-note {
+    min-width: 0;
+  }
+
+  .progress-screen,
+  .app[data-view="applying"] .progress-screen {
+    display: none !important;
+  }
+
+
+  /* v21: exact Figma tokens and stable side-panel states. */
+  :root {
+    --open-surface: #fafafa;
+    --removed-bg: #e4e4e4;
+    --removed-text: #5a5a5a;
+    --switch-border: #111111;
+    --switch-on-track: #111111;
+    --switch-on-dot: #ffffff;
+    --switch-mixed-track: #ffffff;
+    --switch-mixed-dot: #111111;
+    --switch-off-track: #ffffff;
+    --switch-off-dot: #ffffff;
+    --switch-off-dot-border: #111111;
+  }
+
+  html[data-theme="dark"] {
+    --open-surface: #363636;
+    --removed-bg: #3d3d3d;
+    --removed-text: #8a8a8a;
+    --highlight-bg: #f5f5f5;
+    --highlight-text: #2c2c2c;
+    --switch-border: #dadada;
+    --switch-on-track: #f5f5f5;
+    --switch-on-dot: #2c2c2c;
+    --switch-mixed-track: #2c2c2c;
+    --switch-mixed-dot: #f5f5f5;
+    --switch-off-track: #2c2c2c;
+    --switch-off-dot: #2c2c2c;
+    --switch-off-dot-border: #dadada;
+  }
+
+  /* Only Format owns the title/scope line. Rules and Settings begin at the top. */
+  .app[data-panel="rules"] .topbar,
+  .app[data-panel="settings"] .topbar {
+    display: none !important;
+  }
+
+  .app[data-panel="rules"] .content,
+  .app[data-panel="settings"] .content {
+    inset: 0 0 var(--footer-h) var(--side-w) !important;
+  }
+
+  .app[data-panel="main"] .topbar { display: flex !important; }
+  .app[data-panel="main"] .content {
+    inset: var(--topbar-h) 0 var(--footer-h) var(--side-w) !important;
+  }
+
+  .app[data-panel="rules"] .rows,
+  .app[data-panel="settings"] .rows {
+    border-top: 0 !important;
+  }
+
+  .side-tabs {
+    border-bottom-left-radius: 10px;
+    overflow: hidden;
+  }
+
+  .footer,
+  .primary-action {
+    border-bottom-right-radius: 10px;
+    overflow: hidden;
+  }
+
+  /* Switch geometry: 30 × 17, with a stable 9 × 9 square in left / centre / right states. */
+  .switch {
+    position: relative;
+    display: block;
+    width: 30px;
+    height: 17px;
+    margin-left: 10px;
+    padding: 0;
+    border: 1px solid var(--switch-border);
+    background: var(--switch-off-track);
+  }
+
+  .switch::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 9px;
+    height: 9px;
+    box-sizing: border-box;
+    border: 1px solid var(--switch-off-dot-border);
+    background: var(--switch-off-dot);
+    transition: left 110ms ease-out, background-color 110ms linear, border-color 110ms linear;
+  }
+
+  .switch.is-mixed {
+    border-color: var(--switch-border);
+    background: var(--switch-mixed-track);
+  }
+
+  .switch.is-mixed::before {
+    left: 10px;
+    border-color: var(--switch-mixed-dot);
+    background: var(--switch-mixed-dot);
+  }
+
+  .switch.is-on {
+    border-color: var(--switch-border);
+    background: var(--switch-on-track);
+  }
+
+  .switch.is-on::before {
+    left: 17px;
+    border-color: var(--switch-on-dot);
+    background: var(--switch-on-dot);
+  }
+
+  /* Fixed disclosure glyphs: no rotation, no horizontal jump. */
+  .group-button .chevron {
+    width: 16px;
+    min-width: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 1;
+    transform: none !important;
+  }
+
+  .group.is-open > .group-button .chevron { transform: none !important; }
+  .group.is-open > .group-button { background: var(--open-surface); }
+
+  /* Fast, quiet accordion motion. DOM stays mounted, so opening and closing both animate. */
+  .group-content {
+    display: grid !important;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows 150ms cubic-bezier(.2,.7,.2,1), opacity 100ms ease-out, visibility 0s linear 150ms;
+  }
+
+  .group.is-open > .group-content {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition: grid-template-rows 150ms cubic-bezier(.2,.7,.2,1), opacity 100ms ease-out, visibility 0s;
+  }
+
+  .group-content-inner {
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .group-content-inner > .rule-list { padding: 2px 0 12px; }
+
+  .rule > div:first-child { transition: opacity 100ms linear; }
+  .rule.is-disabled > div:first-child { opacity: .45; }
+  .rule.is-disabled .rule-name,
+  .rule.is-disabled .rule-desc { color: inherit; }
+
+  .quote-settings.is-disabled { opacity: .45; }
+
+  /* Examples use JetBrains Mono 11 and Figma's 3 px change markers. */
+  .rule-desc,
+  .quote-settings-note {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .example-highlight {
+    padding: 0 3px;
+    background: var(--highlight-bg);
+    color: var(--highlight-text);
+  }
+
+  .example-highlight.is-removed {
+    background: var(--removed-bg);
+    color: var(--removed-text);
+  }
+
+  .quote-settings-note .example-highlight { padding-inline: 2px; }
+
+  .quote-settings[data-language="ru"] .quote-setting-label { flex-basis: 78px; }
+  .quote-settings[data-language="en"] .quote-setting-label { flex-basis: 56px; }
+
+  .quote-setting-row { height: 24px; }
+  .quote-option { height: 24px; }
+
+  /* The final settings note and reset link stay on one line in the 370 px content column. */
+  .settings-reset-row {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    gap: 8px !important;
+    padding-inline: 12px !important;
+  }
+
+  .settings-note,
+  .settings-reset-row .link-button {
+    font-size: 10px !important;
+    letter-spacing: -0.08px;
+  }
+
+  .settings-note {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .group-content,
+    .switch::before {
+      transition: none !important;
+    }
+  }
+
+
+
+  /* v22: stable bilingual text boxes, switch motion, and quote-result syncing. */
+  :root {
+    --line-ui: 16px;
+    --line-small: 14px;
+    --line-mono: 14px;
+  }
+
+  body, button, input, select {
+    line-height: var(--line-ui);
+  }
+
+  /* Fixed row heights remain unchanged; explicit line boxes prevent Cyrillic/Latin clipping
+     and keep the layout identical when the interface language changes. */
+  .brand,
+  .nav-title,
+  .group-title,
+  .rule-name,
+  .setting-label,
+  .primary-action,
+  .side-tab {
+    line-height: var(--line-ui);
+  }
+
+  .scope,
+  .nav-meta,
+  .summary-rows {
+    line-height: var(--line-small);
+  }
+
+  .compact-label,
+  .group-button .chevron,
+  .group-count,
+  .rule-desc,
+  .quote-setting-label,
+  .quote-settings-note,
+  .segment,
+  .quote-option,
+  .settings-note,
+  .link-button {
+    line-height: var(--line-mono);
+  }
+
+  .brand,
+  .scope,
+  .nav-title,
+  .nav-meta,
+  .group-title,
+  .group-count,
+  .setting-label,
+  .settings-note,
+  .link-button,
+  .primary-action,
+  .side-tab span {
+    min-height: var(--line-ui);
+  }
+
+  .scope,
+  .nav-meta,
+  .group-count,
+  .settings-note,
+  .link-button {
+    min-height: var(--line-small);
+  }
+
+  .hero-label,
+  .result-label,
+  .progress-label {
+    line-height: var(--line-ui);
+    min-height: var(--line-ui);
+  }
+
+  .rule {
+    min-height: 52px;
+  }
+
+  .rule-name {
+    min-height: var(--line-ui);
+  }
+
+  .rule-desc,
+  .quote-settings-note {
+    min-height: var(--line-mono);
+    overflow: visible;
+  }
+
+  .segment,
+  .quote-option,
+  .primary-action,
+  .side-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .side-tab span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 1px;
+  }
+
+  /* Figma examples use a 14 px marker behind 11 px mono text. */
+  .example-highlight {
+    height: 14px;
+    min-height: 14px;
+    padding: 0 3px;
+    line-height: 14px;
+    vertical-align: top;
+  }
+
+  .quote-settings-note .example-highlight {
+    height: 14px;
+    min-height: 14px;
+    padding-inline: 2px;
+    line-height: 14px;
+  }
+
+  /* Switches animate at their final left/centre/right geometry. */
+  .switch {
+    --switch-x: 0px;
+    transition: background-color 130ms ease-out, border-color 130ms ease-out;
+  }
+
+  .switch::before {
+    left: 3px;
+    transform: translateX(var(--switch-x));
+    will-change: transform;
+    transition: transform 135ms cubic-bezier(.2,.75,.25,1), background-color 120ms ease-out, border-color 120ms ease-out;
+  }
+
+  .switch.is-mixed { --switch-x: 7px; }
+  .switch.is-on { --switch-x: 14px; }
+
+  .switch.is-mixed::before,
+  .switch.is-on::before {
+    left: 3px;
+  }
+
+  .switch.is-animating {
+    animation: switch-track-settle 150ms ease-out;
+  }
+
+  .switch.is-animating::before {
+    animation: switch-dot-settle 150ms cubic-bezier(.2,.75,.25,1);
+  }
+
+  @keyframes switch-track-settle {
+    0% { opacity: .76; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes switch-dot-settle {
+    0% { transform: translateX(var(--switch-x)) scale(.74); }
+    62% { transform: translateX(var(--switch-x)) scale(1.08); }
+    100% { transform: translateX(var(--switch-x)) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switch,
+    .switch::before {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+
+  /* v23: clearer switch motion, 15 px example markers, stable bottom edge. */
+  .example-highlight,
+  .quote-settings-note .example-highlight {
+    height: 15px;
+    min-height: 15px;
+    line-height: 15px;
+  }
+
+  .switch {
+    transition: background-color 210ms ease, border-color 210ms ease, filter 210ms ease;
+  }
+
+  .switch::before {
+    transition: transform 220ms cubic-bezier(.22,.8,.2,1), background-color 190ms ease, border-color 190ms ease;
+  }
+
+  .switch.is-animating {
+    animation: switch-track-settle 240ms ease-out;
+  }
+
+  .switch.is-animating::before {
+    animation: switch-dot-settle 240ms cubic-bezier(.22,.8,.2,1);
+  }
+
+  @keyframes switch-track-settle {
+    0% { filter: brightness(.88); }
+    45% { filter: brightness(1.16); }
+    100% { filter: brightness(1); }
+  }
+
+  @keyframes switch-dot-settle {
+    0% { transform: translateX(var(--switch-x)) scale(.72); }
+    58% { transform: translateX(var(--switch-x)) scale(1.16); }
+    100% { transform: translateX(var(--switch-x)) scale(1); }
+  }
+
+  /* The app shell alone owns the lower rounding. Removing nested radii avoids the light-theme seam. */
+  .side-tabs,
+  .footer,
+  .primary-action {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+
+  .app {
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .setting-row[data-setting="nbsp-length"] .segments {
+    flex-shrink: 0;
+  }
+
+
+  /* v24: Russian-typography option, exact mono typography, stable disabled switches. */
+
+  /* Examples and rule counters follow the Figma spec: JetBrains Mono Regular, 11 px. */
+  .rule-desc,
+  .group-count,
+  .quote-settings-note,
+  .quote-option,
+  .settings-note,
+  .link-button {
+    font-family: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    font-synthesis: none;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+    letter-spacing: 0 !important;
+  }
+
+  .group-count {
+    line-height: 14px !important;
+    min-height: 14px;
+  }
+
+  .rule-desc,
+  .quote-settings-note {
+    line-height: 14px !important;
+  }
+
+  /* The off-state square must remain visible when a disabled group is expanded. */
+  .group.is-disabled > .group-button .switch.is-off::before,
+  .group.is-disabled.is-open > .group-button .switch.is-off::before {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 9px !important;
+    height: 9px !important;
+    border: 1px solid var(--switch-off-dot-border) !important;
+    background: var(--switch-off-dot) !important;
+    transform: translateX(0) scale(1) !important;
+  }
+
+  .rule-option-row {
+    width: 100%;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 var(--px) 0 30px;
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface);
+  }
+
+  .rule-option-label {
+    min-width: 0;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .rule-option-row .segments {
+    flex: 0 0 auto;
+  }
+
+  /* One 1 px divider above the primary action on every screen. */
+  .app[data-panel="main"] .format-area {
+    border-bottom: 0 !important;
+  }
+
+  .primary-action {
+    border-top: 1px solid var(--line) !important;
+  }
+
+
+  /* v26: interface-only build. Typography rule behavior remains owned by the existing engine. */
+
+  /* Typograph/Done belongs only to the Format tab. */
+  .app[data-panel="rules"] .footer,
+  .app[data-panel="settings"] .footer {
+    display: none !important;
+  }
+
+  .app[data-panel="rules"] .content,
+  .app[data-panel="settings"] .content {
+    bottom: 0 !important;
+  }
+
+  /* The NBSP-width option is the last item inside Russian typography, not a settings row. */
+  .rule-option-row {
+    width: 100%;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px var(--px) 8px 30px;
+    border: 0 !important;
+    background: var(--surface);
+  }
+
+  .rule-option-label {
+    min-width: 0;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 400;
+    white-space: normal;
+  }
+
+  .rule-option-row .segments { flex: 0 0 auto; }
+
+  /* Main and result counters share one fixed vertical grid. Digit scaling no longer moves labels. */
+  .hero-number,
+  .result-number {
+    height: 209px;
+    min-height: 209px;
+    margin: 0;
+  }
+
+  .hero-number[data-digits="4"],
+  .result-number[data-digits="4"],
+  .hero-number[data-digits="5"],
+  .result-number[data-digits="5"] {
+    height: 209px;
+    min-height: 209px;
+  }
+
+  .hero-label,
+  .result-label {
+    margin-top: 6px;
+    min-height: 32px;
+    max-height: 32px;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .hero .summary-rows,
+  .result-screen .summary-rows {
+    bottom: 12px;
+    min-height: 14px;
+  }
+
+  .format-area,
+  .result-screen { border-bottom: 0 !important; }
+
+
+  /* v32: the defaults note stays fully visible on one line in RU and EN. */
+  .settings-reset-row {
+    height: var(--reset-h) !important;
+    min-height: var(--reset-h);
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    align-items: center;
+    gap: 6px !important;
+    padding: 0 10px !important;
+  }
+
+  .settings-note {
+    display: block;
+    min-width: 0;
+    margin: 0;
+    overflow: visible !important;
+    color: var(--muted);
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    letter-spacing: -0.14px !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+  }
+
+  .settings-reset-row .link-button {
+    align-self: center;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    letter-spacing: -0.14px !important;
+  }
+
+
+
+  /* v33: exact baseline alignment for the defaults note and reset action. */
+  .settings-reset-row {
+    height: var(--reset-h) !important;
+    min-height: var(--reset-h) !important;
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 0 10px !important;
+  }
+
+  .settings-note,
+  .settings-reset-row .link-button {
+    display: flex !important;
+    align-items: center !important;
+    height: 14px !important;
+    min-height: 14px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    line-height: 14px !important;
+    letter-spacing: -0.14px !important;
+    white-space: nowrap !important;
+  }
+
+  .settings-note {
+    min-width: 0;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  /* v33: main, clean-result and completed-result screens use the same fixed coordinates. */
+  :root {
+    --main-number-top: 12px;
+    --main-number-h: 209px;
+    --main-label-top: 227px;
+    --main-label-h: 32px;
+    --main-status-bottom: 12px;
+  }
+
+  .hero,
+  .result-screen {
+    position: relative !important;
+    padding: 0 !important;
+  }
+
+  .hero-number,
+  .result-number {
+    position: absolute !important;
+    top: var(--main-number-top) !important;
+    left: var(--px) !important;
+    right: var(--px) !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    height: var(--main-number-h) !important;
+    min-height: var(--main-number-h) !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .hero-number[data-digits="4"],
+  .result-number[data-digits="4"],
+  .hero-number[data-digits="5"],
+  .result-number[data-digits="5"] {
+    height: var(--main-number-h) !important;
+    min-height: var(--main-number-h) !important;
+    line-height: 1 !important;
+  }
+
+  .hero-label,
+  .result-label {
+    position: absolute !important;
+    top: var(--main-label-top) !important;
+    left: var(--px) !important;
+    right: var(--px) !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    height: var(--main-label-h) !important;
+    min-height: var(--main-label-h) !important;
+    max-height: var(--main-label-h) !important;
+    margin: 0 !important;
+  }
+
+  .hero .summary-rows,
+  .result-screen .summary-rows {
+    position: absolute !important;
+    left: var(--px) !important;
+    right: var(--px) !important;
+    bottom: var(--main-status-bottom) !important;
+    min-height: 14px !important;
+    margin: 0 !important;
+  }
+
+
+  /* v34: selection and result states share the same main-stage elements and coordinates. */
+  .app[data-view="result"][data-panel="main"] .format-area {
+    display: block !important;
+  }
+
+  .app[data-view="result"][data-panel="main"] .result-screen,
+  .app[data-view="result"][data-panel="rules"] .result-screen,
+  .app[data-view="result"][data-panel="settings"] .result-screen {
+    display: none !important;
+    flex: 0 0 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .app[data-view="result"][data-panel="main"] .format-area {
+    flex: 1 1 auto !important;
+    height: auto !important;
+  }
+
+  /* v54: status summaries wrap at token boundaries in every main/result scenario. */
+  .hero .summary-rows,
+  .result-screen .summary-rows {
+    overflow: visible !important;
+  }
+
+  .summary-row {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .summary-token {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+  }
+
+  /* v55: a visual line break replaces the separator before the first token on that line. */
+  .summary-row {
+    --summary-separator-space: 18px;
+    column-gap: var(--summary-separator-space) !important;
+    overflow: hidden !important;
+  }
+
+  .summary-token {
+    position: relative !important;
+    margin-left: calc(-1 * var(--summary-separator-space)) !important;
+    padding-left: var(--summary-separator-space) !important;
+    gap: 0 !important;
+  }
+
+  .summary-separator {
+    position: absolute !important;
+    left: 7px !important;
+    top: 0 !important;
+    line-height: inherit !important;
+  }
+
+  /* The first settings row sits directly under the section header.
+     Its own top border would duplicate the header divider with a thin grey line. */
+  .settings-groups .setting-row:first-child {
+    border-top: 0 !important;
+  }
+
+  /* The native Figma window already owns the shadow; removing the inner shadow fixes the light-theme corner seam. */
+  .app {
+    box-shadow: none !important;
+  }
+
 </style>
 
+<div class="app" id="app">
+  <nav class="side-tabs" aria-label="Sections">
+    <button class="side-tab" id="formatTab" type="button" data-side-panel="main"><span data-i18n="formatTitle">Format</span></button>
+    <button class="side-tab" id="rulesTab" type="button" data-side-panel="rules"><span data-i18n="rulesTitle">Rules</span></button>
+    <button class="side-tab" id="settingsTab" type="button" data-side-panel="settings"><span data-i18n="settingsTitle">Settings</span></button>
+  </nav>
 
-<div class="app-header">
-  <div>
-    <h1>Typography Formatter</h1>
-    <p class="eyebrow">Clean up UI copy while preserving protected syntax.</p>
-  </div>
+  <header class="topbar">
+    <h1 class="brand">Typotypo</h1>
+    <div class="scope" id="scopeLabel">Scope: selected layers</div>
+  </header>
+
+  <main class="content">
+    <section class="format-area" id="formatArea" aria-live="polite">
+      <div class="format-inner">
+        <div class="hero">
+          <div class="hero-number" id="heroNumber">0</div>
+          <div class="hero-label" id="heroLabel">text layers ready to format</div>
+          <div class="summary-rows" id="mainStatusRows"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="compact-summary" id="compactSummary" aria-live="polite">
+      <div class="compact-number" id="compactNumber">0</div>
+      <div class="compact-label" id="compactLabel">ready to format</div>
+    </section>
+
+    <section class="progress-screen" id="progressScreen" aria-live="polite">
+      <div class="progress-number" id="progressNumber">0</div>
+      <div class="progress-label" id="progressLabel">of 0 text layers being formatted</div>
+      <div class="progress-track" aria-hidden="true">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </section>
+
+    <section class="result-screen" id="resultScreen" aria-live="polite">
+      <div class="result-number" id="resultNumber">0</div>
+      <div class="result-label" id="resultLabel">changes applied</div>
+      <div class="summary-rows" id="resultStatusRows"></div>
+    </section>
+
+    <section class="rows" id="navigationRows">
+      <button class="nav-row" id="rulesToggle" type="button" aria-expanded="false">
+        <span class="chevron">▸</span>
+        <span class="nav-title" data-i18n="rulesTitle">Rules</span>
+        <span class="nav-meta" id="rulesMeta">0 of 0 on</span>
+      </button>
+
+      <div class="panel" id="rulesPanel">
+        <div class="panel-inner">
+          <div class="panel-scroll">
+            <div class="rule-groups" id="ruleGroups"></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="nav-row" id="settingsToggle" type="button" aria-expanded="false">
+        <span class="chevron">▸</span>
+        <span class="nav-title" data-i18n="settingsTitle">Settings</span>
+        <span class="nav-meta"></span>
+      </button>
+
+      <div class="panel" id="settingsPanel">
+        <div class="panel-inner">
+          <div class="panel-scroll">
+            <div class="settings-groups">
+              <div class="setting-row">
+                <div class="setting-label" data-i18n="interfaceLanguage">Interface language</div>
+                <div class="segments" data-segment-group="uiLanguage">
+                  <button class="segment" type="button" data-value="ru">RU</button>
+                  <button class="segment" type="button" data-value="en">EN</button>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label" data-i18n="textLanguage">Text language</div>
+                <div class="segments" data-segment-group="languageMode">
+                  <button class="segment" type="button" data-value="auto">Auto</button>
+                  <button class="segment" type="button" data-value="ru">RU</button>
+                  <button class="segment" type="button" data-value="en">EN</button>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label" data-i18n="theme">Theme</div>
+                <div class="segments" data-segment-group="theme">
+                  <button class="segment" type="button" data-value="light">Light</button>
+                  <button class="segment" type="button" data-value="dark">Dark</button>
+                  <button class="segment" type="button" data-value="system">System</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-reset-row">
+              <p class="settings-note" data-i18n="defaultsNote">Defaults depend on text language</p>
+              <button class="link-button" id="resetDefaults" type="button" data-i18n="resetDefaults">Reset to defaults</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <button class="primary-action" id="primaryAction" type="button" disabled>Apply formatting</button>
+  </footer>
 </div>
 
-<p id="summary" class="status-card">Checking selection…</p>
-
-<div class="section">
-  <div class="section-title">Basic settings</div>
-
-  <div class="settings-grid">
-    <div class="settings-card">
-      <div class="settings-card-title">Interface language</div>
-      <select id="uiLanguageMode">
-        <option value="ru">Russian</option>
-        <option value="en">English</option>
-      </select>
-      <p class="hint">Detected automatically on first launch. Your choice is saved after that.</p>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-card-title">Language</div>
-      <select id="languageMode">
-        <option value="auto">Auto-detect</option>
-        <option value="ru">Russian</option>
-        <option value="en">English</option>
-      </select>
-      <p class="hint">Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.</p>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-card-title">Non-breaking space style</div>
-      <select id="nonBreakingSpaceStyle">
-        <option value="regular">Regular non-breaking space</option>
-        <option value="narrow">Narrow non-breaking space</option>
-      </select>
-      <p class="hint">Used for number units, currencies, sizes, and large numbers. Word-based Russian pairs always use a regular non-breaking space.</p>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <details class="quote-details">
-    <summary>Quote styles</summary>
-    <div class="quote-content">
-      <div class="subsection-title">Russian quotes</div>
-
-      <div class="field">
-        <div class="field-label">First level quotes</div>
-        <select id="ruPrimaryQuoteStyle">
-          <option value="frenchGuillemets">French quotes « »</option>
-          <option value="germanLowHigh">German quotes „ “</option>
-          <option value="englishDouble">English double quotes “ ”</option>
-          <option value="programmerDouble">Programmer quotes " "</option>
-          <option value="englishSingle">English single quotes ‘ ’</option>
-          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <div class="field-label">Second level quotes</div>
-        <select id="ruSecondaryQuoteStyle">
-          <option value="frenchGuillemets">French quotes « »</option>
-          <option value="germanLowHigh">German quotes „ “</option>
-          <option value="englishDouble">English double quotes “ ”</option>
-          <option value="programmerDouble">Programmer quotes " "</option>
-          <option value="englishSingle">English single quotes ‘ ’</option>
-          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-        </select>
-      </div>
-
-      <div class="subsection-title">English quotes</div>
-
-      <div class="field">
-        <div class="field-label">First level quotes</div>
-        <select id="enPrimaryQuoteStyle">
-          <option value="frenchGuillemets">French quotes « »</option>
-          <option value="germanLowHigh">German quotes „ “</option>
-          <option value="englishDouble">English double quotes “ ”</option>
-          <option value="programmerDouble">Programmer quotes " "</option>
-          <option value="englishSingle">English single quotes ‘ ’</option>
-          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <div class="field-label">Second level quotes</div>
-        <select id="enSecondaryQuoteStyle">
-          <option value="frenchGuillemets">French quotes « »</option>
-          <option value="germanLowHigh">German quotes „ “</option>
-          <option value="englishDouble">English double quotes “ ”</option>
-          <option value="programmerDouble">Programmer quotes " "</option>
-          <option value="englishSingle">English single quotes ‘ ’</option>
-          <option value="englishSingleReversed">English single reversed ‚ ‘</option>
-        </select>
-      </div>
-
-      <p class="hint">Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.</p>
-    </div>
-  </details>
-</div>
-
-<div class="section">
-  <div class="section-title">Rules</div>
-
-  <div class="rule-toolbar" aria-label="Rule shortcuts">
-    <button id="selectAllRules" type="button">Select all rules</button>
-    <button id="deselectAllRules" type="button">Deselect all</button>
-    <button id="resetDefaults" class="full-width" type="button">Reset to defaults</button>
-  </div>
-
-  <div class="rule-groups">
-    <details class="rule-group" open>
-      <summary>
-        <span class="rule-group-label">
-          <span>Cleanup</span>
-          <span class="rule-group-description">Spacing, invisible artifacts, line breaks, punctuation.</span>
-        </span>
-        <span class="rule-count">7</span>
-      </summary>
-
-      <div class="rules">
-        <label class="rule">
-          <input id="invisibleCopyArtifacts" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Invisible copy artifacts <span class="tag">All</span></div>
-            <p class="rule-description">Removes hidden characters copied from external sources.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="tabs" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Tabs <span class="tag">All</span></div>
-            <p class="rule-description">Replaces tab characters with regular spaces.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="manualLineBreaks" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Manual line breaks <span class="tag">All</span></div>
-            <p class="rule-description">Replaces single manual line breaks with spaces while preserving paragraphs.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="ellipsis" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Ellipsis <span class="tag">All</span></div>
-            <p class="rule-description">Replaces three dots (...) with a proper ellipsis (…).</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="extraSpaces" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Extra spaces <span class="tag">All</span></div>
-            <p class="rule-description">Replaces multiple spaces with a single space.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="trimTextEdges" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Trim text edges <span class="tag">All</span></div>
-            <p class="rule-description">Removes spaces at the beginning and end of a text layer.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="spacingCleanup" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Spacing cleanup <span class="tag">All</span></div>
-            <p class="rule-description">Cleans punctuation, brackets, repeated marks, quote periods, and UI separators.</p>
-          </div>
-        </label>
-      </div>
-    </details>
-
-    <details class="rule-group" open>
-      <summary>
-        <span class="rule-group-label">
-          <span>Numbers and symbols</span>
-          <span class="rule-group-description">Units, currencies, signs, ranges, arrows, fractions.</span>
-        </span>
-        <span class="rule-count">5</span>
-      </summary>
-
-      <div class="rules">
-        <label class="rule">
-          <input id="percentSignNoSpace" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Percent sign <span class="tag">All</span></div>
-            <p class="rule-description">Removes spaces before the percent sign.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="numberUnitsNbsp" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Number units <span class="tag">All</span></div>
-            <p class="rule-description">Keeps numbers with units, temperatures, currencies, and sizes.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="numberSigns" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Number signs <span class="tag">All</span></div>
-            <p class="rule-description">Keeps № and § together with the following number.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="specialSymbols" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Special symbols <span class="tag">All</span></div>
-            <p class="rule-description">Normalizes ©, ™, ±, ≠, ≤, ≥, ₽, fractions, degrees, arrows, and multiplication signs.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="numberRangeDash" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Number ranges <span class="tag">All</span></div>
-            <p class="rule-description">Uses an en dash without spaces in numeric and time ranges.</p>
-          </div>
-        </label>
-      </div>
-    </details>
-
-    <details class="rule-group" open>
-      <summary>
-        <span class="rule-group-label">
-          <span>Quotes</span>
-          <span class="rule-group-description">Russian and English quote normalization.</span>
-        </span>
-        <span class="rule-count">3</span>
-      </summary>
-
-      <div class="rules">
-        <label class="rule">
-          <input id="englishApostrophes" type="checkbox" checked />
-          <div>
-            <div class="rule-title">English apostrophes <span class="tag">English</span></div>
-            <p class="rule-description">Replaces straight apostrophes in English words, decades, and possessives.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="englishQuotes" type="checkbox" checked />
-          <div>
-            <div class="rule-title">English quotes <span class="tag">English</span></div>
-            <p class="rule-description">Normalizes first- and second-level English quotes.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="russianQuotes" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian quotes <span class="tag">Russian</span></div>
-            <p class="rule-description">Normalizes first- and second-level Russian quotes and punctuation around them.</p>
-          </div>
-        </label>
-      </div>
-    </details>
-
-    <details class="rule-group" open>
-      <summary>
-        <span class="rule-group-label">
-          <span>Russian typography</span>
-          <span class="rule-group-description">Dashes, short words, initials, abbreviations, large numbers.</span>
-        </span>
-        <span class="rule-count">5</span>
-      </summary>
-
-      <div class="rules">
-        <label class="rule">
-          <input id="russianSentenceDash" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian sentence dash <span class="tag">Russian</span></div>
-            <p class="rule-description">Converts spaced hyphens and short dashes to an em dash.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="russianShortWordsNbsp" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian short words <span class="tag">Russian</span></div>
-            <p class="rule-description">Keeps short words, particles, abbreviations, and number-word pairs together.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="russianInitialsNbsp" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian initials <span class="tag">Russian</span></div>
-            <p class="rule-description">Keeps initials together with each other and the surname.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="russianNumericAbbreviations" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian numeric abbreviations <span class="tag">Russian</span></div>
-            <p class="rule-description">Normalizes тыс., млн, млрд, and трлн.</p>
-          </div>
-        </label>
-
-        <label class="rule">
-          <input id="russianLargeNumbers" type="checkbox" checked />
-          <div>
-            <div class="rule-title">Russian large numbers <span class="tag">Russian</span></div>
-            <p class="rule-description">Groups large numbers with a non-breaking space.</p>
-          </div>
-        </label>
-      </div>
-    </details>
-
-    <details class="rule-group" open>
-      <summary>
-        <span class="rule-group-label">
-          <span>UI text</span>
-          <span class="rule-group-description">Final punctuation for short interface copy.</span>
-        </span>
-        <span class="rule-count">1</span>
-      </summary>
-
-      <div class="rules">
-        <label class="rule">
-          <input id="uiFinalPeriod" type="checkbox" checked />
-          <div>
-            <div class="rule-title">UI final period <span class="tag">Russian + English</span></div>
-            <p class="rule-description">Removes the final period at the end of short UI text while preserving abbreviations.</p>
-          </div>
-        </label>
-      </div>
-    </details>
-  </div>
-
-  <p class="protection-note">
-    Protected automatically: URLs, emails, inline code, code-like strings, placeholders, HTML tags, HTML/XML entities, and ICU message syntax.
-  </p>
-</div>
-
-<div class="actions">
-  <button id="apply" class="primary" disabled>Apply formatting</button>
-  <button id="close">Close</button>
-</div>
-
-<p id="result"></p>
 
 <script>
-  const summary = document.getElementById("summary");
-  const result = document.getElementById("result");
-  const applyButton = document.getElementById("apply");
-  const closeButton = document.getElementById("close");
-  const selectAllRulesButton = document.getElementById("selectAllRules");
-  const deselectAllRulesButton = document.getElementById("deselectAllRules");
-  const resetDefaultsButton = document.getElementById("resetDefaults");
-
-  const uiLanguageModeSelect = document.getElementById("uiLanguageMode");
-  const languageModeSelect = document.getElementById("languageMode");
-  const nonBreakingSpaceStyleSelect = document.getElementById("nonBreakingSpaceStyle");
-
-  const ruPrimaryQuoteStyleSelect = document.getElementById("ruPrimaryQuoteStyle");
-  const ruSecondaryQuoteStyleSelect = document.getElementById("ruSecondaryQuoteStyle");
-  const enPrimaryQuoteStyleSelect = document.getElementById("enPrimaryQuoteStyle");
-  const enSecondaryQuoteStyleSelect = document.getElementById("enSecondaryQuoteStyle");
-
-  const invisibleCopyArtifactsCheckbox = document.getElementById("invisibleCopyArtifacts");
-  const tabsCheckbox = document.getElementById("tabs");
-  const manualLineBreaksCheckbox = document.getElementById("manualLineBreaks");
-  const ellipsisCheckbox = document.getElementById("ellipsis");
-  const extraSpacesCheckbox = document.getElementById("extraSpaces");
-  const trimTextEdgesCheckbox = document.getElementById("trimTextEdges");
-  const spacingCleanupCheckbox = document.getElementById("spacingCleanup");
-  const percentSignNoSpaceCheckbox = document.getElementById("percentSignNoSpace");
-  const numberUnitsNbspCheckbox = document.getElementById("numberUnitsNbsp");
-  const numberSignsCheckbox = document.getElementById("numberSigns");
-  const specialSymbolsCheckbox = document.getElementById("specialSymbols");
-  const englishApostrophesCheckbox = document.getElementById("englishApostrophes");
-  const englishQuotesCheckbox = document.getElementById("englishQuotes");
-  const russianQuotesCheckbox = document.getElementById("russianQuotes");
-  const numberRangeDashCheckbox = document.getElementById("numberRangeDash");
-  const russianSentenceDashCheckbox = document.getElementById("russianSentenceDash");
-  const russianShortWordsNbspCheckbox = document.getElementById("russianShortWordsNbsp");
-  const russianInitialsNbspCheckbox = document.getElementById("russianInitialsNbsp");
-  const russianNumericAbbreviationsCheckbox = document.getElementById("russianNumericAbbreviations");
-  const russianLargeNumbersCheckbox = document.getElementById("russianLargeNumbers");
-  const uiFinalPeriodCheckbox = document.getElementById("uiFinalPeriod");
-
+  const NBSP = "\u00A0";
   const UI_LANGUAGE_STORAGE_KEY = "typotypoInterfaceLanguage";
+  const THEME_STORAGE_KEY = "typotypoTheme";
 
-  let hasTextLayers = false;
-  let currentTargetScope = "selection";
-  let currentAvailableTextNodeCount = 0;
-  let currentUiLanguage = readStoredUiLanguage() || getDetectedUiLanguage();
-  let isLoadingSettings = true;
-  let lastSelectionInfoMessage = null;
-  let lastApplyResultMessage = null;
+  const elements = {
+    app: document.getElementById("app"),
+    formatTab: document.getElementById("formatTab"),
+    rulesTab: document.getElementById("rulesTab"),
+    settingsTab: document.getElementById("settingsTab"),
+    scopeLabel: document.getElementById("scopeLabel"),
+    formatArea: document.getElementById("formatArea"),
+    compactSummary: document.getElementById("compactSummary"),
+    compactNumber: document.getElementById("compactNumber"),
+    compactLabel: document.getElementById("compactLabel"),
+    heroNumber: document.getElementById("heroNumber"),
+    heroLabel: document.getElementById("heroLabel"),
+    mainStatusRows: document.getElementById("mainStatusRows"),
+    progressScreen: document.getElementById("progressScreen"),
+    progressNumber: document.getElementById("progressNumber"),
+    progressLabel: document.getElementById("progressLabel"),
+    progressFill: document.getElementById("progressFill"),
+    resultScreen: document.getElementById("resultScreen"),
+    resultNumber: document.getElementById("resultNumber"),
+    resultLabel: document.getElementById("resultLabel"),
+    resultStatusRows: document.getElementById("resultStatusRows"),
+    navigationRows: document.getElementById("navigationRows"),
+    rulesToggle: document.getElementById("rulesToggle"),
+    rulesPanel: document.getElementById("rulesPanel"),
+    rulesMeta: document.getElementById("rulesMeta"),
+    settingsToggle: document.getElementById("settingsToggle"),
+    settingsPanel: document.getElementById("settingsPanel"),
+    ruleGroups: document.getElementById("ruleGroups"),
+    resetDefaults: document.getElementById("resetDefaults"),
+    primaryAction: document.getElementById("primaryAction"),
+  };
 
-  const defaultSettings = {
+  const ruleDefinitions = [
+    { id: "invisibleCopyArtifacts", group: "cleanup", tag: "all" },
+    { id: "tabs", group: "cleanup", tag: "all" },
+    { id: "manualLineBreaks", group: "cleanup", tag: "all" },
+    { id: "ellipsis", group: "cleanup", tag: "all" },
+    { id: "extraSpaces", group: "cleanup", tag: "all" },
+    { id: "trimTextEdges", group: "cleanup", tag: "all" },
+    { id: "spacingCleanup", group: "cleanup", tag: "all" },
+    { id: "percentSignNoSpace", group: "numbers", tag: "all" },
+    { id: "numberUnitsNbsp", group: "numbers", tag: "all" },
+    { id: "numberSigns", group: "numbers", tag: "all" },
+    { id: "specialSymbols", group: "numbers", tag: "all" },
+    { id: "numberRangeDash", group: "numbers", tag: "all" },
+    { id: "englishApostrophes", group: "quotes", tag: "english" },
+    { id: "russianQuotes", group: "quotes", tag: "russian" },
+    { id: "englishQuotes", group: "quotes", tag: "english" },
+    { id: "russianSentenceDash", group: "russianTypography", tag: "russian" },
+    { id: "russianShortWordsNbsp", group: "russianTypography", tag: "russian" },
+    { id: "russianInitialsNbsp", group: "russianTypography", tag: "russian" },
+    { id: "russianNumericAbbreviations", group: "russianTypography", tag: "russian" },
+    { id: "russianLargeNumbers", group: "russianTypography", tag: "russian" },
+    { id: "uiFinalPeriod", group: "uiText", tag: "ruEn" },
+  ];
+
+  const groupOrder = ["cleanup", "numbers", "quotes", "russianTypography", "uiText"];
+
+  const quoteStyleOptions = [
+    { id: "frenchGuillemets", label: "« »", sample: ["«", "»"] },
+    { id: "germanLowHigh", label: "„ “", sample: ["„", "“"] },
+    { id: "englishDouble", label: "“ ”", sample: ["“", "”"] },
+    { id: "englishSingle", label: "‘ ’", sample: ["‘", "’"] },
+    { id: "programmerDouble", label: '" "', sample: ['"', '"'] },
+    { id: "englishSingleReversed", label: "' '", sample: ["'", "'"] },
+  ];
+
+  const copy = {
+    en: {
+      formatTitle: "Format",
+      rulesTitle: "Rules",
+      settingsTitle: "Settings",
+      interfaceLanguage: "Interface language",
+      textLanguage: "Text language",
+      theme: "Theme",
+      nbspLength: "Non-breaking space width",
+      nbspRegular: "Regular",
+      nbspThin: "Thin",
+      defaultsNote: "Defaults rules depend on text language",
+      resetDefaults: "Reset to defaults",
+      applyFormatting: "Apply formatting",
+      applyToCurrentPage: "Apply to current page",
+      cancel: "Cancel",
+      done: "Done",
+      formatRemaining: "Format remaining",
+      scope: {
+        selection: "Scope: selected layers",
+        currentPage: "Scope: current page",
+        textLayer: "Scope: text layer",
+        frame: "Scope: frame",
+        section: "Scope: section",
+        group: "Scope: group",
+      },
+      main: {
+        checking: "checking selection",
+        ready: "text layers ready to format",
+        readyOnPage: "text layers on this page ready to format",
+        noTextPage: "text layers on this page",
+        noTextSelection: "text layers in selection",
+        noAvailable: "no text layers available",
+        noRules: "text layers ready — but no rules are on",
+        compactReady: "ready to format",
+      },
+      applying: {
+        label: "of {total} text layers being formatted",
+      },
+      result: {
+        changesAppliedInLayers: "changes applied in {count} text layers",
+        changesApplied: "changes applied",
+        alreadyClean: "changes needed — already clean",
+        noAvailable: "no text layers available",
+        layersChecked: "layers checked",
+        formattedBeforeCancel: "text layers formatted before cancel",
+        remaining: "remaining",
+      },
+      status: {
+        found: "found",
+        available: "available",
+        locked: "locked",
+        hidden: "hidden",
+        empty: "empty",
+        nonEditable: "non-editable",
+        missingFonts: "missing fonts",
+        error: "error",
+        errors: "errors",
+        formatted: "formatted",
+        skippedPrefix: "Skipped:",
+      },
+      tags: {
+        all: "All",
+        russian: "Russian",
+        english: "English",
+        ruEn: "Russian + English",
+      },
+      quoteSettings: {
+        firstLevel: "1st level",
+        secondLevel: "2nd level",
+        result: "Result:",
+        insideQuotes: "Nested quotes",
+        insideQuotesNote: "uses the 2nd level automatically",
+      },
+      groups: {
+        cleanup: "Cleanup",
+        numbers: "Numbers & symbols",
+        quotes: "Quotes",
+        russianTypography: "Russian typography",
+        uiText: "UI text",
+      },
+      rules: {
+        invisibleCopyArtifacts: ["Invisible characters", "Removes paste leftovers.", "removes paste leftovers"],
+        tabs: ["Tabs to spaces", "Replaces tab characters with spaces.", "tab → space"],
+        manualLineBreaks: ["Line breaks inside text", "Replaces line breaks inside a text layer.", "Hello ↵ world → Hello world"],
+        ellipsis: ["Three dots to ellipsis", "Replaces three dots with a proper ellipsis.", "Wait... → Wait …"],
+        extraSpaces: ["Extra spaces", "Replaces several spaces with one.", "Hello ··· world → Hello world"],
+        trimTextEdges: ["Spaces at line edges", "Removes spaces at line edges.", "·· 2024 → 2024"],
+        spacingCleanup: ["Spaces around punctuation", "Cleans spaces around punctuation.", "Hello · , world · ! → Hello, world!"],
+        percentSignNoSpace: ["Percent without space", "Removes spaces before percent signs.", "50 · % → 50%"],
+        numberUnitsNbsp: ["Units stay with numbers", "Keeps units with numbers.", "300 MB → 300 ‿ MB"],
+        numberSigns: ["№ and § stay with numbers", "Keeps № and § with the following number.", "№ 8 → № ‿ 8"],
+        specialSymbols: ["Fractions and symbols", "Normalizes fractions and symbols.", "1/2 → ½ · >= → ≥"],
+        numberRangeDash: ["Dash in ranges", "Uses an en dash in numeric ranges.", "10-20 → 10–20"],
+        englishApostrophes: ["Curly apostrophes", "Replaces straight apostrophes in English words.", "It's good → It’s good"],
+        englishQuotes: ["English quotes", "Normalizes English quotes.", "\"Hello\" → “Hello”"],
+        russianQuotes: ["Russian quotes", "Normalizes Russian quotes.", "\"Привет\" → «Привет»"],
+        russianSentenceDash: ["Dash in sentences", "Converts spaced hyphens to an em dash.", "Это - дом → Это — дом"],
+        russianShortWordsNbsp: ["Short words and abbreviations", "Keeps short words and common Russian abbreviations together.", "о проекте · т. е."],
+        russianInitialsNbsp: ["Initials stay together", "Keeps initials together with the surname.", "А. С. Пушкин → А. ‿ С. ‿ Пушкин"],
+        russianNumericAbbreviations: ["Numeric abbreviations", "Keeps numbers with тыс., млн, млрд and трлн.", "10 тыс → 10 ‿ тыс."],
+        russianLargeNumbers: ["Large number groups", "Groups large numbers.", "2132128 → 2 ‿ 132 ‿ 128"],
+        uiFinalPeriod: ["No final period in short UI copy", "Removes the final period in short UI copy.", "Saved. → Saved"],
+      },
+    },
+    ru: {
+      formatTitle: "Типографирование",
+      rulesTitle: "Правила",
+      settingsTitle: "Настройки",
+      interfaceLanguage: "Язык интерфейса",
+      textLanguage: "Язык текста",
+      theme: "Тема",
+      nbspLength: "Ширина неразрывного пробела",
+      nbspRegular: "Обычный",
+      nbspThin: "Узкий",
+      defaultsNote: "Правила по умолчанию зависят от языка",
+      resetDefaults: "Сбросить настройки",
+      applyFormatting: "Типографировать",
+      applyToCurrentPage: "Типографировать страницу",
+      cancel: "Отменить",
+      done: "Готово",
+      formatRemaining: "Типографировать оставшееся",
+      scope: {
+        selection: "Область: выбранные слои",
+        currentPage: "Область: вся страница",
+        textLayer: "Область: текстовый слой",
+        frame: "Область: фрейм",
+        section: "Область: секция",
+        group: "Область: группа",
+      },
+      main: {
+        checking: "проверяем выделение",
+        ready: "текстовых слоёв готово к типографированию",
+        readyOnPage: "текстовых слоёв на странице готово к типографированию",
+        noTextPage: "текстовых слоёв на странице",
+        noTextSelection: "текстовых слоёв в области",
+        noAvailable: "нет доступных текстовых слоёв",
+        noRules: "текстовых слоёв готово — но правила выключены",
+        compactReady: "готово к типографированию",
+      },
+      applying: {
+        label: "из {total} текстовых слоёв типографируется",
+      },
+      result: {
+        changesAppliedInLayers: "изменений в {count} текстовых слоях",
+        changesApplied: "изменений применено",
+        alreadyClean: "изменений не нужно — всё и так отлично",
+        noAvailable: "нет доступных текстовых слоёв",
+        layersChecked: "текстовых слоёв проверено",
+        formattedBeforeCancel: "текстовых слоёв отформатировано до отмены",
+        remaining: "осталось",
+      },
+      status: {
+        found: "найдено",
+        available: "доступно",
+        locked: "заблокировано",
+        hidden: "скрыто",
+        empty: "пусто",
+        nonEditable: "нельзя редактировать",
+        missingFonts: "нет нужных шрифтов",
+        error: "ошибка",
+        errors: "ошибок",
+        formatted: "отформатировано",
+        skippedPrefix: "Пропущено:",
+      },
+      tags: {
+        all: "Все",
+        russian: "Русский",
+        english: "Английский",
+        ruEn: "Русский + английский",
+      },
+      quoteSettings: {
+        firstLevel: "1-й уровень",
+        secondLevel: "2-й уровень",
+        result: "Результат:",
+        insideQuotes: "Вложенные кавычки",
+        insideQuotesNote: "второй уровень включается автоматически",
+      },
+      groups: {
+        cleanup: "Очистка",
+        numbers: "Числа и символы",
+        quotes: "Кавычки",
+        russianTypography: "Русская типографика",
+        uiText: "Текст интерфейса",
+      },
+      rules: {
+        invisibleCopyArtifacts: ["Невидимые символы", "Убирает мусор после вставки.", "убирает мусор после вставки"],
+        tabs: ["Табы в пробелы", "Заменяет табы пробелами.", "таб → пробел"],
+        manualLineBreaks: ["Переносы внутри текста", "Заменяет переносы внутри текстового слоя.", "Привет ↵ мир → Привет мир"],
+        ellipsis: ["Три точки в многоточие", "Заменяет три точки настоящим многоточием.", "Подожди... → Подожди …"],
+        extraSpaces: ["Лишние пробелы", "Заменяет несколько пробелов одним.", "Привет ··· мир → Привет мир"],
+        trimTextEdges: ["Пробелы по краям строк", "Удаляет пробелы по краям строк.", "·· 2024 → 2024"],
+        spacingCleanup: ["Пробелы у знаков", "Чистит пробелы у знаков.", "Привет · , мир · ! → Привет, мир!"],
+        percentSignNoSpace: ["Проценты без пробела", "Убирает пробел перед процентами.", "50 · % → 50%"],
+        numberUnitsNbsp: ["Единицы измерения не отрываются", "Склеивает единицы измерения с числами.", "300 МБ → 300 ‿ МБ"],
+        numberSigns: ["№ и § не отрываются", "Склеивает № и § со следующим числом.", "№ 8 → № ‿ 8"],
+        specialSymbols: ["Дроби и символы", "Нормализует дроби и символы.", "1/2 → ½ · >= → ≥"],
+        numberRangeDash: ["Тире в диапазонах", "Использует короткое тире в диапазонах.", "10-20 → 10–20"],
+        englishApostrophes: ["Типографские апострофы", "Заменяет прямые апострофы в английских словах.", "It's good → It’s good"],
+        englishQuotes: ["Английские кавычки", "Нормализует английские кавычки.", "\"Hello\" → “Hello”"],
+        russianQuotes: ["Русские кавычки", "Нормализует русские кавычки.", "\"Привет\" → «Привет»"],
+        russianSentenceDash: ["Тире в предложениях", "Заменяет дефисы с пробелами на длинное тире.", "Это - дом → Это — дом"],
+        russianShortWordsNbsp: ["Короткие слова и сокращения", "Склеивает короткие слова и устойчивые сокращения.", "о проекте · т. е."],
+        russianInitialsNbsp: ["Инициалы не разрываются", "Склеивает инициалы между собой и с фамилией.", "А. С. Пушкин → А. ‿ С. ‿ Пушкин"],
+        russianNumericAbbreviations: ["Числовые сокращения", "Склеивает числа с тыс., млн, млрд и трлн.", "10 тыс → 10 ‿ тыс."],
+        russianLargeNumbers: ["Разряды в больших числах", "Разбивает большие числа по разрядам.", "2132128 → 2 ‿ 132 ‿ 128"],
+        uiFinalPeriod: ["Без точки в коротких надписях", "Убирает финальную точку в коротком интерфейсном тексте.", "Сохранено. → Сохранено"],
+      },
+    },
+  };
+
+  let state = {
+    uiLanguage: readStoredUiLanguage() || getDetectedUiLanguage(),
     languageMode: "auto",
+    theme: readStoredTheme() || "system",
+    isLoadingSettings: true,
+    isApplying: false,
+    activePanel: "main",
+    view: "main",
+    openRuleGroup: null,
+    animatedSwitchKeys: [],
+    currentTargetScope: "selection",
+    currentAvailableTextNodeCount: 0,
+    lastSelectionInfoMessage: null,
+    lastApplyResultMessage: null,
+    lastApplyCompletedAt: 0,
+    applySelectionSignature: "",
+    progressDone: 0,
+    progressTotal: 0,
+    enabledRules: getDefaultEnabledRules("auto"),
     options: {
       nonBreakingSpaceStyle: "regular",
       quoteOptions: {
-        ru: {
-          primaryQuoteStyle: "frenchGuillemets",
-          secondaryQuoteStyle: "germanLowHigh",
-        },
-        en: {
-          primaryQuoteStyle: "englishDouble",
-          secondaryQuoteStyle: "englishSingle",
-        },
+        ru: { primaryQuoteStyle: "frenchGuillemets", secondaryQuoteStyle: "germanLowHigh" },
+        en: { primaryQuoteStyle: "englishDouble", secondaryQuoteStyle: "englishSingle" },
       },
-    },
-    enabledRules: {
-      invisibleCopyArtifacts: true,
-      tabs: true,
-      manualLineBreaks: true,
-      ellipsis: true,
-      extraSpaces: true,
-      trimTextEdges: true,
-      spacingCleanup: true,
-      percentSignNoSpace: true,
-      numberUnitsNbsp: true,
-      numberSigns: true,
-      specialSymbols: true,
-      englishApostrophes: true,
-      englishQuotes: true,
-      russianQuotes: true,
-      numberRangeDash: true,
-      russianSentenceDash: true,
-      russianShortWordsNbsp: true,
-      russianInitialsNbsp: true,
-      russianNumericAbbreviations: true,
-      russianLargeNumbers: true,
-      uiFinalPeriod: true,
     },
   };
 
-  const i18n = {
-    en: {
-      appTitle: "Typography Formatter",
-      eyebrow: "Clean up UI copy while preserving protected syntax.",
-      checkingSelection: "Checking selection…",
-      basicSettings: "Basic settings",
-      interfaceLanguage: "Interface language",
-      interfaceLanguageHint: "Detected automatically on first launch. Your choice is saved after that.",
-      uiLanguageRu: "Russian",
-      uiLanguageEn: "English",
-      textLanguage: "Text language",
-      textLanguageHint: "Auto-detect uses the dominant script in each text layer. Use Russian or English for short mixed strings.",
-      autoDetect: "Auto-detect",
-      russian: "Russian",
-      english: "English",
-      nbspStyle: "Non-breaking space style",
-      nbspHint: "Used for number units, currencies, sizes, and large numbers. Word-based Russian pairs always use a regular non-breaking space.",
-      nbspRegular: "Regular non-breaking space",
-      nbspNarrow: "Narrow non-breaking space",
-      quoteStyles: "Quote styles",
-      russianQuotesHeading: "Russian quotes",
-      englishQuotesHeading: "English quotes",
-      firstLevelQuotes: "First level quotes",
-      secondLevelQuotes: "Second level quotes",
-      quoteDefaultsHint: "Defaults: Russian uses « » and „ “. English uses “ ” and ‘ ’.",
-      frenchGuillemets: "French quotes « »",
-      germanLowHigh: "German quotes „ “",
-      englishDouble: "English double quotes “ ”",
-      programmerDouble: "Programmer quotes \" \"",
-      englishSingle: "English single quotes ‘ ’",
-      englishSingleReversed: "English single reversed ‚ ‘",
-      rules: "Rules",
-      selectAllRules: "Select all rules",
-      deselectAllRules: "Deselect all",
-      resetDefaults: "Reset to defaults",
-      allTag: "All",
-      russianTag: "Russian",
-      englishTag: "English",
-      ruEnTag: "Russian + English",
-      groups: {
-        cleanup: ["Cleanup", "Spacing, invisible artifacts, line breaks, punctuation."],
-        numbers: ["Numbers and symbols", "Units, currencies, signs, ranges, arrows, fractions."],
-        quotes: ["Quotes", "Russian and English quote normalization."],
-        russianTypography: ["Russian typography", "Dashes, short words, initials, abbreviations, large numbers."],
-        uiText: ["UI text", "Final punctuation for short interface copy."],
-      },
-      ruleTitles: {
-        invisibleCopyArtifacts: "Invisible copy artifacts",
-        tabs: "Tabs",
-        manualLineBreaks: "Manual line breaks",
-        ellipsis: "Ellipsis",
-        extraSpaces: "Extra spaces",
-        trimTextEdges: "Trim text edges",
-        spacingCleanup: "Spacing cleanup",
-        percentSignNoSpace: "Percent sign",
-        numberUnitsNbsp: "Number units",
-        numberSigns: "Number signs",
-        specialSymbols: "Special symbols",
-        englishApostrophes: "English apostrophes",
-        englishQuotes: "English quotes",
-        russianQuotes: "Russian quotes",
-        numberRangeDash: "Number ranges",
-        russianSentenceDash: "Russian sentence dash",
-        russianShortWordsNbsp: "Russian short words",
-        russianInitialsNbsp: "Russian initials",
-        russianNumericAbbreviations: "Russian numeric abbreviations",
-        russianLargeNumbers: "Russian large numbers",
-        uiFinalPeriod: "UI final period",
-      },
-      ruleDescriptions: {
-        invisibleCopyArtifacts: "Removes hidden characters copied from external sources.",
-        tabs: "Replaces tab characters with regular spaces.",
-        manualLineBreaks: "Replaces single manual line breaks with spaces while preserving paragraphs.",
-        ellipsis: "Replaces three dots (...) with a proper ellipsis (…).",
-        extraSpaces: "Replaces multiple spaces with a single space.",
-        trimTextEdges: "Removes spaces at the beginning and end of a text layer.",
-        spacingCleanup: "Cleans punctuation, brackets, repeated marks, quote periods, and UI separators.",
-        percentSignNoSpace: "Removes spaces before the percent sign.",
-        numberUnitsNbsp: "Keeps numbers with units, temperatures, currencies, and sizes.",
-        numberSigns: "Keeps № and § together with the following number.",
-        specialSymbols: "Normalizes ©, ™, ±, ≠, ≤, ≥, ₽, fractions, degrees, arrows, and multiplication signs.",
-        englishApostrophes: "Replaces straight apostrophes in English words, decades, and possessives.",
-        englishQuotes: "Normalizes first- and second-level English quotes.",
-        russianQuotes: "Normalizes first- and second-level Russian quotes and punctuation around them.",
-        numberRangeDash: "Uses an en dash without spaces in numeric and time ranges.",
-        russianSentenceDash: "Converts spaced hyphens and short dashes to an em dash.",
-        russianShortWordsNbsp: "Keeps short words, particles, abbreviations, and number-word pairs together.",
-        russianInitialsNbsp: "Keeps initials together with each other and the surname.",
-        russianNumericAbbreviations: "Normalizes тыс., млн, млрд, and трлн.",
-        russianLargeNumbers: "Groups large numbers with a non-breaking space.",
-        uiFinalPeriod: "Removes the final period at the end of short UI text while preserving abbreviations.",
-      },
-      protectionNote: "Protected automatically: URLs, emails, inline code, code-like strings, placeholders, HTML tags, HTML/XML entities, and ICU message syntax.",
-      applyFormatting: "Apply formatting",
-      applyToCurrentPage: "Apply to current page",
-      close: "Close",
-      nothingSelectedNoText: "Nothing selected. Current page has no text layers.",
-      nothingSelectedPageTextLayers: "Nothing selected. Current page text layers: {textNodeCount}. Ready to apply to {availableTextNodeCount} visible editable layer(s){skippedDetails}.",
-      selectedNoText: "Selected layers: {selectedCount}. Text layers: 0.",
-      selectedTextLayers: "Selected layers: {selectedCount}. Text layers: {textNodeCount}. Ready to apply to {availableTextNodeCount}{skippedDetails}.",
-      skippedHidden: "hidden",
-      skippedLocked: "locked",
-      skippedEmpty: "empty",
-      skippedNonEditable: "non-editable",
-      skippedErrors: "errors",
-      currentPage: "Current page",
-      selection: "Selection",
-      textLayers: "Text layers",
-      changed: "Changed",
-      unchanged: "Unchanged",
-      skipped: "Skipped",
-      replacements: "Replacements",
-      rulesSkippedByLanguage: "Rules skipped by language",
-      detectedLayers: "Detected layers — Russian: {ru}, English: {en}, Unknown: {unknown}.",
-      confirmCurrentPage: "Nothing is selected. Typograph all visible editable text layers on this page ({count} layer(s))?",
-    },
-    ru: {
-      appTitle: "Типограф",
-      eyebrow: "Приводит интерфейсный текст в порядок и сохраняет защищённый синтаксис.",
-      checkingSelection: "Проверяем выделение…",
-      basicSettings: "Основные настройки",
-      interfaceLanguage: "Язык интерфейса",
-      interfaceLanguageHint: "При первом запуске определяется автоматически. Дальше выбор сохраняется.",
-      uiLanguageRu: "Русский",
-      uiLanguageEn: "Английский",
-      textLanguage: "Язык текста",
-      textLanguageHint: "Автоопределение смотрит на доминирующий алфавит в каждом текстовом слое. Для коротких смешанных строк лучше выбрать русский или английский вручную.",
-      autoDetect: "Автоопределение",
-      russian: "Русский",
-      english: "Английский",
-      nbspStyle: "Тип неразрывного пробела",
-      nbspHint: "Используется для единиц измерения, валют, размеров и больших чисел. Русские словесные связки всегда используют обычный неразрывный пробел.",
-      nbspRegular: "Обычный неразрывный пробел",
-      nbspNarrow: "Узкий неразрывный пробел",
-      quoteStyles: "Стили кавычек",
-      russianQuotesHeading: "Русские кавычки",
-      englishQuotesHeading: "Английские кавычки",
-      firstLevelQuotes: "Кавычки первого уровня",
-      secondLevelQuotes: "Кавычки второго уровня",
-      quoteDefaultsHint: "По умолчанию: русский — « » и „ “, английский — “ ” и ‘ ’.",
-      frenchGuillemets: "Французские кавычки « »",
-      germanLowHigh: "Немецкие кавычки „ “",
-      englishDouble: "Английские двойные кавычки “ ”",
-      programmerDouble: "Прямые кавычки \" \"",
-      englishSingle: "Английские одинарные кавычки ‘ ’",
-      englishSingleReversed: "Английские одинарные обратные ‚ ‘",
-      rules: "Правила",
-      selectAllRules: "Выбрать все правила",
-      deselectAllRules: "Снять выбор",
-      resetDefaults: "Сбросить к настройкам по умолчанию",
-      allTag: "Все",
-      russianTag: "Русский",
-      englishTag: "Английский",
-      ruEnTag: "Русский + английский",
-      groups: {
-        cleanup: ["Очистка", "Пробелы, невидимые символы, переносы строк, пунктуация."],
-        numbers: ["Числа и символы", "Единицы, валюты, знаки, диапазоны, стрелки, дроби."],
-        quotes: ["Кавычки", "Нормализация русских и английских кавычек."],
-        russianTypography: ["Русская типографика", "Тире, короткие слова, инициалы, сокращения, большие числа."],
-        uiText: ["Интерфейсный текст", "Финальная точка в коротких интерфейсных текстах."],
-      },
-      ruleTitles: {
-        invisibleCopyArtifacts: "Невидимые артефакты копирования",
-        tabs: "Табы",
-        manualLineBreaks: "Ручные переносы строк",
-        ellipsis: "Многоточие",
-        extraSpaces: "Лишние пробелы",
-        trimTextEdges: "Пробелы по краям",
-        spacingCleanup: "Очистка пробелов",
-        percentSignNoSpace: "Знак процента",
-        numberUnitsNbsp: "Единицы измерения",
-        numberSigns: "Знаки номера и параграфа",
-        specialSymbols: "Специальные символы",
-        englishApostrophes: "Английские апострофы",
-        englishQuotes: "Английские кавычки",
-        russianQuotes: "Русские кавычки",
-        numberRangeDash: "Числовые диапазоны",
-        russianSentenceDash: "Тире в русском тексте",
-        russianShortWordsNbsp: "Короткие русские слова",
-        russianInitialsNbsp: "Русские инициалы",
-        russianNumericAbbreviations: "Русские числовые сокращения",
-        russianLargeNumbers: "Большие числа",
-        uiFinalPeriod: "Финальная точка в UI",
-      },
-      ruleDescriptions: {
-        invisibleCopyArtifacts: "Удаляет скрытые символы, скопированные из внешних источников.",
-        tabs: "Заменяет табы обычными пробелами.",
-        manualLineBreaks: "Заменяет одиночные ручные переносы строк пробелами и сохраняет абзацы.",
-        ellipsis: "Заменяет три точки (...) на настоящее многоточие (…).",
-        extraSpaces: "Заменяет несколько пробелов одним.",
-        trimTextEdges: "Удаляет пробелы в начале и конце текстового слоя.",
-        spacingCleanup: "Чистит пунктуацию, скобки, повторы знаков, точки у кавычек и UI-разделители.",
-        percentSignNoSpace: "Убирает пробел перед знаком процента.",
-        numberUnitsNbsp: "Склеивает числа с единицами, температурой, валютами и размерами.",
-        numberSigns: "Склеивает № и § со следующим числом.",
-        specialSymbols: "Нормализует ©, ™, ±, ≠, ≤, ≥, ₽, дроби, градусы, стрелки и знак умножения.",
-        englishApostrophes: "Заменяет прямые апострофы в английских словах, десятилетиях и притяжательных формах.",
-        englishQuotes: "Нормализует английские кавычки первого и второго уровня.",
-        russianQuotes: "Нормализует русские кавычки первого и второго уровня и пунктуацию вокруг них.",
-        numberRangeDash: "Использует короткое тире без пробелов в числовых и временных диапазонах.",
-        russianSentenceDash: "Заменяет дефисы и короткие тире с пробелами на длинное тире.",
-        russianShortWordsNbsp: "Склеивает короткие слова, частицы, сокращения и пары число + слово.",
-        russianInitialsNbsp: "Склеивает инициалы между собой и с фамилией.",
-        russianNumericAbbreviations: "Нормализует тыс., млн, млрд и трлн.",
-        russianLargeNumbers: "Разбивает большие числа неразрывным пробелом.",
-        uiFinalPeriod: "Убирает финальную точку в коротком интерфейсном тексте и сохраняет сокращения.",
-      },
-      protectionNote: "Автоматически защищаются: URL, почты, inline-код, строки, похожие на код, плейсхолдеры, HTML-теги, HTML/XML-сущности и ICU-синтаксис.",
-      applyFormatting: "Типографировать",
-      applyToCurrentPage: "Типографировать страницу",
-      close: "Закрыть",
-      nothingSelectedNoText: "Ничего не выделено. На текущей странице нет текстовых слоёв.",
-      nothingSelectedPageTextLayers: "Ничего не выделено. Текстовых слоёв на странице: {textNodeCount}. Готово к обработке: {availableTextNodeCount}{skippedDetails}.",
-      selectedNoText: "Выделено слоёв: {selectedCount}. Текстовых слоёв: 0.",
-      selectedTextLayers: "Выделено слоёв: {selectedCount}. Текстовых слоёв: {textNodeCount}. Готово к обработке: {availableTextNodeCount}{skippedDetails}.",
-      skippedHidden: "скрыто",
-      skippedLocked: "заблокировано",
-      skippedEmpty: "пусто",
-      skippedNonEditable: "нельзя изменить",
-      skippedErrors: "ошибки",
-      currentPage: "Текущая страница",
-      selection: "Выделение",
-      textLayers: "Текстовых слоёв",
-      changed: "Изменено",
-      unchanged: "Без изменений",
-      skipped: "Пропущено",
-      replacements: "Замен",
-      rulesSkippedByLanguage: "Правил пропущено по языку",
-      detectedLayers: "Определённые слои — русский: {ru}, английский: {en}, неизвестный: {unknown}.",
-      confirmCurrentPage: "Ничего не выделено. Типографировать все видимые редактируемые текстовые слои на этой странице ({count})?",
-    },
-  };
-
-  function t(key) {
-    const dictionary = i18n[currentUiLanguage] || i18n.en;
-    return dictionary[key] !== undefined ? dictionary[key] : i18n.en[key] || key;
+  function getCopy(path) {
+    const dictionary = copy[state.uiLanguage] || copy.en;
+    const fallback = copy.en;
+    return path.split(".").reduce((acc, key) => (acc ? acc[key] : undefined), dictionary) ??
+      path.split(".").reduce((acc, key) => (acc ? acc[key] : undefined), fallback) ??
+      path;
   }
 
   function interpolate(template, values) {
-    return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
+    return String(template).replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
+  }
+
+  function countLabel(count, label) {
+    return `${count}${NBSP}${label}`;
+  }
+
+  function isRu() {
+    return state.uiLanguage === "ru";
+  }
+
+  function ruPlural(count, one, few, many) {
+    const value = Math.abs(Number(count || 0));
+    const mod10 = value % 10;
+    const mod100 = value % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+    return many;
+  }
+
+  function ruTextLayerSubject(count) {
+    return ruPlural(count, "текстовый слой", "текстовых слоя", "текстовых слоёв");
+  }
+
+  function ruTextLayerGenitive(count) {
+    const value = Math.abs(Number(count || 0));
+    const mod10 = value % 10;
+    const mod100 = value % 100;
+    return mod10 === 1 && mod100 !== 11 ? "текстового слоя" : "текстовых слоёв";
+  }
+
+  function ruTextLayerPrepositional(count) {
+    const value = Math.abs(Number(count || 0));
+    const mod10 = value % 10;
+    const mod100 = value % 100;
+    return mod10 === 1 && mod100 !== 11 ? "текстовом слое" : "текстовых слоях";
+  }
+
+  function ruReadyVerb(count) {
+    return ruPlural(count, "готов", "готовы", "готовы");
+  }
+
+  function ruCheckedLayersLabel(count) {
+    return ruPlural(count, "текстовый слой проверен", "текстовых слоя проверены", "текстовых слоёв проверено");
+  }
+
+  function statusItem(key, count) {
+    const status = getCopy("status");
+    const value = Number(count || 0);
+
+    if (!isRu()) {
+      if (key === "error") return countLabel(value, value === 1 ? status.error : status.errors);
+      return countLabel(value, status[key]);
+    }
+
+    const label = {
+      found: ruPlural(value, "найден", "найдено", "найдено"),
+      available: ruPlural(value, "доступен", "доступно", "доступно"),
+      locked: ruPlural(value, "заблокирован", "заблокировано", "заблокировано"),
+      hidden: ruPlural(value, "скрыт", "скрыто", "скрыто"),
+      empty: ruPlural(value, "пустой", "пустых", "пустых"),
+      nonEditable: "нельзя редактировать",
+      missingFonts: "без нужных шрифтов",
+      error: ruPlural(value, "ошибка", "ошибки", "ошибок"),
+      formatted: ruPlural(value, "отформатирован", "отформатировано", "отформатировано"),
+    }[key] || status[key];
+
+    return countLabel(value, label);
+  }
+
+  function checkedLayersItem(count) {
+    const value = Number(count || 0);
+    if (isRu()) return countLabel(value, ruCheckedLayersLabel(value));
+    return countLabel(value, getCopy("result.layersChecked"));
+  }
+
+  function resultChangesLabel(changeCount, layerCount) {
+    const changes = Number(changeCount || 0);
+    const layers = Number(layerCount || 0);
+
+    if (isRu()) {
+      const changeLabel = ruPlural(changes, "изменение", "изменения", "изменений");
+      return `${changeLabel} в ${layers}${NBSP}${ruTextLayerPrepositional(layers)}`;
+    }
+
+    return interpolate(getCopy("result.changesAppliedInLayers"), { count: layers });
+  }
+
+  function getSelectionSignature(message) {
+    const source = message || {};
+    return [
+      source.selectionKey || "",
+      source.targetScope || source.scopeType || "",
+      source.selectedCount || 0,
+      source.textNodeCount || 0,
+      source.availableTextNodeCount || 0,
+      source.skippedHiddenNodeCount || source.hiddenCount || 0,
+      source.skippedLockedNodeCount || source.lockedCount || 0,
+      source.skippedEmptyNodeCount || source.emptyCount || 0,
+      source.skippedNonEditableNodeCount || source.nonEditableCount || 0,
+      source.skippedMissingFontsNodeCount || source.missingFontsCount || 0,
+      source.errorNodeCount || source.errorCount || 0,
+    ].join(":");
   }
 
   function normalizeUiLanguage(value) {
     return value === "ru" || value === "en" ? value : null;
   }
 
+  function normalizeTheme(value) {
+    return value === "light" || value === "dark" || value === "system" ? value : null;
+  }
+
   function getDetectedUiLanguage() {
     const languages = [];
-
-    if (Array.isArray(navigator.languages)) {
-      languages.push(...navigator.languages);
-    }
-
-    if (navigator.language) {
-      languages.push(navigator.language);
-    }
-
-    return languages.some((language) => String(language).toLowerCase().startsWith("ru"))
-      ? "ru"
-      : "en";
+    if (Array.isArray(navigator.languages)) languages.push(...navigator.languages);
+    if (navigator.language) languages.push(navigator.language);
+    return languages.some((language) => String(language).toLowerCase().startsWith("ru")) ? "ru" : "en";
   }
 
   function readStoredUiLanguage() {
-    try {
-      return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY));
-    } catch (error) {
-      return null;
-    }
+    try { return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)); }
+    catch (error) { return null; }
   }
 
   function writeStoredUiLanguage(language) {
-    try {
-      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language);
-    } catch (error) {
-      // Figma plugin UI can still work without localStorage; code.ts also stores this setting.
-    }
+    try { window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language); }
+    catch (error) {}
   }
 
-  function getUiSettings() {
+  function readStoredTheme() {
+    try { return normalizeTheme(window.localStorage.getItem(THEME_STORAGE_KEY)); }
+    catch (error) { return null; }
+  }
+
+  function writeStoredTheme(theme) {
+    try { window.localStorage.setItem(THEME_STORAGE_KEY, theme); }
+    catch (error) {}
+  }
+
+  function getSystemTheme() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  function applyTheme() {
+    const effectiveTheme = state.theme === "system" ? getSystemTheme() : state.theme;
+    document.documentElement.dataset.theme = effectiveTheme;
+  }
+
+  function getDefaultQuoteOptions() {
     return {
-      uiLanguage: currentUiLanguage,
-    };
-  }
-
-  function setTextContent(element, value) {
-    if (element) {
-      element.textContent = value;
-    }
-  }
-
-  function setSelectOptionText(select, value, text) {
-    const option = select ? select.querySelector(`option[value="${value}"]`) : null;
-
-    if (option) {
-      option.textContent = text;
-    }
-  }
-
-  function setRuleCopy(checkbox, title, tag, description) {
-    const rule = checkbox.closest(".rule");
-
-    if (!rule) {
-      return;
-    }
-
-    const titleElement = rule.querySelector(".rule-title");
-    const descriptionElement = rule.querySelector(".rule-description");
-
-    if (titleElement) {
-      titleElement.innerHTML = `${title} <span class="tag">${tag}</span>`;
-    }
-
-    if (descriptionElement) {
-      descriptionElement.textContent = description;
-    }
-  }
-
-  function setRuleGroupCopy(groupIndex, title, description) {
-    const group = document.querySelectorAll(".rule-group")[groupIndex];
-
-    if (!group) {
-      return;
-    }
-
-    const labelParts = group.querySelectorAll(".rule-group-label span");
-
-    if (labelParts[0]) {
-      labelParts[0].textContent = title;
-    }
-
-    if (labelParts[1]) {
-      labelParts[1].textContent = description;
-    }
-  }
-
-  function applyQuoteOptionTranslations(select) {
-    setSelectOptionText(select, "frenchGuillemets", t("frenchGuillemets"));
-    setSelectOptionText(select, "germanLowHigh", t("germanLowHigh"));
-    setSelectOptionText(select, "englishDouble", t("englishDouble"));
-    setSelectOptionText(select, "programmerDouble", t("programmerDouble"));
-    setSelectOptionText(select, "englishSingle", t("englishSingle"));
-    setSelectOptionText(select, "englishSingleReversed", t("englishSingleReversed"));
-  }
-
-  function applyInterfaceLanguage() {
-    document.documentElement.lang = currentUiLanguage;
-
-    setTextContent(document.querySelector("h1"), t("appTitle"));
-    setTextContent(document.querySelector(".eyebrow"), t("eyebrow"));
-    setTextContent(document.querySelectorAll(".section-title")[0], t("basicSettings"));
-    setTextContent(document.querySelectorAll(".section-title")[1], t("rules"));
-
-    const settingsCards = document.querySelectorAll(".settings-card");
-    setTextContent(settingsCards[0]?.querySelector(".settings-card-title"), t("interfaceLanguage"));
-    setTextContent(settingsCards[0]?.querySelector(".hint"), t("interfaceLanguageHint"));
-    setTextContent(settingsCards[1]?.querySelector(".settings-card-title"), t("textLanguage"));
-    setTextContent(settingsCards[1]?.querySelector(".hint"), t("textLanguageHint"));
-    setTextContent(settingsCards[2]?.querySelector(".settings-card-title"), t("nbspStyle"));
-    setTextContent(settingsCards[2]?.querySelector(".hint"), t("nbspHint"));
-
-    setSelectOptionText(uiLanguageModeSelect, "ru", t("uiLanguageRu"));
-    setSelectOptionText(uiLanguageModeSelect, "en", t("uiLanguageEn"));
-    setSelectOptionText(languageModeSelect, "auto", t("autoDetect"));
-    setSelectOptionText(languageModeSelect, "ru", t("russian"));
-    setSelectOptionText(languageModeSelect, "en", t("english"));
-    setSelectOptionText(nonBreakingSpaceStyleSelect, "regular", t("nbspRegular"));
-    setSelectOptionText(nonBreakingSpaceStyleSelect, "narrow", t("nbspNarrow"));
-
-    setTextContent(document.querySelector(".quote-details summary"), t("quoteStyles"));
-    const subsectionTitles = document.querySelectorAll(".subsection-title");
-    setTextContent(subsectionTitles[0], t("russianQuotesHeading"));
-    setTextContent(subsectionTitles[1], t("englishQuotesHeading"));
-    document.querySelectorAll(".field-label").forEach((label, index) => {
-      label.textContent = index % 2 === 0 ? t("firstLevelQuotes") : t("secondLevelQuotes");
-    });
-
-    applyQuoteOptionTranslations(ruPrimaryQuoteStyleSelect);
-    applyQuoteOptionTranslations(ruSecondaryQuoteStyleSelect);
-    applyQuoteOptionTranslations(enPrimaryQuoteStyleSelect);
-    applyQuoteOptionTranslations(enSecondaryQuoteStyleSelect);
-    setTextContent(document.querySelector(".quote-content .hint"), t("quoteDefaultsHint"));
-
-    selectAllRulesButton.textContent = t("selectAllRules");
-    deselectAllRulesButton.textContent = t("deselectAllRules");
-    resetDefaultsButton.textContent = t("resetDefaults");
-
-    const groups = t("groups");
-    setRuleGroupCopy(0, groups.cleanup[0], groups.cleanup[1]);
-    setRuleGroupCopy(1, groups.numbers[0], groups.numbers[1]);
-    setRuleGroupCopy(2, groups.quotes[0], groups.quotes[1]);
-    setRuleGroupCopy(3, groups.russianTypography[0], groups.russianTypography[1]);
-    setRuleGroupCopy(4, groups.uiText[0], groups.uiText[1]);
-
-    const allTag = t("allTag");
-    const russianTag = t("russianTag");
-    const englishTag = t("englishTag");
-    const ruEnTag = t("ruEnTag");
-    const titles = t("ruleTitles");
-    const descriptions = t("ruleDescriptions");
-
-    setRuleCopy(invisibleCopyArtifactsCheckbox, titles.invisibleCopyArtifacts, allTag, descriptions.invisibleCopyArtifacts);
-    setRuleCopy(tabsCheckbox, titles.tabs, allTag, descriptions.tabs);
-    setRuleCopy(manualLineBreaksCheckbox, titles.manualLineBreaks, allTag, descriptions.manualLineBreaks);
-    setRuleCopy(ellipsisCheckbox, titles.ellipsis, allTag, descriptions.ellipsis);
-    setRuleCopy(extraSpacesCheckbox, titles.extraSpaces, allTag, descriptions.extraSpaces);
-    setRuleCopy(trimTextEdgesCheckbox, titles.trimTextEdges, allTag, descriptions.trimTextEdges);
-    setRuleCopy(spacingCleanupCheckbox, titles.spacingCleanup, allTag, descriptions.spacingCleanup);
-    setRuleCopy(percentSignNoSpaceCheckbox, titles.percentSignNoSpace, allTag, descriptions.percentSignNoSpace);
-    setRuleCopy(numberUnitsNbspCheckbox, titles.numberUnitsNbsp, allTag, descriptions.numberUnitsNbsp);
-    setRuleCopy(numberSignsCheckbox, titles.numberSigns, allTag, descriptions.numberSigns);
-    setRuleCopy(specialSymbolsCheckbox, titles.specialSymbols, allTag, descriptions.specialSymbols);
-    setRuleCopy(englishApostrophesCheckbox, titles.englishApostrophes, englishTag, descriptions.englishApostrophes);
-    setRuleCopy(englishQuotesCheckbox, titles.englishQuotes, englishTag, descriptions.englishQuotes);
-    setRuleCopy(russianQuotesCheckbox, titles.russianQuotes, russianTag, descriptions.russianQuotes);
-    setRuleCopy(numberRangeDashCheckbox, titles.numberRangeDash, allTag, descriptions.numberRangeDash);
-    setRuleCopy(russianSentenceDashCheckbox, titles.russianSentenceDash, russianTag, descriptions.russianSentenceDash);
-    setRuleCopy(russianShortWordsNbspCheckbox, titles.russianShortWordsNbsp, russianTag, descriptions.russianShortWordsNbsp);
-    setRuleCopy(russianInitialsNbspCheckbox, titles.russianInitialsNbsp, russianTag, descriptions.russianInitialsNbsp);
-    setRuleCopy(russianNumericAbbreviationsCheckbox, titles.russianNumericAbbreviations, russianTag, descriptions.russianNumericAbbreviations);
-    setRuleCopy(russianLargeNumbersCheckbox, titles.russianLargeNumbers, russianTag, descriptions.russianLargeNumbers);
-    setRuleCopy(uiFinalPeriodCheckbox, titles.uiFinalPeriod, ruEnTag, descriptions.uiFinalPeriod);
-
-    setTextContent(document.querySelector(".protection-note"), t("protectionNote"));
-    closeButton.textContent = t("close");
-
-    if (!lastSelectionInfoMessage) {
-      summary.textContent = t("checkingSelection");
-    }
-
-    if (lastSelectionInfoMessage) {
-      renderSelectionInfo(lastSelectionInfoMessage);
-    }
-
-    if (lastApplyResultMessage) {
-      renderApplyResult(lastApplyResultMessage);
-    }
-
-    updateApplyButtonState();
-  }
-
-  function saveCurrentUiSettings() {
-    writeStoredUiLanguage(currentUiLanguage);
-
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "save-ui-settings",
-          uiSettings: getUiSettings(),
-        },
+      ru: {
+        primaryQuoteStyle: "frenchGuillemets",
+        secondaryQuoteStyle: "germanLowHigh",
       },
-      "*"
-    );
-  }
-
-  function handleUiLanguageChange() {
-    currentUiLanguage = normalizeUiLanguage(uiLanguageModeSelect.value) || getDetectedUiLanguage();
-    uiLanguageModeSelect.value = currentUiLanguage;
-    saveCurrentUiSettings();
-    applyInterfaceLanguage();
-  }
-
-  function getRuleCheckboxes() {
-    return [
-      invisibleCopyArtifactsCheckbox,
-      tabsCheckbox,
-      manualLineBreaksCheckbox,
-      ellipsisCheckbox,
-      extraSpacesCheckbox,
-      trimTextEdgesCheckbox,
-      spacingCleanupCheckbox,
-      percentSignNoSpaceCheckbox,
-      numberUnitsNbspCheckbox,
-      numberSignsCheckbox,
-      specialSymbolsCheckbox,
-      englishApostrophesCheckbox,
-      englishQuotesCheckbox,
-      russianQuotesCheckbox,
-      numberRangeDashCheckbox,
-      russianSentenceDashCheckbox,
-      russianShortWordsNbspCheckbox,
-      russianInitialsNbspCheckbox,
-      russianNumericAbbreviationsCheckbox,
-      russianLargeNumbersCheckbox,
-      uiFinalPeriodCheckbox,
-    ];
-  }
-
-  function getEnabledRules() {
-    return {
-      invisibleCopyArtifacts: invisibleCopyArtifactsCheckbox.checked,
-      tabs: tabsCheckbox.checked,
-      manualLineBreaks: manualLineBreaksCheckbox.checked,
-      ellipsis: ellipsisCheckbox.checked,
-      extraSpaces: extraSpacesCheckbox.checked,
-      trimTextEdges: trimTextEdgesCheckbox.checked,
-      spacingCleanup: spacingCleanupCheckbox.checked,
-      percentSignNoSpace: percentSignNoSpaceCheckbox.checked,
-      numberUnitsNbsp: numberUnitsNbspCheckbox.checked,
-      numberSigns: numberSignsCheckbox.checked,
-      specialSymbols: specialSymbolsCheckbox.checked,
-      englishApostrophes: englishApostrophesCheckbox.checked,
-      englishQuotes: englishQuotesCheckbox.checked,
-      russianQuotes: russianQuotesCheckbox.checked,
-      numberRangeDash: numberRangeDashCheckbox.checked,
-      russianSentenceDash: russianSentenceDashCheckbox.checked,
-      russianShortWordsNbsp: russianShortWordsNbspCheckbox.checked,
-      russianInitialsNbsp: russianInitialsNbspCheckbox.checked,
-      russianNumericAbbreviations: russianNumericAbbreviationsCheckbox.checked,
-      russianLargeNumbers: russianLargeNumbersCheckbox.checked,
-      uiFinalPeriod: uiFinalPeriodCheckbox.checked,
-    };
-  }
-
-  function getOptions() {
-    return {
-      nonBreakingSpaceStyle: nonBreakingSpaceStyleSelect.value,
-      quoteOptions: {
-        ru: {
-          primaryQuoteStyle: ruPrimaryQuoteStyleSelect.value,
-          secondaryQuoteStyle: ruSecondaryQuoteStyleSelect.value,
-        },
-        en: {
-          primaryQuoteStyle: enPrimaryQuoteStyleSelect.value,
-          secondaryQuoteStyle: enSecondaryQuoteStyleSelect.value,
-        },
+      en: {
+        primaryQuoteStyle: "englishDouble",
+        secondaryQuoteStyle: "englishSingle",
       },
     };
+  }
+
+  function getDefaultEnabledRules(languageMode) {
+    const enabledRules = {};
+    ruleDefinitions.forEach((rule) => { enabledRules[rule.id] = true; });
+
+    if (languageMode === "ru") {
+      enabledRules.englishApostrophes = false;
+      enabledRules.englishQuotes = false;
+    }
+
+    if (languageMode === "en") {
+      enabledRules.russianQuotes = false;
+      enabledRules.russianSentenceDash = false;
+      enabledRules.russianShortWordsNbsp = false;
+      enabledRules.russianInitialsNbsp = false;
+      enabledRules.russianNumericAbbreviations = false;
+      enabledRules.russianLargeNumbers = false;
+    }
+
+    return enabledRules;
   }
 
   function getSettings() {
     return {
-      languageMode: languageModeSelect.value,
-      options: getOptions(),
-      enabledRules: getEnabledRules(),
+      languageMode: state.languageMode,
+      options: state.options,
+      enabledRules: state.enabledRules,
     };
   }
 
-  function applySettingsToUi(settings) {
-    const options = settings.options || {};
-    const quoteOptions = options.quoteOptions || {};
-    const ruQuoteOptions = quoteOptions.ru || {};
-    const enQuoteOptions = quoteOptions.en || {};
-
-    languageModeSelect.value = settings.languageMode || "auto";
-    nonBreakingSpaceStyleSelect.value = options.nonBreakingSpaceStyle || "regular";
-
-    ruPrimaryQuoteStyleSelect.value =
-      ruQuoteOptions.primaryQuoteStyle || "frenchGuillemets";
-
-    ruSecondaryQuoteStyleSelect.value =
-      ruQuoteOptions.secondaryQuoteStyle || "germanLowHigh";
-
-    enPrimaryQuoteStyleSelect.value =
-      enQuoteOptions.primaryQuoteStyle || "englishDouble";
-
-    enSecondaryQuoteStyleSelect.value =
-      enQuoteOptions.secondaryQuoteStyle || "englishSingle";
-
-    invisibleCopyArtifactsCheckbox.checked = settings.enabledRules.invisibleCopyArtifacts;
-    tabsCheckbox.checked = settings.enabledRules.tabs;
-    manualLineBreaksCheckbox.checked =
-      settings.enabledRules.manualLineBreaks !== undefined
-        ? settings.enabledRules.manualLineBreaks
-        : true;
-    ellipsisCheckbox.checked = settings.enabledRules.ellipsis;
-    extraSpacesCheckbox.checked = settings.enabledRules.extraSpaces;
-    trimTextEdgesCheckbox.checked = settings.enabledRules.trimTextEdges;
-    spacingCleanupCheckbox.checked =
-      settings.enabledRules.spacingCleanup !== undefined
-        ? settings.enabledRules.spacingCleanup
-        : settings.enabledRules.spacesBeforePunctuation !== false ||
-          settings.enabledRules.spacesAfterPunctuation === true;
-    percentSignNoSpaceCheckbox.checked = settings.enabledRules.percentSignNoSpace;
-    numberUnitsNbspCheckbox.checked = settings.enabledRules.numberUnitsNbsp;
-    numberSignsCheckbox.checked =
-      settings.enabledRules.numberSigns !== undefined
-        ? settings.enabledRules.numberSigns
-        : true;
-    specialSymbolsCheckbox.checked = settings.enabledRules.specialSymbols;
-    englishApostrophesCheckbox.checked =
-      settings.enabledRules.englishApostrophes !== undefined
-        ? settings.enabledRules.englishApostrophes
-        : true;
-    englishQuotesCheckbox.checked = settings.enabledRules.englishQuotes;
-    russianQuotesCheckbox.checked = settings.enabledRules.russianQuotes;
-    numberRangeDashCheckbox.checked =
-      settings.enabledRules.numberRangeDash !== undefined
-        ? settings.enabledRules.numberRangeDash
-        : settings.enabledRules.russianNumberRangeDash !== undefined
-          ? settings.enabledRules.russianNumberRangeDash
-          : true;
-    russianSentenceDashCheckbox.checked = settings.enabledRules.russianSentenceDash;
-    russianShortWordsNbspCheckbox.checked = settings.enabledRules.russianShortWordsNbsp;
-    russianInitialsNbspCheckbox.checked = settings.enabledRules.russianInitialsNbsp;
-    russianNumericAbbreviationsCheckbox.checked = settings.enabledRules.russianNumericAbbreviations;
-    russianLargeNumbersCheckbox.checked = settings.enabledRules.russianLargeNumbers;
-    uiFinalPeriodCheckbox.checked = settings.enabledRules.uiFinalPeriod;
+  function getUiSettings() {
+    return {
+      uiLanguage: state.uiLanguage,
+      theme: state.theme,
+    };
   }
 
-  function hasEnabledRules() {
-    const enabledRules = getEnabledRules();
-
-    return (
-      enabledRules.invisibleCopyArtifacts ||
-      enabledRules.tabs ||
-      enabledRules.manualLineBreaks ||
-      enabledRules.ellipsis ||
-      enabledRules.extraSpaces ||
-      enabledRules.trimTextEdges ||
-      enabledRules.spacingCleanup ||
-      enabledRules.percentSignNoSpace ||
-      enabledRules.numberUnitsNbsp ||
-      enabledRules.numberSigns ||
-      enabledRules.specialSymbols ||
-      enabledRules.englishApostrophes ||
-      enabledRules.englishQuotes ||
-      enabledRules.russianQuotes ||
-      enabledRules.numberRangeDash ||
-      enabledRules.russianSentenceDash ||
-      enabledRules.russianShortWordsNbsp ||
-      enabledRules.russianInitialsNbsp ||
-      enabledRules.russianNumericAbbreviations ||
-      enabledRules.russianLargeNumbers ||
-      enabledRules.uiFinalPeriod
-    );
-  }
-
-  function updateApplyButtonState() {
-    applyButton.disabled = isLoadingSettings || !hasTextLayers || !hasEnabledRules();
-    applyButton.textContent = currentTargetScope === "currentPage" ? t("applyToCurrentPage") : t("applyFormatting");
+  function saveCurrentUiSettings() {
+    writeStoredUiLanguage(state.uiLanguage);
+    writeStoredTheme(state.theme);
+    parent.postMessage({ pluginMessage: { type: "save-ui-settings", uiSettings: getUiSettings() } }, "*");
   }
 
   function saveCurrentSettings() {
-    if (isLoadingSettings) {
-      return;
+    if (state.isLoadingSettings) return;
+    parent.postMessage({ pluginMessage: { type: "save-settings", settings: getSettings() } }, "*");
+  }
+
+  function hasEnabledRules() {
+    return Object.values(state.enabledRules).some(Boolean);
+  }
+
+  function enabledRulesCount() {
+    return ruleDefinitions.filter((rule) => state.enabledRules[rule.id]).length;
+  }
+
+  function totalRulesCount() {
+    return ruleDefinitions.length;
+  }
+
+  function enabledRulesInGroup(groupId) {
+    return ruleDefinitions.filter((rule) => rule.group === groupId && state.enabledRules[rule.id]).length;
+  }
+
+  function totalRulesInGroup(groupId) {
+    return ruleDefinitions.filter((rule) => rule.group === groupId).length;
+  }
+
+
+  function setNumberContent(element, value) {
+    if (!element) return;
+    const text = String(value);
+    element.textContent = text;
+    element.dataset.digits = String(text.replace(/\D/g, "").length || text.length);
+  }
+
+  function createElement(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+  }
+
+  function createSwitch(stateName, animationKey = "") {
+    const switchElement = createElement("span", `switch ${stateName || ""}`.trim());
+    switchElement.setAttribute("aria-hidden", "true");
+    if (animationKey && state.animatedSwitchKeys.includes(animationKey)) {
+      switchElement.classList.add("is-animating");
     }
-
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "save-settings",
-          settings: getSettings(),
-        },
-      },
-      "*"
-    );
+    return switchElement;
   }
 
-  function handleSettingsChange() {
-    result.textContent = "";
-    lastApplyResultMessage = null;
-    updateApplyButtonState();
+  function getGroupSwitchState(groupId) {
+    const enabled = enabledRulesInGroup(groupId);
+    const total = totalRulesInGroup(groupId);
+    if (enabled === 0) return "is-off";
+    if (enabled === total) return "is-on";
+    return "is-mixed";
+  }
+
+  function setGroupEnabled(groupId, enabled) {
+    ruleDefinitions.filter((rule) => rule.group === groupId).forEach((rule) => {
+      state.enabledRules[rule.id] = enabled;
+    });
     saveCurrentSettings();
+    render();
   }
 
-  function formatLanguageStats(languageStats) {
-    return interpolate(t("detectedLayers"), {
-      ru: languageStats.ru,
-      en: languageStats.en,
-      unknown: languageStats.unknown,
+  function renderStatusRows(container, rows) {
+    container.textContent = "";
+
+    rows.filter((row) => row.length > 0).forEach((row) => {
+      const rowElement = createElement("div", "summary-row");
+
+      row.forEach((item, index) => {
+        const tokenElement = createElement("span", "summary-token");
+        const previousItem = index > 0 ? String(row[index - 1] || "") : "";
+
+        if (index > 0 && !previousItem.endsWith(":")) {
+          tokenElement.appendChild(createElement("span", "summary-separator", "·"));
+        }
+
+        tokenElement.appendChild(createElement("span", "summary-item", item));
+        rowElement.appendChild(tokenElement);
+      });
+
+      container.appendChild(rowElement);
     });
   }
 
-  function formatSkippedDetails(message) {
-    const parts = [];
+  function getSelectionInfo() {
+    const message = state.lastSelectionInfoMessage || {};
+    const targetScope = message.targetScope === "currentPage" ? "currentPage" : "selection";
+    const reportedScopeType = message.scopeType;
+    const scopeType = ["currentPage", "textLayer", "frame", "section", "group", "selectedLayers", "selection"].includes(reportedScopeType)
+      ? reportedScopeType
+      : (targetScope === "currentPage" ? "currentPage" : "selectedLayers");
+    const textNodeCount = Number(message.textNodeCount || 0);
+    const availableTextNodeCount = Number(message.availableTextNodeCount || 0);
 
-    if (message.skippedHiddenNodeCount) {
-      parts.push(`${t("skippedHidden")}: ${message.skippedHiddenNodeCount}`);
-    }
-
-    if (message.skippedLockedNodeCount) {
-      parts.push(`${t("skippedLocked")}: ${message.skippedLockedNodeCount}`);
-    }
-
-    if (message.skippedEmptyNodeCount) {
-      parts.push(`${t("skippedEmpty")}: ${message.skippedEmptyNodeCount}`);
-    }
-
-    if (message.skippedNonEditableNodeCount) {
-      parts.push(`${t("skippedNonEditable")}: ${message.skippedNonEditableNodeCount}`);
-    }
-
-    if (message.errorNodeCount) {
-      parts.push(`${t("skippedErrors")}: ${message.errorNodeCount}`);
-    }
-
-    return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+    return {
+      targetScope,
+      scopeType,
+      foundCount: textNodeCount,
+      availableCount: availableTextNodeCount,
+      lockedCount: Number(message.skippedLockedNodeCount || message.lockedCount || 0),
+      hiddenCount: Number(message.skippedHiddenNodeCount || message.hiddenCount || 0),
+      emptyCount: Number(message.skippedEmptyNodeCount || message.emptyCount || 0),
+      nonEditableCount: Number(message.skippedNonEditableNodeCount || message.nonEditableCount || 0),
+      missingFontsCount: Number(message.skippedMissingFontsNodeCount || message.missingFontsCount || 0),
+      errorCount: Number(message.errorNodeCount || message.errorCount || 0),
+    };
   }
 
-  function formatTargetScope(targetScope) {
-    return targetScope === "currentPage" ? t("currentPage") : t("selection");
+  function makeSkippedItems(info, mode) {
+    const status = getCopy("status");
+    const items = [];
+
+    if (info.emptyCount) items.push(statusItem("empty", info.emptyCount));
+    if (info.nonEditableCount) items.push(statusItem("nonEditable", info.nonEditableCount));
+    if (info.missingFontsCount) items.push(statusItem("missingFonts", info.missingFontsCount));
+    if (info.lockedCount) items.push(statusItem("locked", info.lockedCount));
+    if (info.hiddenCount) items.push(statusItem("hidden", info.hiddenCount));
+    if (info.errorCount) items.push(statusItem("error", info.errorCount));
+
+    if (mode === "main") {
+      return items;
+    }
+
+    return items;
   }
 
-  function renderSelectionInfo(message) {
-    currentTargetScope = message.targetScope || "selection";
-    currentAvailableTextNodeCount = message.availableTextNodeCount || 0;
-    hasTextLayers = currentAvailableTextNodeCount > 0;
+  function buildMainStatusRows(info) {
+    const status = getCopy("status");
+    const items = [];
 
-    const skippedDetails = formatSkippedDetails(message);
+    if (info.foundCount) items.push(statusItem("found", info.foundCount));
+    if (info.availableCount || info.foundCount) items.push(statusItem("available", info.availableCount));
 
-    if (currentTargetScope === "currentPage") {
-      if (message.textNodeCount === 0) {
-        summary.textContent = t("nothingSelectedNoText");
-        updateApplyButtonState();
+    if (info.lockedCount) items.push(statusItem("locked", info.lockedCount));
+    if (info.hiddenCount) items.push(statusItem("hidden", info.hiddenCount));
+    if (info.emptyCount) items.push(statusItem("empty", info.emptyCount));
+    if (info.nonEditableCount) items.push(statusItem("nonEditable", info.nonEditableCount));
+    if (info.missingFontsCount) items.push(statusItem("missingFonts", info.missingFontsCount));
+    if (info.errorCount) items.push(statusItem("error", info.errorCount));
+
+    if (items.length <= 3) return [items];
+
+    const errorItems = info.errorCount ? [items[items.length - 1]] : [];
+    const mainItems = info.errorCount ? items.slice(0, -1) : items;
+    return errorItems.length ? [mainItems, errorItems] : [mainItems];
+  }
+
+  function formatScope(info) {
+    const scope = getCopy("scope");
+    if (info.scopeType === "currentPage") return scope.currentPage;
+    if (info.scopeType === "textLayer") return scope.textLayer;
+    if (info.scopeType === "frame") return scope.frame;
+    if (info.scopeType === "section") return scope.section;
+    if (info.scopeType === "group") return scope.group;
+    return scope.selection;
+  }
+
+  function getHeroCount(info) {
+    return info.availableCount;
+  }
+
+  function getHeroLabel(info) {
+    if (info.foundCount > 0 && info.availableCount === 0) {
+      return getCopy("main.noAvailable");
+    }
+
+    if (isRu()) {
+      const count = Number(info.availableCount || 0);
+      const subject = ruTextLayerSubject(count);
+      const ready = ruReadyVerb(count);
+
+      if (!hasEnabledRules() && count > 0) return `${subject} ${ready} — но правила выключены`;
+      if (info.scopeType === "currentPage") {
+        return count > 0 ? `${subject} на странице ${ready} к типографированию` : `${subject} на странице`;
+      }
+      return count > 0 ? `${subject} ${ready} к типографированию` : `${subject} в области`;
+    }
+
+    if (!hasEnabledRules() && info.availableCount > 0) return getCopy("main.noRules");
+    if (info.scopeType === "currentPage") {
+      return info.availableCount > 0 ? getCopy("main.readyOnPage") : getCopy("main.noTextPage");
+    }
+    return info.availableCount > 0 ? getCopy("main.ready") : getCopy("main.noTextSelection");
+  }
+
+  function setActivePanel(panel) {
+    state.activePanel = panel;
+    if (panel !== "rules") state.openRuleGroup = null;
+    render();
+  }
+
+  function setView(view) {
+    state.view = view;
+    render();
+  }
+
+  function renderText() {
+    document.documentElement.lang = state.uiLanguage;
+    document.querySelectorAll("[data-i18n]").forEach((node) => {
+      node.textContent = getCopy(node.dataset.i18n);
+    });
+
+    document.querySelectorAll('[data-segment-group="languageMode"] .segment[data-value="auto"]').forEach((node) => {
+      node.textContent = state.uiLanguage === "ru" ? "Авто" : "Auto";
+    });
+    document.querySelectorAll('[data-segment-group="theme"] .segment[data-value="light"]').forEach((node) => {
+      node.textContent = state.uiLanguage === "ru" ? "Светлая" : "Light";
+    });
+    document.querySelectorAll('[data-segment-group="theme"] .segment[data-value="dark"]').forEach((node) => {
+      node.textContent = state.uiLanguage === "ru" ? "Тёмная" : "Dark";
+    });
+    document.querySelectorAll('[data-segment-group="theme"] .segment[data-value="system"]').forEach((node) => {
+      node.textContent = state.uiLanguage === "ru" ? "Системная" : "System";
+    });
+  }
+
+  function renderSegments() {
+    document.querySelectorAll(".segments").forEach((group) => {
+      const groupName = group.dataset.segmentGroup;
+      const value = groupName === "uiLanguage"
+        ? state.uiLanguage
+        : (groupName === "nonBreakingSpaceStyle" ? state.options.nonBreakingSpaceStyle : state[groupName]);
+      group.querySelectorAll(".segment").forEach((segment) => {
+        segment.classList.toggle("is-active", segment.dataset.value === value);
+      });
+    });
+  }
+
+  function getRuleExample(ruleId) {
+    const rules = getCopy("rules");
+    const value = rules && rules[ruleId];
+    if (Array.isArray(value) && value[2]) return value[2];
+    if (Array.isArray(value) && value[1]) return value[1];
+    return "";
+  }
+
+  function appendExamplePart(container, text, highlighted) {
+    const span = createElement("span", highlighted ? "example-highlight" : "", text);
+    container.appendChild(span);
+  }
+
+  function renderExample(ruleId, container) {
+    container.textContent = "";
+    const ru = isRu();
+    const text = (...parts) => appendInlineParts(container, parts);
+    const added = (value) => ({ text: value, highlight: true });
+    const removed = (value) => ({ text: value, kind: "removed" });
+    const strong = (value) => ({ text: value, highlight: false });
+
+    switch (ruleId) {
+      case "invisibleCopyArtifacts":
+        text(ru ? "убирает мусор после вставки" : "removes paste leftovers");
+        return;
+      case "tabs":
+        text(ru ? "таб → пробел" : "tab → space");
+        return;
+      case "manualLineBreaks":
+        text(ru ? "Привет" : "Hello", removed("↵"), ru ? "мир → Привет мир" : "world → Hello world");
+        return;
+      case "ellipsis":
+        text(ru ? "Подожди... → Подожди" : "Wait... → Wait", added("…"));
+        return;
+      case "extraSpaces":
+        text(ru ? "Привет" : "Hello", removed("···"), ru ? "мир → Привет мир" : "world → Hello world");
+        return;
+      case "trimTextEdges":
+        text(removed("··"), "2024 → 2024");
+        return;
+      case "spacingCleanup":
+        text(ru ? "Привет" : "Hello", removed("·"), ru ? ", мир" : ", world", removed("·"), ru ? "! → Привет, мир!" : "! → Hello, world!");
+        return;
+      case "percentSignNoSpace":
+        text("50", removed("·"), "% → 50%");
+        return;
+      case "numberUnitsNbsp":
+        text(ru ? "300 МБ → 300" : "300 MB → 300", added("‿"), ru ? "МБ" : "MB");
+        return;
+      case "numberSigns":
+        text("№ 8 → №", added("‿"), "8");
+        return;
+      case "specialSymbols":
+        text("1/2 → ", added("½"), "  ·  >= → ", added("≥"));
+        return;
+      case "numberRangeDash":
+        text("10-20 → 10", added("–"), "20");
+        return;
+      case "englishApostrophes":
+        text("It's good → ", strong("It"), added("’"), strong("s good"));
+        return;
+      case "russianQuotes":
+        text('"Привет" → ', added("«"), strong("Привет"), added("»"));
+        return;
+      case "englishQuotes":
+        text('"Hello" → ', added("“"), strong("Hello"), added("”"));
+        return;
+      case "russianSentenceDash":
+        text("Это - дом → Это ", added("—"), " дом");
+        return;
+      case "russianShortWordsNbsp":
+        text("о проекте → о", added("‿"), "проекте · т. е. → т.", added("‿"), "е.");
+        return;
+      case "russianInitialsNbsp":
+        text("А. С. Пушкин → А.", added("‿"), "С.", added("‿"), "Пушкин");
+        return;
+      case "russianNumericAbbreviations":
+        text("10 тыс → 10", added("‿"), "тыс.");
+        return;
+      case "russianLargeNumbers":
+        text("2132128 → 2", added("‿"), "132", added("‿"), "128");
+        return;
+      case "uiFinalPeriod":
+        text(ru ? "Сохранено" : "Saved", removed("."), ru ? " → Сохранено" : " → Saved");
+        return;
+      default:
+        container.textContent = getRuleExample(ruleId);
+    }
+  }
+
+  function renderQuoteStyleRow(language, level) {
+    const settingsCopy = getCopy("quoteSettings");
+    const row = createElement("div", "quote-setting-row");
+    const labelKey = level === "primaryQuoteStyle" ? "firstLevel" : "secondLevel";
+    const label = createElement("div", "quote-setting-label", settingsCopy[labelKey]);
+    const options = createElement("div", "quote-options");
+    const currentValue = state.options?.quoteOptions?.[language]?.[level];
+
+    quoteStyleOptions.forEach((option) => {
+      const button = createElement("button", "quote-option", option.label);
+      button.type = "button";
+      button.classList.toggle("is-active", option.id === currentValue);
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.options.quoteOptions = state.options.quoteOptions || {};
+        state.options.quoteOptions[language] = state.options.quoteOptions[language] || {};
+        state.options.quoteOptions[language][level] = option.id;
+        saveCurrentSettings();
+        render();
+      };
+      options.appendChild(button);
+    });
+
+    row.append(label, options);
+    return row;
+  }
+
+  function appendInlineParts(container, parts) {
+    parts.forEach((part) => {
+      if (typeof part === "string") {
+        container.appendChild(document.createTextNode(part));
         return;
       }
 
-      summary.textContent = interpolate(t("nothingSelectedPageTextLayers"), {
-        textNodeCount: message.textNodeCount,
-        availableTextNodeCount: message.availableTextNodeCount,
-        skippedDetails,
-      });
-      updateApplyButtonState();
-      return;
-    }
-
-    if (message.textNodeCount === 0) {
-      summary.textContent = interpolate(t("selectedNoText"), {
-        selectedCount: message.selectedCount,
-      });
-      updateApplyButtonState();
-      return;
-    }
-
-    summary.textContent = interpolate(t("selectedTextLayers"), {
-      selectedCount: message.selectedCount,
-      textNodeCount: message.textNodeCount,
-      availableTextNodeCount: message.availableTextNodeCount,
-      skippedDetails,
+      const className = part.kind === "removed"
+        ? "example-highlight is-removed"
+        : (part.highlight ? "example-highlight" : "example-strong");
+      container.appendChild(createElement("span", className, part.text));
     });
-    updateApplyButtonState();
   }
 
-  function renderApplyResult(message) {
-    const skippedDetails = formatSkippedDetails(message);
+  function getSelectedQuotePair(language, level) {
+    const selectedId = state.options?.quoteOptions?.[language]?.[level];
+    const selected = quoteStyleOptions.find((option) => option.id === selectedId);
+    if (selected) return selected.sample;
 
-    result.textContent =
-      `${formatTargetScope(message.targetScope)} · ` +
-      `${t("textLayers")}: ${message.totalTextNodeCount}. ` +
-      `${t("changed")}: ${message.changedNodeCount}. ` +
-      `${t("unchanged")}: ${message.unchangedNodeCount}. ` +
-      `${t("skipped")}: ${message.skippedNodeCount}${skippedDetails}. ` +
-      `${t("replacements")}: ${message.totalReplacementCount}. ` +
-      `${t("rulesSkippedByLanguage")}: ${message.skippedRuleCount}. ` +
-      formatLanguageStats(message.languageStats);
+    const fallbackId = language === "ru"
+      ? (level === "primaryQuoteStyle" ? "frenchGuillemets" : "germanLowHigh")
+      : (level === "primaryQuoteStyle" ? "englishDouble" : "englishSingle");
+    return quoteStyleOptions.find((option) => option.id === fallbackId)?.sample || ['"', '"'];
   }
+
+  function renderQuoteResult(language) {
+    const settingsCopy = getCopy("quoteSettings");
+    const result = createElement("div", "quote-settings-note");
+    const [outerOpen, outerClose] = getSelectedQuotePair(language, "primaryQuoteStyle");
+    const [innerOpen, innerClose] = getSelectedQuotePair(language, "secondaryQuoteStyle");
+
+    if (language === "ru") {
+      appendInlineParts(result, [
+        `${settingsCopy.result} `,
+        { text: `${outerOpen}Цитата `, highlight: false },
+        { text: `${innerOpen}внутри${innerClose}`, highlight: true },
+        { text: ` цитаты${outerClose}`, highlight: false },
+      ]);
+    } else {
+      appendInlineParts(result, [
+        `${settingsCopy.result} `,
+        { text: `${outerOpen}A `, highlight: false },
+        { text: `${innerOpen}nested${innerClose}`, highlight: true },
+        { text: ` quote${outerClose}`, highlight: false },
+      ]);
+    }
+    return result;
+  }
+
+  function renderQuoteSettings(language, enabled = true) {
+    const block = createElement("div", "quote-settings");
+    block.dataset.language = language;
+    block.classList.toggle("is-disabled", !enabled);
+    block.appendChild(renderQuoteStyleRow(language, "primaryQuoteStyle"));
+    block.appendChild(renderQuoteStyleRow(language, "secondaryQuoteStyle"));
+    block.appendChild(renderQuoteResult(language));
+    return block;
+  }
+
+  function setOpenRuleGroup(nextGroupId) {
+    state.openRuleGroup = nextGroupId;
+    elements.app.dataset.openGroup = nextGroupId || "none";
+    elements.app.dataset.rulesMode = nextGroupId ? "group" : "closed";
+
+    elements.ruleGroups.querySelectorAll(".group").forEach((group) => {
+      const isOpen = group.dataset.groupId === nextGroupId;
+      group.classList.toggle("is-open", isOpen);
+      const button = group.querySelector(".group-button");
+      const chevron = group.querySelector(".group-button .chevron");
+      if (button) button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      if (chevron) chevron.textContent = isOpen ? "▾" : "▸";
+    });
+  }
+
+
+  function renderNbspWidthSetting() {
+    const row = createElement("div", "rule-option-row");
+    row.dataset.setting = "nbsp-width";
+
+    const label = createElement("div", "rule-option-label", getCopy("nbspLength"));
+    const segments = createElement("div", "segments");
+    segments.dataset.segmentGroup = "nonBreakingSpaceStyle";
+
+    [
+      ["regular", getCopy("nbspRegular")],
+      ["narrow", getCopy("nbspThin")],
+    ].forEach(([value, text]) => {
+      const button = createElement("button", "segment", text);
+      button.type = "button";
+      button.dataset.value = value;
+      button.classList.toggle("is-active", state.options.nonBreakingSpaceStyle === value);
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setSegment("nonBreakingSpaceStyle", value);
+      };
+      segments.appendChild(button);
+    });
+
+    row.append(label, segments);
+    return row;
+  }
+
+  function renderRules() {
+    elements.ruleGroups.textContent = "";
+
+    groupOrder.forEach((groupId) => {
+      const isOpen = state.openRuleGroup === groupId;
+      const group = createElement("div", "group");
+      group.dataset.groupId = groupId;
+      group.classList.toggle("is-open", isOpen);
+      group.classList.toggle("is-disabled", enabledRulesInGroup(groupId) === 0);
+
+      const button = createElement("button", "group-button");
+      button.type = "button";
+      button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+      const chevron = createElement("span", "chevron", isOpen ? "▾" : "▸");
+      const title = createElement("span", "group-title", getCopy(`groups.${groupId}`));
+      const count = createElement("span", "group-count", `${enabledRulesInGroup(groupId)}/${totalRulesInGroup(groupId)}`);
+      const groupSwitch = createSwitch(getGroupSwitchState(groupId), `group:${groupId}`);
+      button.append(chevron, title, count, groupSwitch);
+      button.onclick = (event) => {
+        const rect = button.getBoundingClientRect();
+        const clickedSwitchArea = event.clientX >= rect.right - 54;
+        if (clickedSwitchArea) {
+          state.animatedSwitchKeys = [
+            `group:${groupId}`,
+            ...ruleDefinitions.filter((rule) => rule.group === groupId).map((rule) => `rule:${rule.id}`),
+          ];
+          setGroupEnabled(groupId, enabledRulesInGroup(groupId) !== totalRulesInGroup(groupId));
+          return;
+        }
+        setOpenRuleGroup(state.openRuleGroup === groupId ? null : groupId);
+      };
+
+      const content = createElement("div", "group-content");
+      const contentInner = createElement("div", "group-content-inner");
+      const ruleList = createElement("div", "rule-list");
+
+      ruleDefinitions.filter((rule) => rule.group === groupId).forEach((rule) => {
+        const ruleLabel = createElement("label", "rule");
+        const isEnabled = state.enabledRules[rule.id] !== false;
+        ruleLabel.classList.toggle("is-disabled", !isEnabled);
+        const checkbox = document.createElement("input");
+        checkbox.className = "switch-input";
+        checkbox.type = "checkbox";
+        checkbox.checked = isEnabled;
+        checkbox.onchange = () => {
+          state.animatedSwitchKeys = [`rule:${rule.id}`, `group:${groupId}`];
+          state.enabledRules[rule.id] = checkbox.checked;
+          saveCurrentSettings();
+          render();
+        };
+
+        const ruleText = createElement("div");
+        const ruleName = createElement("div", "rule-name", getCopy(`rules.${rule.id}`)[0]);
+        const tag = createElement("span", "rule-tag", getCopy(`tags.${rule.tag}`));
+        ruleName.appendChild(tag);
+        const description = createElement("div", "rule-desc");
+        renderExample(rule.id, description);
+        const ruleSwitch = createSwitch(isEnabled ? "is-on" : "is-off", `rule:${rule.id}`);
+        ruleText.append(ruleName, description);
+        ruleLabel.append(ruleText, checkbox, ruleSwitch);
+        ruleList.appendChild(ruleLabel);
+
+        if (groupId === "quotes" && rule.id === "russianQuotes") {
+          ruleList.appendChild(renderQuoteSettings("ru", isEnabled));
+        }
+
+        if (groupId === "quotes" && rule.id === "englishQuotes") {
+          ruleList.appendChild(renderQuoteSettings("en", isEnabled));
+        }
+      });
+
+      if (groupId === "russianTypography") {
+        ruleList.appendChild(renderNbspWidthSetting());
+      }
+
+      contentInner.appendChild(ruleList);
+      content.appendChild(contentInner);
+      group.append(button, content);
+      elements.ruleGroups.appendChild(group);
+    });
+
+    elements.rulesMeta.textContent = interpolate(state.uiLanguage === "ru" ? "{enabled} из {total} включено" : "{enabled} of {total} on", {
+      enabled: enabledRulesCount(),
+      total: totalRulesCount(),
+    });
+  }
+
+  function shouldMuteMainNumber(info) {
+    return !info.availableCount || !hasEnabledRules();
+  }
+
+  function getResultViewModel() {
+    const message = state.lastApplyResultMessage || {};
+    const totalReplacementCount = Number(message.totalReplacementCount || message.changesAppliedCount || 0);
+    const changedNodeCount = Number(message.changedNodeCount || message.formattedLayerCount || 0);
+    const skippedNodeCount = Number(message.skippedNodeCount || 0);
+    const errorNodeCount = Number(message.errorNodeCount || message.errorCount || 0);
+    const missingFontsCount = Number(message.skippedMissingFontsNodeCount || message.missingFontsCount || 0);
+    const checkedNodeCount = Number(
+      message.checkedNodeCount ??
+      message.availableTextNodeCount ??
+      (changedNodeCount + Number(message.unchangedNodeCount || 0))
+    );
+    const hasWarnings = skippedNodeCount > 0 || missingFontsCount > 0;
+    const allSkipped =
+      checkedNodeCount === 0 &&
+      skippedNodeCount > 0 &&
+      errorNodeCount === 0;
+    let resultType = "done";
+
+    if (message.type === "apply-cancelled" || message.wasCancelled) {
+      resultType = "cancelled";
+    } else if (allSkipped) {
+      resultType = "unavailable";
+    } else if (totalReplacementCount === 0 && changedNodeCount === 0 && errorNodeCount === 0) {
+      resultType = "clean";
+    } else if (hasWarnings || errorNodeCount > 0) {
+      resultType = "errors";
+    }
+
+    const count = resultType === "clean" || resultType === "unavailable"
+      ? 0
+      : (resultType === "cancelled" ? Number(message.formattedBeforeCancelCount || changedNodeCount || 0) : totalReplacementCount);
+
+    let label = "";
+    if (resultType === "clean") {
+      label = getCopy("result.alreadyClean");
+    } else if (resultType === "unavailable") {
+      label = getCopy("result.noAvailable");
+    } else if (resultType === "cancelled") {
+      label = getCopy("result.formattedBeforeCancel");
+    } else {
+      label = resultChangesLabel(totalReplacementCount, changedNodeCount);
+    }
+
+    return { message, resultType, count, label };
+  }
+
+  function renderPanels(info) {
+    const isRules = state.activePanel === "rules";
+    const isSettings = state.activePanel === "settings";
+    const showResultCompact = state.view === "result" && (isRules || isSettings);
+    const showMainCompact = state.view !== "result" && (isRules || isSettings);
+    const showCompact = showMainCompact || showResultCompact;
+
+    elements.rulesToggle.setAttribute("aria-expanded", isRules ? "true" : "false");
+    elements.settingsToggle.setAttribute("aria-expanded", isSettings ? "true" : "false");
+    elements.rulesPanel.classList.toggle("is-open", isRules);
+    elements.settingsPanel.classList.toggle("is-open", isSettings);
+    elements.formatArea.classList.toggle("is-compact", showCompact);
+    elements.compactSummary.classList.toggle("is-visible", showCompact);
+
+    if (showResultCompact) {
+      const result = getResultViewModel();
+      setNumberContent(elements.compactNumber, result.count);
+      elements.compactNumber.classList.toggle("is-muted", (result.resultType === "clean" || result.resultType === "unavailable"));
+      elements.compactLabel.textContent = result.label;
+      return;
+    }
+
+    setNumberContent(elements.compactNumber, getHeroCount(info));
+    elements.compactNumber.classList.toggle("is-muted", shouldMuteMainNumber(info));
+    elements.compactLabel.textContent = isRu() ? getHeroLabel(info) : getCopy("main.compactReady");
+  }
+
+  function renderMain(info) {
+    elements.scopeLabel.textContent = formatScope(info);
+    setNumberContent(elements.heroNumber, state.isLoadingSettings && !state.lastSelectionInfoMessage ? "0" : getHeroCount(info));
+    elements.heroNumber.classList.toggle("is-muted", state.isLoadingSettings && !state.lastSelectionInfoMessage ? true : shouldMuteMainNumber(info));
+    elements.heroLabel.textContent = state.isLoadingSettings && !state.lastSelectionInfoMessage ? getCopy("main.checking") : getHeroLabel(info);
+    renderStatusRows(elements.mainStatusRows, buildMainStatusRows(info));
+  }
+
+  function renderProgress() {
+    const total = state.progressTotal || getSelectionInfo().availableCount || 0;
+    const done = Math.min(state.progressDone || 0, total);
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    setNumberContent(elements.progressNumber, done);
+    elements.progressLabel.textContent = isRu()
+      ? `из ${total}${NBSP}${ruTextLayerGenitive(total)} типографируется`
+      : interpolate(getCopy("applying.label"), { total });
+    elements.progressFill.style.setProperty("--progress", `${percent}%`);
+  }
+
+  function buildResultStatusRows(message, resultType) {
+    const status = getCopy("status");
+    const info = {
+      lockedCount: Number(message.skippedLockedNodeCount || message.lockedCount || 0),
+      hiddenCount: Number(message.skippedHiddenNodeCount || message.hiddenCount || 0),
+      emptyCount: Number(message.skippedEmptyNodeCount || message.emptyCount || 0),
+      nonEditableCount: Number(message.skippedNonEditableNodeCount || message.nonEditableCount || 0),
+      missingFontsCount: Number(message.skippedMissingFontsNodeCount || message.missingFontsCount || 0),
+      errorCount: Number(message.errorNodeCount || message.errorCount || 0),
+    };
+
+    if (resultType === "clean" || resultType === "unavailable") {
+      const rows = [];
+      const checkedCount = Number(
+        message.checkedNodeCount ??
+        message.availableTextNodeCount ??
+        message.checkedLayerCount ??
+        0
+      );
+
+      if (resultType === "clean") {
+        rows.push([checkedLayersItem(checkedCount)]);
+      }
+
+      const skippedItems = [];
+      if (info.missingFontsCount) skippedItems.push(statusItem("missingFonts", info.missingFontsCount));
+      if (info.lockedCount) skippedItems.push(statusItem("locked", info.lockedCount));
+      if (info.hiddenCount) skippedItems.push(statusItem("hidden", info.hiddenCount));
+      if (info.emptyCount) skippedItems.push(statusItem("empty", info.emptyCount));
+      if (info.nonEditableCount) skippedItems.push(statusItem("nonEditable", info.nonEditableCount));
+      if (skippedItems.length) rows.push(skippedItems);
+      return rows;
+    }
+
+    if (resultType === "cancelled") {
+      return [[countLabel(Number(message.remainingCount || 0), getCopy("result.remaining"))]];
+    }
+
+    const warningItems = [];
+
+    if (message.changedNodeCount !== undefined && resultType === "errors") {
+      warningItems.push(statusItem("formatted", Number(message.changedNodeCount || 0)));
+    }
+
+    if (info.missingFontsCount) warningItems.push(statusItem("missingFonts", info.missingFontsCount));
+    if (info.lockedCount) warningItems.push(statusItem("locked", info.lockedCount));
+    if (info.hiddenCount) warningItems.push(statusItem("hidden", info.hiddenCount));
+    if (info.emptyCount) warningItems.push(statusItem("empty", info.emptyCount));
+    if (info.nonEditableCount) warningItems.push(statusItem("nonEditable", info.nonEditableCount));
+    if (info.errorCount) warningItems.push(statusItem("error", info.errorCount));
+
+    if (resultType === "done" && warningItems.length) {
+      return [[status.skippedPrefix, ...warningItems]];
+    }
+
+    return warningItems.length ? [warningItems] : [];
+  }
+
+  function renderResult() {
+    const result = getResultViewModel();
+    setNumberContent(elements.resultNumber, result.count);
+    elements.resultNumber.classList.toggle("is-muted", (result.resultType === "clean" || result.resultType === "unavailable"));
+    elements.resultLabel.textContent = result.label;
+    renderStatusRows(elements.resultStatusRows, buildResultStatusRows(result.message, result.resultType));
+
+    if (state.view === "result") {
+      setNumberContent(elements.heroNumber, result.count);
+      elements.heroNumber.classList.toggle("is-muted", (result.resultType === "clean" || result.resultType === "unavailable"));
+      elements.heroLabel.textContent = result.label;
+      renderStatusRows(elements.mainStatusRows, buildResultStatusRows(result.message, result.resultType));
+    }
+  }
+
+  function renderPrimaryAction(info) {
+    const disabled = state.isLoadingSettings || state.isApplying || !info.availableCount || !hasEnabledRules();
+
+    if (state.view === "result") {
+      elements.primaryAction.disabled = false;
+      elements.primaryAction.textContent = getCopy("done");
+      return;
+    }
+
+    elements.primaryAction.disabled = disabled;
+    elements.primaryAction.textContent = info.scopeType === "currentPage" ? getCopy("applyToCurrentPage") : getCopy("applyFormatting");
+  }
+
+  function render() {
+    elements.app.dataset.panel = state.activePanel;
+    elements.app.dataset.view = state.view;
+    elements.app.dataset.openGroup = state.openRuleGroup || "none";
+    elements.app.dataset.rulesMode = state.activePanel === "rules" ? (state.openRuleGroup ? "group" : "closed") : "none";
+    applyTheme();
+    renderText();
+    renderRules();
+    renderSegments();
+
+    const info = getSelectionInfo();
+    renderMain(info);
+    renderPanels(info);
+    renderProgress();
+    renderResult();
+    renderPrimaryAction(info);
+
+    const isResultView = state.view === "result";
+    const isPanelOpen = state.activePanel === "rules" || state.activePanel === "settings";
+
+    [elements.formatTab, elements.rulesTab, elements.settingsTab].forEach((tab) => {
+      if (!tab) return;
+      tab.classList.toggle("is-active", tab.dataset.sidePanel === state.activePanel);
+    });
+
+    elements.navigationRows.classList.toggle("is-hidden", !isPanelOpen);
+    elements.progressScreen.classList.remove("is-visible");
+    elements.resultScreen.classList.remove("is-visible");
+    elements.compactSummary.classList.toggle("is-hidden", !isPanelOpen);
+
+    if (state.animatedSwitchKeys.length) {
+      const renderedAnimationKeys = state.animatedSwitchKeys.join("|");
+      requestAnimationFrame(() => {
+        if (state.animatedSwitchKeys.join("|") === renderedAnimationKeys) {
+          state.animatedSwitchKeys = [];
+        }
+      });
+    }
+  }
+
+  function applySettingsToState(settings) {
+    const safeSettings = settings || {};
+    const safeEnabledRules = safeSettings.enabledRules || {};
+    state.languageMode = safeSettings.languageMode || "auto";
+    state.options = {
+      ...state.options,
+      ...(safeSettings.options || {}),
+      quoteOptions: {
+        ...state.options.quoteOptions,
+        ...((safeSettings.options || {}).quoteOptions || {}),
+      },
+    };
+
+    const defaults = getDefaultEnabledRules(state.languageMode);
+    ruleDefinitions.forEach((rule) => {
+      state.enabledRules[rule.id] = safeEnabledRules[rule.id] !== undefined ? Boolean(safeEnabledRules[rule.id]) : defaults[rule.id];
+    });
+  }
+
+  function setSegment(groupName, value) {
+    if (groupName === "uiLanguage") {
+      const normalized = normalizeUiLanguage(value);
+      if (!normalized) return;
+      state.uiLanguage = normalized;
+      saveCurrentUiSettings();
+      render();
+      return;
+    }
+
+    if (groupName === "theme") {
+      const normalized = normalizeTheme(value);
+      if (!normalized) return;
+      state.theme = normalized;
+      saveCurrentUiSettings();
+      render();
+      return;
+    }
+
+    if (groupName === "nonBreakingSpaceStyle") {
+      // The UI only stores and forwards the selected width.
+      // The typography engine decides which rules use this option.
+      state.options.nonBreakingSpaceStyle = value === "narrow" ? "narrow" : "regular";
+      saveCurrentSettings();
+      render();
+      return;
+    }
+
+    if (groupName === "languageMode") {
+      state.languageMode = value === "ru" || value === "en" || value === "auto" ? value : "auto";
+      saveCurrentSettings();
+      render();
+    }
+  }
+
+  document.querySelectorAll(".segment").forEach((segment) => {
+    segment.onclick = () => {
+      const group = segment.closest(".segments");
+      if (!group) return;
+      setSegment(group.dataset.segmentGroup, segment.dataset.value);
+    };
+  });
+
+  function openSidePanel(panel) {
+    if (panel !== "main" && state.view === "result") {
+      state.lastApplyResultMessage = null;
+      state.applySelectionSignature = null;
+      state.progressDone = 0;
+      state.progressTotal = 0;
+      state.isApplying = false;
+      state.view = "main";
+    }
+
+    if (panel === "main") {
+      state.activePanel = "main";
+      state.openRuleGroup = null;
+      render();
+      return;
+    }
+
+    setActivePanel(panel);
+  }
+
+  elements.formatTab.onclick = () => openSidePanel("main");
+  elements.rulesTab.onclick = () => openSidePanel("rules");
+  elements.settingsTab.onclick = () => openSidePanel("settings");
+
+  elements.rulesToggle.onclick = () => setActivePanel("rules");
+  elements.settingsToggle.onclick = () => setActivePanel("settings");
+
+  elements.resetDefaults.onclick = () => {
+    const quoteDefaults = getDefaultQuoteOptions();
+
+    state.enabledRules = getDefaultEnabledRules(state.languageMode);
+    state.options.nonBreakingSpaceStyle = "regular";
+
+    if (state.languageMode === "ru") {
+      state.options.quoteOptions.ru = { ...quoteDefaults.ru };
+    } else if (state.languageMode === "en") {
+      state.options.quoteOptions.en = { ...quoteDefaults.en };
+    } else {
+      state.options.quoteOptions = {
+        ru: { ...quoteDefaults.ru },
+        en: { ...quoteDefaults.en },
+      };
+    }
+
+    saveCurrentSettings();
+    render();
+  };
+
+  elements.primaryAction.onclick = () => {
+    const info = getSelectionInfo();
+
+    if (state.view === "result") {
+      state.lastApplyResultMessage = null;
+      state.applySelectionSignature = null;
+      state.progressDone = 0;
+      state.progressTotal = 0;
+      state.isApplying = false;
+      state.activePanel = "main";
+      state.openRuleGroup = null;
+      setView("main");
+      return;
+    }
+
+    if (!info.availableCount || !hasEnabledRules() || state.isApplying) return;
+
+    state.progressDone = 0;
+    state.progressTotal = info.availableCount;
+    state.applySelectionSignature = getSelectionSignature(state.lastSelectionInfoMessage);
+    state.isApplying = true;
+    state.activePanel = "main";
+    state.openRuleGroup = null;
+    render();
+
+    parent.postMessage({
+      pluginMessage: {
+        type: "apply",
+        settings: getSettings(),
+        uiSettings: getUiSettings(),
+      },
+    }, "*");
+  };
 
   window.onmessage = (event) => {
     const message = event.data.pluginMessage;
-
-    if (!message) {
-      return;
-    }
+    if (!message) return;
 
     if (message.type === "settings-loaded") {
       const uiSettings = message.uiSettings || {};
-      const storedUiLanguage = readStoredUiLanguage();
-      const pluginStoredUiLanguage = normalizeUiLanguage(uiSettings.uiLanguage);
-
-      currentUiLanguage =
-        storedUiLanguage || pluginStoredUiLanguage || currentUiLanguage || getDetectedUiLanguage();
-      uiLanguageModeSelect.value = currentUiLanguage;
-      writeStoredUiLanguage(currentUiLanguage);
-
-      applySettingsToUi(message.settings);
-      applyInterfaceLanguage();
-
-      isLoadingSettings = false;
+      state.uiLanguage = readStoredUiLanguage() || normalizeUiLanguage(uiSettings.uiLanguage) || state.uiLanguage;
+      state.theme = readStoredTheme() || normalizeTheme(uiSettings.theme) || state.theme;
+      applySettingsToState(message.settings);
+      state.isLoadingSettings = false;
       saveCurrentUiSettings();
-      updateApplyButtonState();
+      render();
+      return;
     }
 
     if (message.type === "selection-info") {
-      result.textContent = "";
-      lastApplyResultMessage = null;
-      lastSelectionInfoMessage = message;
-      renderSelectionInfo(message);
-    }
+      const nextSelectionSignature = getSelectionSignature(message);
+      state.lastSelectionInfoMessage = message;
+      state.currentTargetScope = message.targetScope || "selection";
+      state.currentAvailableTextNodeCount = Number(message.availableTextNodeCount || 0);
 
-    if (message.type === "apply-result") {
-      lastApplyResultMessage = message;
-      renderApplyResult(message);
-    }
-  };
-
-  uiLanguageModeSelect.onchange = handleUiLanguageChange;
-  languageModeSelect.onchange = handleSettingsChange;
-  nonBreakingSpaceStyleSelect.onchange = handleSettingsChange;
-
-  ruPrimaryQuoteStyleSelect.onchange = handleSettingsChange;
-  ruSecondaryQuoteStyleSelect.onchange = handleSettingsChange;
-  enPrimaryQuoteStyleSelect.onchange = handleSettingsChange;
-  enSecondaryQuoteStyleSelect.onchange = handleSettingsChange;
-
-  invisibleCopyArtifactsCheckbox.onchange = handleSettingsChange;
-  tabsCheckbox.onchange = handleSettingsChange;
-  manualLineBreaksCheckbox.onchange = handleSettingsChange;
-  ellipsisCheckbox.onchange = handleSettingsChange;
-  extraSpacesCheckbox.onchange = handleSettingsChange;
-  trimTextEdgesCheckbox.onchange = handleSettingsChange;
-  spacingCleanupCheckbox.onchange = handleSettingsChange;
-  percentSignNoSpaceCheckbox.onchange = handleSettingsChange;
-  numberUnitsNbspCheckbox.onchange = handleSettingsChange;
-  numberSignsCheckbox.onchange = handleSettingsChange;
-  specialSymbolsCheckbox.onchange = handleSettingsChange;
-  englishApostrophesCheckbox.onchange = handleSettingsChange;
-  englishQuotesCheckbox.onchange = handleSettingsChange;
-  russianQuotesCheckbox.onchange = handleSettingsChange;
-  numberRangeDashCheckbox.onchange = handleSettingsChange;
-  russianSentenceDashCheckbox.onchange = handleSettingsChange;
-  russianShortWordsNbspCheckbox.onchange = handleSettingsChange;
-  russianInitialsNbspCheckbox.onchange = handleSettingsChange;
-  russianNumericAbbreviationsCheckbox.onchange = handleSettingsChange;
-  russianLargeNumbersCheckbox.onchange = handleSettingsChange;
-  uiFinalPeriodCheckbox.onchange = handleSettingsChange;
-
-  selectAllRulesButton.onclick = () => {
-    getRuleCheckboxes().forEach((checkbox) => {
-      checkbox.checked = true;
-    });
-
-    handleSettingsChange();
-  };
-
-  deselectAllRulesButton.onclick = () => {
-    getRuleCheckboxes().forEach((checkbox) => {
-      checkbox.checked = false;
-    });
-
-    handleSettingsChange();
-  };
-
-  resetDefaultsButton.onclick = () => {
-    applySettingsToUi(defaultSettings);
-    handleSettingsChange();
-  };
-
-  applyButton.onclick = () => {
-    if (currentTargetScope === "currentPage") {
-      const shouldApplyToPage = window.confirm(
-        interpolate(t("confirmCurrentPage"), { count: currentAvailableTextNodeCount })
-      );
-
-      if (!shouldApplyToPage) {
+      if (state.isApplying) {
+        render();
         return;
       }
+
+      if (state.view === "result") {
+        const sameSelectionAsApply =
+          Boolean(state.applySelectionSignature) &&
+          nextSelectionSignature === state.applySelectionSignature;
+
+        if (sameSelectionAsApply) {
+          render();
+          return;
+        }
+      }
+
+      state.lastApplyResultMessage = null;
+      state.applySelectionSignature = null;
+      state.activePanel = "main";
+      state.openRuleGroup = null;
+      state.view = "main";
+      render();
+      return;
     }
 
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "apply",
-          settings: getSettings(),
-          uiSettings: getUiSettings(),
-        },
-      },
-      "*"
-    );
+    if (message.type === "apply-start") {
+      state.isApplying = true;
+      state.progressDone = 0;
+      state.progressTotal = Number(message.total || message.totalToProcessCount || getSelectionInfo().availableCount || 0);
+      render();
+      return;
+    }
+
+    if (message.type === "apply-progress") {
+      state.isApplying = true;
+      state.progressDone = Number(message.done || message.processedCount || 0);
+      state.progressTotal = Number(message.total || message.totalToProcessCount || state.progressTotal || 0);
+      render();
+      return;
+    }
+
+    if (message.type === "apply-cancelled") {
+      state.isApplying = false;
+      state.lastApplyResultMessage = message;
+      state.lastApplyCompletedAt = Date.now();
+      state.activePanel = "main";
+      state.openRuleGroup = null;
+      setView("result");
+      return;
+    }
+
+    if (message.type === "apply-result" || message.type === "apply-complete") {
+      state.isApplying = false;
+      state.lastApplyResultMessage = message;
+      state.lastApplyCompletedAt = Date.now();
+      state.progressDone = state.progressTotal || Number(message.availableTextNodeCount || message.totalTextNodeCount || 0);
+      state.activePanel = "main";
+      state.openRuleGroup = null;
+      setView("result");
+      return;
+    }
   };
 
-  closeButton.onclick = () => {
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "close",
-          uiSettings: getUiSettings(),
-        },
-      },
-      "*"
-    );
-  };
+  if (window.matchMedia) {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    if (media.addEventListener) media.addEventListener("change", applyTheme);
+    else if (media.addListener) media.addListener(applyTheme);
+  }
 
-  uiLanguageModeSelect.value = currentUiLanguage;
-  applyInterfaceLanguage();
+  render();
 </script>
