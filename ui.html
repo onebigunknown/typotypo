@@ -1668,12 +1668,13 @@
   /* The NBSP-width option is the last item inside Russian typography, not a settings row. */
   .rule-option-row {
     width: 100%;
-    min-height: 52px;
+    height: var(--row-h);
+    min-height: var(--row-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 8px var(--px) 8px 30px;
+    padding: 0 var(--px) 0 30px;
     border: 0 !important;
     background: var(--surface);
   }
@@ -1786,6 +1787,45 @@
     min-width: 0;
     overflow: visible !important;
     text-overflow: clip !important;
+  }
+
+  /* v34: donation link pinned to the bottom of the Settings page. */
+  .app[data-panel="settings"] #settingsPanel.is-open {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+
+  .app[data-panel="settings"] #settingsPanel .panel-inner,
+  .app[data-panel="settings"] #settingsPanel .panel-scroll {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .app[data-panel="settings"] #settingsPanel .panel-scroll {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-donation-row {
+    flex: 0 0 40px;
+    min-height: 40px;
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface);
+  }
+
+  .settings-donation-link {
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 400;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   /* v33: main, clean-result and completed-result screens use the same fixed coordinates. */
@@ -2022,6 +2062,16 @@
               <p class="settings-note" data-i18n="defaultsNote">Defaults depend on text language</p>
               <button class="link-button" id="resetDefaults" type="button" data-i18n="resetDefaults">Reset to defaults</button>
             </div>
+
+            <div class="settings-donation-row">
+              <a
+                class="settings-donation-link"
+                href="https://pay.cloudtips.ru/p/7eebd503"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="supportCreator"
+              >Support the creator</a>
+            </div>
           </div>
         </div>
       </div>
@@ -2114,11 +2164,12 @@
       interfaceLanguage: "Interface language",
       textLanguage: "Text language",
       theme: "Theme",
-      nbspLength: "Non-breaking space width",
+      nbspLength: "Space width in numbers",
       nbspRegular: "Regular",
-      nbspThin: "Thin",
+      nbspThin: "Narrow",
       defaultsNote: "Defaults rules depend on text language",
       resetDefaults: "Reset to defaults",
+      supportCreator: "Support the creator",
       applyFormatting: "Apply formatting",
       applyToCurrentPage: "Apply to current page",
       cancel: "Cancel",
@@ -2193,20 +2244,20 @@
         manualLineBreaks: ["Line breaks inside text", "Replaces line breaks inside a text layer.", "Hello ↵ world → Hello world"],
         ellipsis: ["Three dots to ellipsis", "Replaces three dots with a proper ellipsis.", "Wait... → Wait …"],
         extraSpaces: ["Extra spaces", "Replaces several spaces with one.", "Hello ··· world → Hello world"],
-        trimTextEdges: ["Spaces at line edges", "Removes spaces at line edges.", "·· 2024 → 2024"],
+        trimTextEdges: ["Spaces at text edges", "Removes spaces at line edges.", "·· 2024 → 2024"],
         spacingCleanup: ["Spaces around punctuation", "Cleans spaces around punctuation.", "Hello · , world · ! → Hello, world!"],
         percentSignNoSpace: ["Percent without space", "Removes spaces before percent signs.", "50 · % → 50%"],
-        numberUnitsNbsp: ["Units stay with numbers", "Keeps units with numbers.", "300 MB → 300 ‿ MB"],
+        numberUnitsNbsp: ["Numbers and units stay together", "Keeps units with numbers.", "300 MB → 300 ‿ MB"],
         numberSigns: ["№ and § stay with numbers", "Keeps № and § with the following number.", "№ 8 → № ‿ 8"],
-        specialSymbols: ["Fractions and symbols", "Normalizes fractions and symbols.", "1/2 → ½ · >= → ≥"],
-        numberRangeDash: ["Dash in ranges", "Uses an en dash in numeric ranges.", "10-20 → 10–20"],
+        specialSymbols: ["Replace fractions and signs with symbols", "Normalizes fractions and symbols.", "1/2 → ½ · >= → ≥"],
+        numberRangeDash: ["En dashes in ranges", "Uses an en dash in numeric ranges.", "10-20 → 10–20"],
         englishApostrophes: ["Curly apostrophes", "Replaces straight apostrophes in English words.", "It's good → It’s good"],
-        englishQuotes: ["English quotes", "Normalizes English quotes.", "\"Hello\" → “Hello”"],
-        russianQuotes: ["Russian quotes", "Normalizes Russian quotes.", "\"Привет\" → «Привет»"],
+        englishQuotes: ["Quotes in English text", "Normalizes English quotes.", "\"Hello\" → “Hello”"],
+        russianQuotes: ["Quotes in Russian text", "Normalizes Russian quotes.", "\"Привет\" → «Привет»"],
         russianSentenceDash: ["Dash in sentences", "Converts spaced hyphens to an em dash.", "Это - дом → Это — дом"],
-        russianShortWordsNbsp: ["Short words and abbreviations", "Keeps short words and common Russian abbreviations together.", "о проекте · т. е."],
+        russianShortWordsNbsp: ["Short words stay together", "Keeps short words and common Russian abbreviations together.", "о проекте · т. е."],
         russianInitialsNbsp: ["Initials stay together", "Keeps initials together with the surname.", "А. С. Пушкин → А. ‿ С. ‿ Пушкин"],
-        russianNumericAbbreviations: ["Numeric abbreviations", "Keeps numbers with тыс., млн, млрд and трлн.", "10 тыс → 10 ‿ тыс."],
+        russianNumericAbbreviations: ["Numbers and abbreviations stay together", "Keeps numbers with тыс., млн, млрд and трлн.", "10 тыс → 10 ‿ тыс."],
         russianLargeNumbers: ["Large number groups", "Groups large numbers.", "2132128 → 2 ‿ 132 ‿ 128"],
         uiFinalPeriod: ["No final period in short UI copy", "Removes the final period in short UI copy.", "Saved. → Saved"],
       },
@@ -2218,11 +2269,12 @@
       interfaceLanguage: "Язык интерфейса",
       textLanguage: "Язык текста",
       theme: "Тема",
-      nbspLength: "Ширина неразрывного пробела",
+      nbspLength: "Ширина пробела в числах",
       nbspRegular: "Обычный",
       nbspThin: "Узкий",
       defaultsNote: "Правила по умолчанию зависят от языка",
       resetDefaults: "Сбросить настройки",
+      supportCreator: "Поддержать автора",
       applyFormatting: "Типографировать",
       applyToCurrentPage: "Типографировать страницу",
       cancel: "Отменить",
@@ -2297,20 +2349,20 @@
         manualLineBreaks: ["Переносы внутри текста", "Заменяет переносы внутри текстового слоя.", "Привет ↵ мир → Привет мир"],
         ellipsis: ["Три точки в многоточие", "Заменяет три точки настоящим многоточием.", "Подожди... → Подожди …"],
         extraSpaces: ["Лишние пробелы", "Заменяет несколько пробелов одним.", "Привет ··· мир → Привет мир"],
-        trimTextEdges: ["Пробелы по краям строк", "Удаляет пробелы по краям строк.", "·· 2024 → 2024"],
-        spacingCleanup: ["Пробелы у знаков", "Чистит пробелы у знаков.", "Привет · , мир · ! → Привет, мир!"],
+        trimTextEdges: ["Пробелы по краям текста", "Удаляет пробелы по краям строк.", "·· 2024 → 2024"],
+        spacingCleanup: ["Пробелы у знаков препинания", "Чистит пробелы у знаков.", "Привет · , мир · ! → Привет, мир!"],
         percentSignNoSpace: ["Проценты без пробела", "Убирает пробел перед процентами.", "50 · % → 50%"],
-        numberUnitsNbsp: ["Единицы измерения не отрываются", "Склеивает единицы измерения с числами.", "300 МБ → 300 ‿ МБ"],
-        numberSigns: ["№ и § не отрываются", "Склеивает № и § со следующим числом.", "№ 8 → № ‿ 8"],
-        specialSymbols: ["Дроби и символы", "Нормализует дроби и символы.", "1/2 → ½ · >= → ≥"],
-        numberRangeDash: ["Тире в диапазонах", "Использует короткое тире в диапазонах.", "10-20 → 10–20"],
+        numberUnitsNbsp: ["Единицы измерения не разрываются", "Склеивает единицы измерения с числами.", "300 МБ → 300 ‿ МБ"],
+        numberSigns: ["№ и § не разрываются", "Склеивает № и § со следующим числом.", "№ 8 → № ‿ 8"],
+        specialSymbols: ["Замена дробей и знаков символами", "Нормализует дроби и символы.", "1/2 → ½ · >= → ≥"],
+        numberRangeDash: ["Среднее тире в диапазонах", "Использует короткое тире в диапазонах.", "10-20 → 10–20"],
         englishApostrophes: ["Типографские апострофы", "Заменяет прямые апострофы в английских словах.", "It's good → It’s good"],
-        englishQuotes: ["Английские кавычки", "Нормализует английские кавычки.", "\"Hello\" → “Hello”"],
-        russianQuotes: ["Русские кавычки", "Нормализует русские кавычки.", "\"Привет\" → «Привет»"],
+        englishQuotes: ["Кавычки в английском тексте", "Нормализует английские кавычки.", "\"Hello\" → “Hello”"],
+        russianQuotes: ["Кавычки в русском тексте", "Нормализует русские кавычки.", "\"Привет\" → «Привет»"],
         russianSentenceDash: ["Тире в предложениях", "Заменяет дефисы с пробелами на длинное тире.", "Это - дом → Это — дом"],
-        russianShortWordsNbsp: ["Короткие слова и сокращения", "Склеивает короткие слова и устойчивые сокращения.", "о проекте · т. е."],
+        russianShortWordsNbsp: ["Короткие слова не разрываются", "Склеивает короткие слова и устойчивые сокращения.", "о проекте · т. е."],
         russianInitialsNbsp: ["Инициалы не разрываются", "Склеивает инициалы между собой и с фамилией.", "А. С. Пушкин → А. ‿ С. ‿ Пушкин"],
-        russianNumericAbbreviations: ["Числовые сокращения", "Склеивает числа с тыс., млн, млрд и трлн.", "10 тыс → 10 ‿ тыс."],
+        russianNumericAbbreviations: ["Числа и сокращения не разрываются", "Склеивает числа с тыс., млн, млрд и трлн.", "10 тыс → 10 ‿ тыс."],
         russianLargeNumbers: ["Разряды в больших числах", "Разбивает большие числа по разрядам.", "2132128 → 2 ‿ 132 ‿ 128"],
         uiFinalPeriod: ["Без точки в коротких надписях", "Убирает финальную точку в коротком интерфейсном тексте.", "Сохранено. → Сохранено"],
       },
@@ -3082,15 +3134,13 @@
         }
       });
 
-      if (groupId === "russianTypography") {
-        ruleList.appendChild(renderNbspWidthSetting());
-      }
-
       contentInner.appendChild(ruleList);
       content.appendChild(contentInner);
       group.append(button, content);
       elements.ruleGroups.appendChild(group);
     });
+
+    elements.ruleGroups.appendChild(renderNbspWidthSetting());
 
     elements.rulesMeta.textContent = interpolate(state.uiLanguage === "ru" ? "{enabled} из {total} включено" : "{enabled} of {total} on", {
       enabled: enabledRulesCount(),
