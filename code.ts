@@ -5,24 +5,35 @@ type LanguageStats = TypotypoEngine.LanguageStats;
 
 figma.showUI(__html__, {
   width: 420,
-  height: 1180,
+  height: 640,
 });
 
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const UI_SETTINGS_STORAGE_KEY = "typotypoInterfaceSettings";
 
 type UiLanguage = "ru" | "en";
+type UiTheme = "light" | "dark" | "system";
 
 type UiSettings = {
   uiLanguage?: UiLanguage;
+  theme?: UiTheme;
 };
 
 
 type TargetScope = "selection" | "currentPage";
+type ScopeType =
+  | "currentPage"
+  | "textLayer"
+  | "frame"
+  | "section"
+  | "group"
+  | "selectedLayers";
 type PreflightSkipReason = "hidden" | "locked" | "empty";
 
 type TextNodeTarget = {
   targetScope: TargetScope;
+  scopeType: ScopeType;
+  selectionKey: string;
   selectedCount: number;
   textNodes: TextNode[];
 };
@@ -33,6 +44,7 @@ type TextNodeAvailabilitySummary = {
   skippedHiddenNodeCount: number;
   skippedLockedNodeCount: number;
   skippedEmptyNodeCount: number;
+  skippedMissingFontsNodeCount: number;
 };
 
 async function loadSettings(): Promise<ApplySettings> {
@@ -64,14 +76,27 @@ function normalizeUiSettings(value: unknown): UiSettings {
     return {};
   }
 
-  const rawSettings = value as { uiLanguage?: unknown; uiLanguageMode?: unknown };
+  const rawSettings = value as {
+    uiLanguage?: unknown;
+    uiLanguageMode?: unknown;
+    theme?: unknown;
+  };
   const rawLanguage = rawSettings.uiLanguage ?? rawSettings.uiLanguageMode;
+  const safeUiSettings: UiSettings = {};
 
   if (rawLanguage === "ru" || rawLanguage === "en") {
-    return { uiLanguage: rawLanguage };
+    safeUiSettings.uiLanguage = rawLanguage;
   }
 
-  return {};
+  if (
+    rawSettings.theme === "light" ||
+    rawSettings.theme === "dark" ||
+    rawSettings.theme === "system"
+  ) {
+    safeUiSettings.theme = rawSettings.theme;
+  }
+
+  return safeUiSettings;
 }
 
 async function loadUiSettings(): Promise<UiSettings> {
@@ -91,7 +116,7 @@ async function saveUiSettings(uiSettings: unknown) {
   try {
     const safeUiSettings = normalizeUiSettings(uiSettings);
 
-    if (!safeUiSettings.uiLanguage) {
+    if (!safeUiSettings.uiLanguage && !safeUiSettings.theme) {
       return;
     }
 
@@ -182,12 +207,64 @@ function collectTextNodesFromSceneNodeRoots(
   return textNodes;
 }
 
+function resolveSelectionScopeType(
+  selection: readonly SceneNode[]
+): ScopeType {
+  if (selection.length === 0) {
+    return "currentPage";
+  }
+
+  if (selection.length > 1) {
+    return "selectedLayers";
+  }
+
+  const node = selection[0];
+
+  if (node.type === "TEXT") {
+    return "textLayer";
+  }
+
+  if (node.type === "SECTION") {
+    return "section";
+  }
+
+  if (node.type === "GROUP") {
+    return "group";
+  }
+
+  if (
+    node.type === "FRAME" ||
+    node.type === "COMPONENT" ||
+    node.type === "INSTANCE" ||
+    node.type === "COMPONENT_SET"
+  ) {
+    return "frame";
+  }
+
+  return "selectedLayers";
+}
+
+function getSelectionKey(selection: readonly SceneNode[]): string {
+  if (selection.length === 0) {
+    return `page:${figma.currentPage.id}`;
+  }
+
+  return `selection:${selection
+    .map((node) => node.id)
+    .sort()
+    .join(",")}`;
+}
+
 function resolveTextNodeTarget(): TextNodeTarget {
   const selection = figma.currentPage.selection;
+  const scopeType = resolveSelectionScopeType(selection);
+  const selectionKey = getSelectionKey(selection);
 
   if (selection.length === 0) {
     return {
       targetScope: "currentPage",
+      scopeType,
+      selectionKey,
       selectedCount: 0,
       textNodes: collectTextNodesFromSceneNodeRoots(figma.currentPage.children),
     };
@@ -195,21 +272,49 @@ function resolveTextNodeTarget(): TextNodeTarget {
 
   return {
     targetScope: "selection",
+    scopeType,
+    selectionKey,
     selectedCount: selection.length,
     textNodes: collectTextNodesFromSceneNodeRoots(selection),
   };
 }
 
-function summarizeTextNodeAvailability(
+function getUniqueFontsForTextNode(node: TextNode): FontName[] {
+  const fonts: FontName[] = [];
+
+  function addFont(fontName: FontName | typeof figma.mixed) {
+    if (fontName !== figma.mixed) {
+      fonts.push(fontName as FontName);
+    }
+  }
+
+  if (node.fontName !== figma.mixed) {
+    addFont(node.fontName as FontName);
+  } else {
+    for (let index = 0; index < node.characters.length; index += 1) {
+      addFont(node.getRangeFontName(index, index + 1));
+    }
+  }
+
+  return Array.from(
+    new Map(
+      fonts.map((font) => [`${font.family}-${font.style}`, font])
+    ).values()
+  );
+}
+
+async function summarizeTextNodeAvailability(
   textNodes: TextNode[]
-): TextNodeAvailabilitySummary {
+): Promise<TextNodeAvailabilitySummary> {
   const summary: TextNodeAvailabilitySummary = {
     totalTextNodeCount: textNodes.length,
     availableTextNodeCount: 0,
     skippedHiddenNodeCount: 0,
     skippedLockedNodeCount: 0,
     skippedEmptyNodeCount: 0,
+    skippedMissingFontsNodeCount: 0,
   };
+  const candidateNodes: TextNode[] = [];
 
   for (const node of textNodes) {
     const skipReason = getTextNodePreflightSkipReason(node);
@@ -229,29 +334,86 @@ function summarizeTextNodeAvailability(
       continue;
     }
 
-    summary.availableTextNodeCount += 1;
+    candidateNodes.push(node);
+  }
+
+  const fontAvailability = new Map<string, Promise<boolean>>();
+
+  function canLoadFont(font: FontName): Promise<boolean> {
+    const key = `${font.family}-${font.style}`;
+    const existing = fontAvailability.get(key);
+
+    if (existing) {
+      return existing;
+    }
+
+    const availability = figma
+      .loadFontAsync(font)
+      .then(() => true)
+      .catch((error) => {
+        console.warn(`Could not load font during selection analysis: ${key}`, error);
+        return false;
+      });
+
+    fontAvailability.set(key, availability);
+    return availability;
+  }
+
+  const availabilityResults = await Promise.all(
+    candidateNodes.map(async (node) => {
+      try {
+        const fonts = getUniqueFontsForTextNode(node);
+        const loaded = await Promise.all(fonts.map(canLoadFont));
+        return loaded.every(Boolean);
+      } catch (error) {
+        console.warn("Could not inspect text node fonts during selection analysis:", error);
+        return false;
+      }
+    })
+  );
+
+  for (const isAvailable of availabilityResults) {
+    if (isAvailable) {
+      summary.availableTextNodeCount += 1;
+    } else {
+      summary.skippedMissingFontsNodeCount += 1;
+    }
   }
 
   return summary;
 }
 
-function sendSelectionInfo() {
+let selectionInfoRequestId = 0;
+
+async function sendSelectionInfo() {
+  const requestId = ++selectionInfoRequestId;
   const target = resolveTextNodeTarget();
-  const availabilitySummary = summarizeTextNodeAvailability(target.textNodes);
+  const availabilitySummary = await summarizeTextNodeAvailability(
+    target.textNodes
+  );
+
+  if (requestId !== selectionInfoRequestId) {
+    return;
+  }
 
   figma.ui.postMessage({
     type: "selection-info",
     targetScope: target.targetScope,
+    scopeType: target.scopeType,
+    selectionKey: target.selectionKey,
     selectedCount: target.selectedCount,
     textNodeCount: availabilitySummary.totalTextNodeCount,
     availableTextNodeCount: availabilitySummary.availableTextNodeCount,
     skippedHiddenNodeCount: availabilitySummary.skippedHiddenNodeCount,
     skippedLockedNodeCount: availabilitySummary.skippedLockedNodeCount,
     skippedEmptyNodeCount: availabilitySummary.skippedEmptyNodeCount,
+    skippedMissingFontsNodeCount:
+      availabilitySummary.skippedMissingFontsNodeCount,
   });
 }
 
 type CharacterStyleSnapshot = {
+  textStyleId: string | typeof figma.mixed;
   fontName: FontName | typeof figma.mixed;
   fontSize: number | typeof figma.mixed;
   fills: readonly Paint[] | typeof figma.mixed;
@@ -266,6 +428,7 @@ function getCharacterStyleSnapshot(
   index: number
 ): CharacterStyleSnapshot {
   return {
+    textStyleId: node.getRangeTextStyleId(index, index + 1),
     fontName: node.getRangeFontName(index, index + 1),
     fontSize: node.getRangeFontSize(index, index + 1),
     fills: node.getRangeFills(index, index + 1),
@@ -393,6 +556,7 @@ function mapFormattedCharactersToOriginalCharacters(
 
 function getStyleKey(style: CharacterStyleSnapshot): string {
   return JSON.stringify({
+    textStyleId: style.textStyleId,
     fontName: style.fontName,
     fontSize: style.fontSize,
     fills: style.fills,
@@ -475,26 +639,92 @@ function applyStyleToRange(
   }
 }
 
-function applyStyleSnapshotsToFormattedText(
-  node: TextNode,
+function getMappedStylesForFormattedText(
   originalText: string,
   formattedText: string,
   originalStyles: CharacterStyleSnapshot[]
-) {
-  if (originalStyles.length === 0 || formattedText.length === 0) {
-    return;
-  }
-
+): CharacterStyleSnapshot[] {
   const originalIndexByFormattedIndex =
     mapFormattedCharactersToOriginalCharacters(originalText, formattedText);
 
+  return originalIndexByFormattedIndex.map(
+    (originalIndex) => originalStyles[originalIndex] || originalStyles[0]
+  );
+}
+
+async function applyTextStyleIdsToFormattedText(
+  node: TextNode,
+  mappedStyles: CharacterStyleSnapshot[]
+) {
+  if (mappedStyles.length === 0) {
+    return;
+  }
+
   let rangeStart = 0;
-  let currentStyle =
-    originalStyles[originalIndexByFormattedIndex[0]] || originalStyles[0];
+  let currentTextStyleId = mappedStyles[0].textStyleId;
+
+  async function applyTextStyleIdToRange(
+    start: number,
+    end: number,
+    textStyleId: string | typeof figma.mixed
+  ) {
+    if (
+      start >= end ||
+      textStyleId === figma.mixed ||
+      textStyleId.length === 0
+    ) {
+      return;
+    }
+
+    try {
+      await node.setRangeTextStyleIdAsync(start, end, textStyleId);
+    } catch (error) {
+      console.warn(
+        `Could not restore textStyleId for range ${start}-${end}:`,
+        error
+      );
+    }
+  }
+
+  for (let index = 1; index < mappedStyles.length; index++) {
+    const textStyleId = mappedStyles[index].textStyleId;
+
+    if (textStyleId === currentTextStyleId) {
+      continue;
+    }
+
+    await applyTextStyleIdToRange(
+      rangeStart,
+      index,
+      currentTextStyleId
+    );
+
+    rangeStart = index;
+    currentTextStyleId = textStyleId;
+  }
+
+  await applyTextStyleIdToRange(
+    rangeStart,
+    mappedStyles.length,
+    currentTextStyleId
+  );
+}
+
+function applyVisualStylesToFormattedText(
+  node: TextNode,
+  formattedText: string,
+  mappedStyles: CharacterStyleSnapshot[]
+) {
+  if (mappedStyles.length === 0 || formattedText.length === 0) {
+    return;
+  }
+
+  let rangeStart = 0;
+  let currentStyle = mappedStyles[0];
   let currentStyleKey = getStyleKey(currentStyle);
 
   for (let index = 1; index < formattedText.length; index++) {
-    const style = originalStyles[originalIndexByFormattedIndex[index]] || currentStyle;
+    const style = mappedStyles[index] || currentStyle;
     const styleKey = getStyleKey(style);
 
     if (styleKey === currentStyleKey) {
@@ -511,6 +741,28 @@ function applyStyleSnapshotsToFormattedText(
   applyStyleToRange(node, rangeStart, formattedText.length, currentStyle);
 }
 
+async function applyStyleSnapshotsToFormattedText(
+  node: TextNode,
+  originalText: string,
+  formattedText: string,
+  originalStyles: CharacterStyleSnapshot[]
+) {
+  if (originalStyles.length === 0 || formattedText.length === 0) {
+    return;
+  }
+
+  const mappedStyles = getMappedStylesForFormattedText(
+    originalText,
+    formattedText,
+    originalStyles
+  );
+
+  // Restore linked text styles first. Reapplying the saved visual properties
+  // afterwards preserves local overrides without dropping the style link.
+  await applyTextStyleIdsToFormattedText(node, mappedStyles);
+  applyVisualStylesToFormattedText(node, formattedText, mappedStyles);
+}
+
 async function loadFontsFromStyleSnapshots(styles: CharacterStyleSnapshot[]) {
   const fonts = styles
     .map((style) => style.fontName)
@@ -523,28 +775,115 @@ async function loadFontsFromStyleSnapshots(styles: CharacterStyleSnapshot[]) {
   await Promise.all(uniqueFonts.map((font) => figma.loadFontAsync(font)));
 }
 
+class MissingFontLoadError extends Error {
+  readonly fontName: FontName;
+
+  constructor(fontName: FontName, originalError: unknown) {
+    super(
+      `Could not load font ${fontName.family} ${fontName.style}: ${getErrorMessage(originalError)}`
+    );
+    this.name = "MissingFontLoadError";
+    this.fontName = fontName;
+  }
+}
+
 async function loadFontsForTextNode(node: TextNode) {
-  const fonts: FontName[] = [];
+  const uniqueFonts = getUniqueFontsForTextNode(node);
 
-  function addFont(fontName: FontName | typeof figma.mixed) {
-    if (fontName !== figma.mixed) {
-      fonts.push(fontName as FontName);
+  for (const font of uniqueFonts) {
+    try {
+      await figma.loadFontAsync(font);
+    } catch (error) {
+      throw new MissingFontLoadError(font, error);
     }
   }
+}
 
-  if (node.fontName !== figma.mixed) {
-    addFont(node.fontName as FontName);
-  } else {
-    for (let i = 0; i < node.characters.length; i++) {
-      addFont(node.getRangeFontName(i, i + 1));
+type TextEditHunk = {
+  start: number;
+  end: number;
+  insertedText: string;
+};
+
+function buildTextEditHunks(
+  originalText: string,
+  formattedText: string
+): TextEditHunk[] {
+  const hunks: TextEditHunk[] = [];
+
+  let originalIndex = 0;
+  let formattedIndex = 0;
+
+  while (
+    originalIndex < originalText.length ||
+    formattedIndex < formattedText.length
+  ) {
+    if (
+      originalIndex < originalText.length &&
+      formattedIndex < formattedText.length &&
+      originalText[originalIndex] === formattedText[formattedIndex]
+    ) {
+      originalIndex += 1;
+      formattedIndex += 1;
+      continue;
     }
+
+    const nextMatch = findNextMatchingCharacter(
+      originalText,
+      formattedText,
+      originalIndex,
+      formattedIndex
+    );
+
+    const nextOriginalIndex = nextMatch
+      ? nextMatch.originalIndex
+      : originalText.length;
+    const nextFormattedIndex = nextMatch
+      ? nextMatch.formattedIndex
+      : formattedText.length;
+
+    hunks.push({
+      start: originalIndex,
+      end: nextOriginalIndex,
+      insertedText: formattedText.slice(formattedIndex, nextFormattedIndex),
+    });
+
+    originalIndex = nextOriginalIndex;
+    formattedIndex = nextFormattedIndex;
   }
 
-  const uniqueFonts = Array.from(
-    new Map(fonts.map((font) => [`${font.family}-${font.style}`, font])).values()
+  return hunks;
+}
+
+function applyTextEditHunk(node: TextNode, hunk: TextEditHunk) {
+  const { start, end, insertedText } = hunk;
+
+  if (start === end) {
+    if (insertedText.length === 0) {
+      return;
+    }
+
+    const useStyle: "BEFORE" | "AFTER" =
+      start < node.characters.length ? "AFTER" : "BEFORE";
+
+    node.insertCharacters(start, insertedText, useStyle);
+    return;
+  }
+
+  if (insertedText.length === 0) {
+    node.deleteCharacters(start, end);
+    return;
+  }
+
+  // Insert before the original range and copy the style from its first
+  // character. Then remove the shifted original range. This keeps linked
+  // text styles, local overrides, mixed fonts, fills and other range styles
+  // attached without rebuilding them property by property.
+  node.insertCharacters(start, insertedText, "AFTER");
+  node.deleteCharacters(
+    start + insertedText.length,
+    end + insertedText.length
   );
-
-  await Promise.all(uniqueFonts.map((font) => figma.loadFontAsync(font)));
 }
 
 async function updateTextNodeCharactersPreservingStyles(
@@ -552,24 +891,182 @@ async function updateTextNodeCharactersPreservingStyles(
   formattedText: string
 ) {
   const originalText = node.characters;
-  const originalStyles = getTextStyleSnapshots(node);
 
   await loadFontsForTextNode(node);
-  await loadFontsFromStyleSnapshots(originalStyles);
 
-  node.characters = formattedText;
-  applyStyleSnapshotsToFormattedText(
-    node,
-    originalText,
-    formattedText,
-    originalStyles
+  const hunks = buildTextEditHunks(originalText, formattedText);
+
+  for (let index = hunks.length - 1; index >= 0; index--) {
+    applyTextEditHunk(node, hunks[index]);
+  }
+
+  if (node.characters !== formattedText) {
+    throw new Error("Could not apply formatted text exactly");
+  }
+}
+
+
+const LIST_LINE_BREAK_TOKEN_PREFIX = "\uE000";
+const LIST_LINE_BREAK_TOKEN_SUFFIX = "\uE001";
+const LIST_LINE_BREAK_TOKEN_MIDDLE_START = 0xe100;
+const LIST_LINE_BREAK_TOKEN_MIDDLE_END = 0xf8ff;
+
+type ProtectedListLineBreaks = {
+  text: string;
+  token: string | null;
+};
+
+function rangeHasListFormatting(
+  node: TextNode,
+  start: number,
+  end: number
+): boolean {
+  if (start < 0 || end > node.characters.length || start >= end) {
+    return false;
+  }
+
+  const getRangeListOptions = (node as any).getRangeListOptions;
+
+  if (typeof getRangeListOptions !== "function") {
+    return false;
+  }
+
+  try {
+    const listOptions = getRangeListOptions.call(node, start, end);
+
+    if (listOptions === figma.mixed) {
+      return true;
+    }
+
+    if (!listOptions || typeof listOptions !== "object") {
+      return false;
+    }
+
+    const listType = (listOptions as { type?: unknown }).type;
+
+    return typeof listType === "string" && listType !== "NONE";
+  } catch (error) {
+    console.warn(
+      `Could not read list formatting for range ${start}-${end}:`,
+      error
+    );
+    return false;
+  }
+}
+
+function isListParagraphBoundary(node: TextNode, index: number): boolean {
+  const textLength = node.characters.length;
+
+  if (index < 0 || index >= textLength || node.characters[index] !== "\n") {
+    return false;
+  }
+
+  const adjacentRanges: Array<[number, number]> = [];
+
+  if (index > 0) {
+    adjacentRanges.push([index - 1, index]);
+  }
+
+  adjacentRanges.push([index, index + 1]);
+
+  if (index + 1 < textLength) {
+    adjacentRanges.push([index + 1, index + 2]);
+  }
+
+  return adjacentRanges.some(([start, end]) =>
+    rangeHasListFormatting(node, start, end)
+  );
+}
+
+function findUnusedListLineBreakToken(text: string): string | null {
+  for (
+    let codePoint = LIST_LINE_BREAK_TOKEN_MIDDLE_START;
+    codePoint <= LIST_LINE_BREAK_TOKEN_MIDDLE_END;
+    codePoint += 1
+  ) {
+    const token =
+      LIST_LINE_BREAK_TOKEN_PREFIX +
+      String.fromCharCode(codePoint) +
+      LIST_LINE_BREAK_TOKEN_SUFFIX;
+
+    if (!text.includes(token)) {
+      return token;
+    }
+  }
+
+  return null;
+}
+
+function protectListParagraphBreaks(
+  node: TextNode,
+  text: string
+): ProtectedListLineBreaks {
+  if (!text.includes("\n")) {
+    return { text, token: null };
+  }
+
+  const token = findUnusedListLineBreakToken(text);
+
+  if (!token) {
+    console.warn("Could not reserve a token for list paragraph breaks");
+    return { text, token: null };
+  }
+
+  let protectedText = "";
+  let protectedBreakCount = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "\n" && isListParagraphBoundary(node, index)) {
+      protectedText += token;
+      protectedBreakCount += 1;
+    } else {
+      protectedText += text[index];
+    }
+  }
+
+  return protectedBreakCount > 0
+    ? { text: protectedText, token }
+    : { text, token: null };
+}
+
+function restoreListParagraphBreaks(
+  text: string,
+  token: string | null
+): string {
+  return token ? text.split(token).join("\n") : text;
+}
+
+function getErrorMessage(error: unknown): string {
+  return String(
+    error instanceof Error ? error.message : error ?? ""
+  ).toLowerCase();
+}
+
+function isProbablyMissingFontError(error: unknown): boolean {
+  if (error instanceof MissingFontLoadError) {
+    return true;
+  }
+
+  const message = getErrorMessage(error);
+
+  if (!message.includes("font")) {
+    return false;
+  }
+
+  return (
+    message.includes("missing") ||
+    message.includes("not found") ||
+    message.includes("not available") ||
+    message.includes("unavailable") ||
+    message.includes("cannot load") ||
+    message.includes("can't load") ||
+    message.includes("could not load") ||
+    message.includes("failed to load")
   );
 }
 
 function isProbablyNonEditableError(error: unknown): boolean {
-  const message = String(
-    error instanceof Error ? error.message : error ?? ""
-  ).toLowerCase();
+  const message = getErrorMessage(error);
 
   return (
     message.includes("read only") ||
@@ -596,6 +1093,7 @@ async function applyTypographyRules(settings: ApplySettings) {
   let skippedLockedNodeCount = 0;
   let skippedEmptyNodeCount = 0;
   let skippedNonEditableNodeCount = 0;
+  let skippedMissingFontsNodeCount = 0;
   let errorNodeCount = 0;
   let skippedRuleCount = 0;
 
@@ -632,17 +1130,25 @@ async function applyTypographyRules(settings: ApplySettings) {
 
       languageStats[language] += 1;
 
+      const protectedListBreaks = protectListParagraphBreaks(
+        node,
+        originalText
+      );
       const result = TypotypoEngine.applyRulesToText(
-        originalText,
+        protectedListBreaks.text,
         safeSettings,
         language
+      );
+      const formattedText = restoreListParagraphBreaks(
+        result.formattedText,
+        protectedListBreaks.token
       );
 
       skippedRuleCount += result.skippedRuleCount;
 
       if (
         result.replacementCount === 0 ||
-        result.formattedText === originalText
+        formattedText === originalText
       ) {
         unchangedNodeCount += 1;
         continue;
@@ -650,7 +1156,7 @@ async function applyTypographyRules(settings: ApplySettings) {
 
       await updateTextNodeCharactersPreservingStyles(
         node,
-        result.formattedText
+        formattedText
       );
 
       changedNodeCount += 1;
@@ -658,7 +1164,9 @@ async function applyTypographyRules(settings: ApplySettings) {
     } catch (error) {
       console.error("Could not update text node:", error);
 
-      if (isProbablyNonEditableError(error)) {
+      if (isProbablyMissingFontError(error)) {
+        skippedMissingFontsNodeCount += 1;
+      } else if (isProbablyNonEditableError(error)) {
         skippedNonEditableNodeCount += 1;
       } else {
         errorNodeCount += 1;
@@ -671,13 +1179,17 @@ async function applyTypographyRules(settings: ApplySettings) {
     skippedLockedNodeCount +
     skippedEmptyNodeCount +
     skippedNonEditableNodeCount +
-    errorNodeCount;
+    skippedMissingFontsNodeCount;
 
   figma.ui.postMessage({
     type: "apply-result",
     targetScope: target.targetScope,
+    scopeType: target.scopeType,
+    selectionKey: target.selectionKey,
     selectedCount: target.selectedCount,
     totalTextNodeCount: target.textNodes.length,
+    availableTextNodeCount: changedNodeCount + unchangedNodeCount,
+    checkedNodeCount: changedNodeCount + unchangedNodeCount,
     changedNodeCount,
     unchangedNodeCount,
     totalReplacementCount,
@@ -686,6 +1198,7 @@ async function applyTypographyRules(settings: ApplySettings) {
     skippedLockedNodeCount,
     skippedEmptyNodeCount,
     skippedNonEditableNodeCount,
+    skippedMissingFontsNodeCount,
     errorNodeCount,
     skippedRuleCount,
     languageStats,
@@ -693,10 +1206,11 @@ async function applyTypographyRules(settings: ApplySettings) {
 
   figma.notify(
     `Updated ${changedNodeCount} text layer${changedNodeCount === 1 ? "" : "s"}` +
-      (skippedNodeCount > 0 ? ` · Skipped ${skippedNodeCount}` : "")
+      (skippedNodeCount > 0 ? ` · Skipped ${skippedNodeCount}` : "") +
+      (errorNodeCount > 0 ? ` · Errors ${errorNodeCount}` : "")
   );
 
-  sendSelectionInfo();
+  await sendSelectionInfo();
 }
 
 async function initializePlugin() {
@@ -711,11 +1225,15 @@ async function initializePlugin() {
     uiSettings,
   });
 
-  sendSelectionInfo();
+  await sendSelectionInfo();
 }
 
 figma.on("selectionchange", () => {
-  sendSelectionInfo();
+  void sendSelectionInfo();
+});
+
+figma.on("currentpagechange", () => {
+  void sendSelectionInfo();
 });
 
 figma.ui.onmessage = async (message) => {

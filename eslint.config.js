@@ -2,12 +2,17 @@ const eslint = require('@eslint/js')
 const tseslint = require('typescript-eslint')
 const figmaPlugin = require('@figma/eslint-plugin-figma-plugins')
 
+const defaultUnusedVariablesRule = [
+  'error',
+  {
+    argsIgnorePattern: '^_',
+    varsIgnorePattern: '^_',
+    caughtErrorsIgnorePattern: '^_',
+  },
+]
+
 module.exports = tseslint.config(
   eslint.configs.recommended,
-  // @typescript-eslint/recommended-type-checked is too aggressive for
-  // widget code...it doesn't seem to like JSX element return values or
-  // unbundling the `widget` object for use* hooks. So we'll use
-  // tseslint.configs.recommended instead.
   tseslint.configs.recommended,
   {
     plugins: {
@@ -15,18 +20,49 @@ module.exports = tseslint.config(
     },
     rules: {
       ...figmaPlugin.configs.recommended.rules,
-      // allow underscore-prefixing of unused variables
+      '@typescript-eslint/no-unused-vars': defaultUnusedVariablesRule,
+    },
+  },
+  {
+    files: ['code.ts'],
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
+          varsIgnorePattern:
+            '^(?:_.*|getTextStyleSnapshots|applyStyleSnapshotsToFormattedText|loadFontsFromStyleSnapshots)$',
           caughtErrorsIgnorePattern: '^_',
         },
       ],
     },
   },
   {
-    ignores: ['code.js', 'dist', 'eslint.config.js'],
+    files: ['typography-engine.ts'],
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+      'no-useless-escape': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern:
+            '^(?:_.*|TypotypoEngine|isOpeningQuotePosition)$',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
+    ignores: [
+      'node_modules/**',
+      'code.js',
+      'typography-engine.js',
+      'dist/**',
+      '.cursor/**',
+      'eslint.config.js',
+    ],
   },
 )
