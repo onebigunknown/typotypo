@@ -1,40 +1,104 @@
-Below are the steps to get your plugin running. You can also find instructions at:
+# Typotypo
 
-  https://www.figma.com/plugin-docs/plugin-quickstart-guide/
+Typography cleanup for Russian and English interface text in Figma.
 
-This plugin template uses Typescript and NPM, two standard tools in creating JavaScript applications.
+Typotypo helps designers and writers clean up interface copy without leaving the design file. Select text layers, a frame, or a section—or run the plugin across the current page.
 
-First, download Node.js which comes with NPM. This will allow you to install TypeScript and other
-libraries. You can find the download link here:
+No AI, analytics, or network access.
 
-  https://nodejs.org/en/download/
+## Features
 
-Next, install TypeScript using the command:
+- Formats selected text layers and text inside selected frames or sections
+- Formats editable text layers on the current page when nothing is selected
+- Supports Russian and English typography
+- Automatically detects the text language or lets you choose it manually
+- Applies configurable rules for spaces, line breaks, ellipses, quotes, apostrophes, dashes, numbers, units, symbols, and non-breaking spaces
+- Preserves text formatting and linked styles where possible
+- Skips hidden, locked, unavailable, or otherwise non-editable layers
+- Includes Russian and English interfaces
+- Supports light, dark, and system themes
+- Stores rule preferences between launches
 
-  npm install -g typescript
+## How to use
 
-Finally, in the directory of your plugin, get the latest type definitions for the plugin API by running:
+1. Select one or more text layers, frames, or sections in Figma.
+2. Open Typotypo.
+3. Review the detected scope and available text layers.
+4. Enable the typography rules you need.
+5. Choose automatic, Russian, or English text language.
+6. Click **Apply formatting**.
 
-  npm install --save-dev @figma/plugin-typings
+When nothing is selected, Typotypo works with editable text layers on the current page.
 
-If you are familiar with JavaScript, TypeScript will look very familiar. In fact, valid JavaScript code
-is already valid Typescript code.
+## Privacy
 
-TypeScript adds type annotations to variables. This allows code editors such as Visual Studio Code
-to provide information about the Figma API while you are writing code, as well as help catch bugs
-you previously didn't notice.
+Typotypo does not collect, transmit, sell, or share personal data.
 
-For more information, visit https://www.typescriptlang.org/
+Text from Figma documents is processed locally inside the plugin and is not sent to external servers. The plugin does not use analytics and has no network access.
 
-Using TypeScript requires a compiler to convert TypeScript (code.ts) into JavaScript (code.js)
-for the browser to run.
+Interface preferences and typography settings may be stored locally using Figma client storage.
 
-We recommend writing TypeScript code using Visual Studio code:
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 
-1. Download Visual Studio Code if you haven't already: https://code.visualstudio.com/.
-2. Open this directory in Visual Studio Code.
-3. Compile TypeScript to JavaScript: Run the "Terminal > Run Build Task..." menu item,
-    then select "npm: watch". You will have to do this again every time
-    you reopen Visual Studio Code.
+## Support
 
-That's it! Visual Studio Code will regenerate the JavaScript file every time you save.
+Found a bug or have an idea?
+
+[Open an issue](https://github.com/onebigunknown/typotypo/issues).
+
+Please include:
+
+- what you expected to happen;
+- what happened instead;
+- the selected language and enabled rules;
+- a minimal text example;
+- your Figma platform and operating system.
+
+## Development
+
+Requirements:
+
+- Node.js
+- npm
+- Figma desktop app
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Build the plugin (compiles `code.ts` to `code.js`):
+
+```bash
+npm run build
+```
+
+Run the build and lint checks together:
+
+```bash
+npm run check
+```
+
+Rebuild automatically on file changes:
+
+```bash
+npm run watch
+```
+
+### Import into Figma Desktop
+
+1. Open the Figma desktop app.
+2. Go to **Plugins → Development → Import plugin from manifest…**.
+3. Select the `manifest.json` file in this repository.
+4. The plugin appears under **Plugins → Development** and can be run from there.
+
+## Support the project
+
+Typotypo is free to use.
+
+[Support the creator](https://pay.cloudtips.ru/p/7eebd503)
+
+## License
+
+See [LICENSE](LICENSE).
