@@ -1,0 +1,127 @@
+name: Bug report
+description: Report a reproducible problem with Typotypo
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Typotypo.
+
+        Do not use this form to report security vulnerabilities. Use the private vulnerability reporting link in the issue chooser instead.
+
+        Do not include confidential Figma document content, personal data, passwords, access tokens, or other sensitive information.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem clearly and concisely.
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable sequence of steps that reproduces the problem.
+      placeholder: |
+        1. Select…
+        2. Enable…
+        3. Click…
+        4. See…
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect Typotypo to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What did Typotypo do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal text example
+      description: Use a synthetic example without confidential or personal information.
+      placeholder: Paste the smallest text example that reproduces the problem.
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: text-language
+    attributes:
+      label: Selected text language
+      options:
+        - Automatic
+        - Russian
+        - English
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: rules
+    attributes:
+      label: Enabled typography rules
+      description: List the rules that were enabled when the problem occurred.
+      placeholder: For example, quotes, dashes, non-breaking spaces, units.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: figma-platform
+    attributes:
+      label: Figma platform
+      options:
+        - Desktop app
+        - Web app
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: For example, macOS 15 or Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Typotypo version
+      description: Enter the published version if known.
+      placeholder: For example, 1.0.0
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots or other useful details here.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing Issues for the same problem.
+          required: true
+        - label: I confirm that this report does not contain confidential or sensitive information.
+          required: true

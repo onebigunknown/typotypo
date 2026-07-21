@@ -1,0 +1,79 @@
+name: Feature request
+description: Suggest an improvement, workflow change, or typography rule
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to Typotypo.
+
+        Describe the underlying problem or use case before proposing a specific solution.
+
+        Do not include confidential Figma document content, personal data, passwords, access tokens, or other sensitive information.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Request category
+      options:
+        - Typography rule
+        - Language support
+        - Plugin interface
+        - Formatting scope and workflow
+        - Accessibility
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem are you trying to solve?
+      placeholder: Describe the situation in which this improvement would be useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe how you think Typotypo should behave.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: Provide a synthetic text or interface example without confidential information.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any alternative solutions or workarounds you considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, references, or other useful details here.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing Issues for a similar request.
+          required: true
+        - label: I confirm that this request does not contain confidential or sensitive information.
+          required: true
