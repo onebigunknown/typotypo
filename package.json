@@ -15,7 +15,7 @@
   "author": "Anton Abramovich",
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@figma/eslint-plugin-figma-plugins": "*",
     "@figma/plugin-typings": "*",
     "eslint": "^9.39.4",
