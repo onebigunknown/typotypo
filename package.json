@@ -20,6 +20,6 @@
     "@figma/plugin-typings": "*",
     "eslint": "^9.39.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.65.0"
   }
 }
