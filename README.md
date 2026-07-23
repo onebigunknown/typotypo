@@ -1,3 +1,5 @@
+<img width="1920" height="1080" alt="Frame 1" src="https://github.com/user-attachments/assets/bd37be48-2e41-43c0-96bf-cf2b8181bb18" />
+
 # Typotypo
 
 Typography cleanup for Russian and English interface text in Figma.
