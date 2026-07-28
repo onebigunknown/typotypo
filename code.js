@@ -867,6 +867,21 @@ figma.showUI(__html__, {
 });
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const UI_SETTINGS_STORAGE_KEY = "typotypoInterfaceSettings";
+const PAGE_AVAILABILITY_RELEVANT_PROPERTIES = new Set([
+    "parent",
+    "locked",
+    "visible",
+    "styledTextSegments",
+    "fontName",
+    "textStyleId",
+    "componentPropertyReferences",
+    "componentProperties",
+    "type",
+]);
+const MAX_CACHED_PAGES = 10;
+const pageAvailabilityCache = new Map();
+const pageNodeChangeSubscriptions = new Map();
+const fontAvailabilityCache = new Map();
 async function loadSettings() {
     try {
         const storedSettings = await figma.clientStorage.getAsync(SETTINGS_STORAGE_KEY);
@@ -1039,6 +1054,9 @@ function resolveTextNodeTarget() {
     };
 }
 function getUniqueFontsForTextNode(node) {
+    if (node.characters.length === 0) {
+        return [];
+    }
     const fonts = [];
     function addFont(fontName) {
         if (fontName !== figma.mixed) {
@@ -1049,59 +1067,84 @@ function getUniqueFontsForTextNode(node) {
         addFont(node.fontName);
     }
     else {
-        for (let index = 0; index < node.characters.length; index += 1) {
-            addFont(node.getRangeFontName(index, index + 1));
+        try {
+            for (const segment of node.getStyledTextSegments(["fontName"])) {
+                addFont(segment.fontName);
+            }
+        }
+        catch (error) {
+            console.warn("Could not read styled text segments while collecting fonts:", error);
+            for (const fontName of node.getRangeAllFontNames(0, node.characters.length)) {
+                addFont(fontName);
+            }
         }
     }
     return Array.from(new Map(fonts.map((font) => [`${font.family}-${font.style}`, font])).values());
 }
-async function summarizeTextNodeAvailability(textNodes) {
-    const summary = {
-        totalTextNodeCount: textNodes.length,
+function createEmptyTextNodeAvailabilitySummary() {
+    return {
+        totalTextNodeCount: 0,
         availableTextNodeCount: 0,
         skippedHiddenNodeCount: 0,
         skippedLockedNodeCount: 0,
         skippedEmptyNodeCount: 0,
         skippedMissingFontsNodeCount: 0,
     };
+}
+function adjustTextNodeAvailabilitySummary(summary, state, delta) {
+    summary.totalTextNodeCount += delta;
+    if (state === "available") {
+        summary.availableTextNodeCount += delta;
+        return;
+    }
+    if (state === "hidden") {
+        summary.skippedHiddenNodeCount += delta;
+        return;
+    }
+    if (state === "locked") {
+        summary.skippedLockedNodeCount += delta;
+        return;
+    }
+    if (state === "empty") {
+        summary.skippedEmptyNodeCount += delta;
+        return;
+    }
+    summary.skippedMissingFontsNodeCount += delta;
+}
+function canLoadFontForAvailabilityAnalysis(font) {
+    const key = `${font.family}-${font.style}`;
+    const existing = fontAvailabilityCache.get(key);
+    if (existing) {
+        return existing;
+    }
+    const availability = figma
+        .loadFontAsync(font)
+        .then(() => true)
+        .catch((error) => {
+        console.warn(`Could not load font during selection analysis: ${key}`, error);
+        fontAvailabilityCache.delete(key);
+        return false;
+    });
+    fontAvailabilityCache.set(key, availability);
+    return availability;
+}
+async function analyzeTextNodeAvailability(textNodes) {
+    const summary = createEmptyTextNodeAvailabilitySummary();
+    const states = new Map();
     const candidateNodes = [];
     for (const node of textNodes) {
         const skipReason = getTextNodePreflightSkipReason(node);
-        if (skipReason === "hidden") {
-            summary.skippedHiddenNodeCount += 1;
-            continue;
-        }
-        if (skipReason === "locked") {
-            summary.skippedLockedNodeCount += 1;
-            continue;
-        }
-        if (skipReason === "empty") {
-            summary.skippedEmptyNodeCount += 1;
+        if (skipReason) {
+            states.set(node.id, skipReason);
+            adjustTextNodeAvailabilitySummary(summary, skipReason, 1);
             continue;
         }
         candidateNodes.push(node);
     }
-    const fontAvailability = new Map();
-    function canLoadFont(font) {
-        const key = `${font.family}-${font.style}`;
-        const existing = fontAvailability.get(key);
-        if (existing) {
-            return existing;
-        }
-        const availability = figma
-            .loadFontAsync(font)
-            .then(() => true)
-            .catch((error) => {
-            console.warn(`Could not load font during selection analysis: ${key}`, error);
-            return false;
-        });
-        fontAvailability.set(key, availability);
-        return availability;
-    }
     const availabilityResults = await Promise.all(candidateNodes.map(async (node) => {
         try {
             const fonts = getUniqueFontsForTextNode(node);
-            const loaded = await Promise.all(fonts.map(canLoadFont));
+            const loaded = await Promise.all(fonts.map(canLoadFontForAvailabilityAnalysis));
             return loaded.every(Boolean);
         }
         catch (error) {
@@ -1109,21 +1152,432 @@ async function summarizeTextNodeAvailability(textNodes) {
             return false;
         }
     }));
-    for (const isAvailable of availabilityResults) {
-        if (isAvailable) {
-            summary.availableTextNodeCount += 1;
+    availabilityResults.forEach((isAvailable, index) => {
+        const node = candidateNodes[index];
+        const state = isAvailable
+            ? "available"
+            : "missingFonts";
+        states.set(node.id, state);
+        adjustTextNodeAvailabilitySummary(summary, state, 1);
+    });
+    return { summary, states };
+}
+async function summarizeTextNodeAvailability(textNodes) {
+    const analysis = await analyzeTextNodeAvailability(textNodes);
+    return analysis.summary;
+}
+async function getSelectionAvailabilitySummary(page, textNodes) {
+    const entry = pageAvailabilityCache.get(page.id);
+    if (!entry || !entry.summary || entry.dirty || entry.pending) {
+        const summary = await summarizeTextNodeAvailability(textNodes);
+        return {
+            summary,
+            source: "direct",
+            cachedNodeCount: 0,
+            missingNodeCount: textNodes.length,
+        };
+    }
+    const summary = createEmptyTextNodeAvailabilitySummary();
+    const missingNodes = [];
+    let cachedNodeCount = 0;
+    for (const node of textNodes) {
+        if (node.removed) {
+            continue;
+        }
+        const cachedState = entry.nodeStates.get(node.id);
+        if (cachedState) {
+            adjustTextNodeAvailabilitySummary(summary, cachedState, 1);
+            cachedNodeCount += 1;
         }
         else {
-            summary.skippedMissingFontsNodeCount += 1;
+            missingNodes.push(node);
         }
     }
+    if (missingNodes.length === 0) {
+        return {
+            summary,
+            source: "page-cache",
+            cachedNodeCount,
+            missingNodeCount: 0,
+        };
+    }
+    const revisionAtStart = entry.revision;
+    const analysis = await analyzeTextNodeAvailability(missingNodes);
+    for (const node of missingNodes) {
+        const state = analysis.states.get(node.id);
+        if (!state) {
+            continue;
+        }
+        adjustTextNodeAvailabilitySummary(summary, state, 1);
+    }
+    const canMergeIntoPageCache = entry.summary !== null &&
+        !entry.dirty &&
+        !entry.pending &&
+        entry.revision === revisionAtStart;
+    if (canMergeIntoPageCache && entry.summary) {
+        const nextSummary = { ...entry.summary };
+        const nextTextNodes = new Map(entry.textNodes);
+        const nextNodeStates = new Map(entry.nodeStates);
+        for (const node of missingNodes) {
+            const state = analysis.states.get(node.id);
+            if (!state) {
+                continue;
+            }
+            adjustTextNodeAvailabilitySummary(nextSummary, state, 1);
+            nextNodeStates.set(node.id, state);
+            nextTextNodes.set(node.id, node);
+        }
+        entry.summary = nextSummary;
+        entry.textNodes = nextTextNodes;
+        entry.nodeStates = nextNodeStates;
+    }
+    return {
+        summary,
+        source: "page-cache",
+        cachedNodeCount,
+        missingNodeCount: missingNodes.length,
+    };
+}
+function getOrCreatePageAvailabilityCacheEntry(pageId) {
+    const existingEntry = pageAvailabilityCache.get(pageId);
+    if (existingEntry) {
+        return existingEntry;
+    }
+    const entry = {
+        summary: null,
+        textNodes: new Map(),
+        nodeStates: new Map(),
+        dirty: true,
+        revision: 0,
+        pending: null,
+        updateQueue: Promise.resolve(),
+        lastAccessedAt: Date.now(),
+    };
+    pageAvailabilityCache.set(pageId, entry);
+    return entry;
+}
+function markPageAvailabilityCacheDirty(pageId) {
+    const entry = pageAvailabilityCache.get(pageId);
+    if (!entry) {
+        return;
+    }
+    entry.dirty = true;
+    entry.revision += 1;
+}
+function forgetPageAvailabilityCache(pageId) {
+    const subscription = pageNodeChangeSubscriptions.get(pageId);
+    if (subscription) {
+        subscription.page.off("nodechange", subscription.callback);
+        pageNodeChangeSubscriptions.delete(pageId);
+    }
+    pageAvailabilityCache.delete(pageId);
+}
+function evictLeastRecentlyUsedPageAvailabilityCaches(currentPageId) {
+    if (pageAvailabilityCache.size <= MAX_CACHED_PAGES) {
+        return;
+    }
+    const evictionCandidates = Array.from(pageAvailabilityCache.entries())
+        .filter(([pageId]) => pageId !== currentPageId)
+        .sort(([, a], [, b]) => a.lastAccessedAt - b.lastAccessedAt);
+    let excessCount = pageAvailabilityCache.size - MAX_CACHED_PAGES;
+    for (const [pageId] of evictionCandidates) {
+        if (excessCount <= 0) {
+            break;
+        }
+        forgetPageAvailabilityCache(pageId);
+        excessCount -= 1;
+    }
+}
+function pruneRemovedPageAvailabilityCaches() {
+    if (pageAvailabilityCache.size === 0 &&
+        pageNodeChangeSubscriptions.size === 0) {
+        return;
+    }
+    const existingPageIds = new Set(figma.root.children.map((page) => page.id));
+    const trackedPageIds = new Set([
+        ...pageAvailabilityCache.keys(),
+        ...pageNodeChangeSubscriptions.keys(),
+    ]);
+    for (const pageId of trackedPageIds) {
+        if (!existingPageIds.has(pageId)) {
+            forgetPageAvailabilityCache(pageId);
+        }
+    }
+}
+function isRemovedNode(node) {
+    return "removed" in node && node.removed === true;
+}
+function collectTextNodesFromCreatedNode(node) {
+    if (node.type === "TEXT") {
+        return [node];
+    }
+    if ("findAllWithCriteria" in node) {
+        return node.findAllWithCriteria({
+            types: ["TEXT"],
+        });
+    }
+    return collectTextNodesFromSceneNodeRoots([node]);
+}
+async function collectTextNodesFromPage(page) {
+    await page.loadAsync();
+    return page.findAllWithCriteria({
+        types: ["TEXT"],
+    });
+}
+function shouldReanalyzeTextNodeAfterPropertyChange(entry, node, properties) {
+    if (properties.some((property) => PAGE_AVAILABILITY_RELEVANT_PROPERTIES.has(property))) {
+        return true;
+    }
+    if (!properties.includes("characters")) {
+        return false;
+    }
+    const previousState = entry.nodeStates.get(node.id);
+    if (!previousState) {
+        return true;
+    }
+    const wasEmpty = previousState === "empty";
+    const isEmpty = node.characters.trim().length === 0;
+    return wasEmpty !== isEmpty;
+}
+async function applyIncrementalPageAvailabilityChanges(page, event) {
+    const entry = pageAvailabilityCache.get(page.id);
+    if (!entry) {
+        return false;
+    }
+    if (entry.pending) {
+        try {
+            await entry.pending;
+        }
+        catch {
+            // The in-flight full recompute failed; the dirty/missing-summary
+            // check below decides how to proceed.
+        }
+    }
+    if (!entry.summary || entry.dirty) {
+        markPageAvailabilityCacheDirty(page.id);
+        return false;
+    }
+    entry.lastAccessedAt = Date.now();
+    const revisionAtStart = entry.revision;
+    const createdTextNodes = new Map();
+    const textNodesToReanalyze = new Map();
+    const deletedTextNodeIds = new Set();
+    let requiresFullRebuild = false;
+    for (const change of event.nodeChanges) {
+        if (change.type === "DELETE") {
+            if (change.node.type !== "TEXT") {
+                let cachedRemovedTextNodeCount = 0;
+                for (const [textNodeId, textNode] of entry.textNodes) {
+                    if (textNode.removed) {
+                        deletedTextNodeIds.add(textNodeId);
+                        cachedRemovedTextNodeCount += 1;
+                    }
+                }
+                if (cachedRemovedTextNodeCount === 0) {
+                    requiresFullRebuild = true;
+                    break;
+                }
+                continue;
+            }
+            if (!entry.nodeStates.has(change.node.id)) {
+                requiresFullRebuild = true;
+                break;
+            }
+            deletedTextNodeIds.add(change.node.id);
+            continue;
+        }
+        if (isRemovedNode(change.node)) {
+            requiresFullRebuild = true;
+            break;
+        }
+        if (change.type === "CREATE") {
+            try {
+                for (const textNode of collectTextNodesFromCreatedNode(change.node)) {
+                    if (!entry.textNodes.has(textNode.id)) {
+                        createdTextNodes.set(textNode.id, textNode);
+                    }
+                }
+            }
+            catch (error) {
+                console.warn("Could not inspect newly created node subtree:", error);
+                requiresFullRebuild = true;
+                break;
+            }
+            continue;
+        }
+        if (change.node.type === "TEXT") {
+            const textNode = change.node;
+            if (!entry.textNodes.has(textNode.id)) {
+                requiresFullRebuild = true;
+                break;
+            }
+            if (shouldReanalyzeTextNodeAfterPropertyChange(entry, textNode, change.properties)) {
+                textNodesToReanalyze.set(textNode.id, textNode);
+            }
+            continue;
+        }
+        if (change.properties.some((property) => PAGE_AVAILABILITY_RELEVANT_PROPERTIES.has(property))) {
+            requiresFullRebuild = true;
+            break;
+        }
+    }
+    if (requiresFullRebuild) {
+        markPageAvailabilityCacheDirty(page.id);
+        return false;
+    }
+    for (const deletedId of deletedTextNodeIds) {
+        createdTextNodes.delete(deletedId);
+        textNodesToReanalyze.delete(deletedId);
+    }
+    const nodesToAnalyze = Array.from(new Map([...createdTextNodes.values(), ...textNodesToReanalyze.values()].map((node) => [node.id, node])).values());
+    const analysis = await analyzeTextNodeAvailability(nodesToAnalyze);
+    if (entry.revision !== revisionAtStart || entry.dirty || !entry.summary) {
+        return false;
+    }
+    const nextSummary = { ...entry.summary };
+    const nextTextNodes = new Map(entry.textNodes);
+    const nextNodeStates = new Map(entry.nodeStates);
+    for (const deletedId of deletedTextNodeIds) {
+        const previousState = nextNodeStates.get(deletedId);
+        if (!previousState) {
+            markPageAvailabilityCacheDirty(page.id);
+            return false;
+        }
+        adjustTextNodeAvailabilitySummary(nextSummary, previousState, -1);
+        nextNodeStates.delete(deletedId);
+        nextTextNodes.delete(deletedId);
+    }
+    for (const node of nodesToAnalyze) {
+        const nextState = analysis.states.get(node.id);
+        if (!nextState) {
+            markPageAvailabilityCacheDirty(page.id);
+            return false;
+        }
+        const previousState = nextNodeStates.get(node.id);
+        if (previousState) {
+            if (previousState !== nextState) {
+                adjustTextNodeAvailabilitySummary(nextSummary, previousState, -1);
+                adjustTextNodeAvailabilitySummary(nextSummary, nextState, 1);
+            }
+        }
+        else {
+            adjustTextNodeAvailabilitySummary(nextSummary, nextState, 1);
+        }
+        nextNodeStates.set(node.id, nextState);
+        nextTextNodes.set(node.id, node);
+    }
+    entry.summary = nextSummary;
+    entry.nodeStates = nextNodeStates;
+    entry.textNodes = nextTextNodes;
+    return deletedTextNodeIds.size > 0 || nodesToAnalyze.length > 0;
+}
+function queueIncrementalPageAvailabilityChanges(page, event) {
+    const entry = pageAvailabilityCache.get(page.id);
+    if (!entry) {
+        return;
+    }
+    const update = entry.updateQueue
+        .then(() => applyIncrementalPageAvailabilityChanges(page, event))
+        .catch((error) => {
+        console.warn("Could not update the page text-layer cache:", error);
+        markPageAvailabilityCacheDirty(page.id);
+        return false;
+    });
+    entry.updateQueue = update.then(() => undefined);
+    void update.then((didUpdate) => {
+        if (didUpdate &&
+            figma.currentPage.id === page.id &&
+            page.selection.length === 0) {
+            void sendSelectionInfo();
+        }
+    });
+}
+function ensurePageAvailabilityCacheSubscription(page) {
+    if (pageNodeChangeSubscriptions.has(page.id)) {
+        return;
+    }
+    const callback = (event) => {
+        queueIncrementalPageAvailabilityChanges(page, event);
+    };
+    page.on("nodechange", callback);
+    pageNodeChangeSubscriptions.set(page.id, { page, callback });
+}
+async function getPageAvailabilitySummary(page) {
+    ensurePageAvailabilityCacheSubscription(page);
+    const entry = getOrCreatePageAvailabilityCacheEntry(page.id);
+    entry.lastAccessedAt = Date.now();
+    evictLeastRecentlyUsedPageAvailabilityCaches(page.id);
+    await entry.updateQueue;
+    if (entry.summary && !entry.dirty) {
+        return entry.summary;
+    }
+    if (entry.pending) {
+        return entry.pending;
+    }
+    const revisionAtStart = entry.revision;
+    const pending = (async () => {
+        const textNodes = await collectTextNodesFromPage(page);
+        const analysis = await analyzeTextNodeAvailability(textNodes);
+        if (entry.revision === revisionAtStart) {
+            entry.summary = analysis.summary;
+            entry.textNodes = new Map(textNodes.map((node) => [node.id, node]));
+            entry.nodeStates = analysis.states;
+            entry.dirty = false;
+        }
+        return analysis.summary;
+    })();
+    entry.pending = pending;
+    let summary;
+    try {
+        summary = await pending;
+    }
+    finally {
+        if (entry.pending === pending) {
+            entry.pending = null;
+        }
+    }
+    if (entry.revision !== revisionAtStart) {
+        return getPageAvailabilitySummary(page);
+    }
     return summary;
+}
+async function warmPageAvailabilityCache(page) {
+    try {
+        await getPageAvailabilitySummary(page);
+    }
+    catch (error) {
+        console.warn("Could not warm the page text-layer cache:", error);
+        markPageAvailabilityCacheDirty(page.id);
+    }
 }
 let selectionInfoRequestId = 0;
 async function sendSelectionInfo() {
     const requestId = ++selectionInfoRequestId;
+    const page = figma.currentPage;
+    const selection = page.selection;
+    if (selection.length === 0) {
+        const availabilitySummary = await getPageAvailabilitySummary(page);
+        if (requestId !== selectionInfoRequestId) {
+            return;
+        }
+        figma.ui.postMessage({
+            type: "selection-info",
+            targetScope: "currentPage",
+            scopeType: "currentPage",
+            selectionKey: `page:${page.id}`,
+            selectedCount: 0,
+            textNodeCount: availabilitySummary.totalTextNodeCount,
+            availableTextNodeCount: availabilitySummary.availableTextNodeCount,
+            skippedHiddenNodeCount: availabilitySummary.skippedHiddenNodeCount,
+            skippedLockedNodeCount: availabilitySummary.skippedLockedNodeCount,
+            skippedEmptyNodeCount: availabilitySummary.skippedEmptyNodeCount,
+            skippedMissingFontsNodeCount: availabilitySummary.skippedMissingFontsNodeCount,
+        });
+        return;
+    }
     const target = resolveTextNodeTarget();
-    const availabilitySummary = await summarizeTextNodeAvailability(target.textNodes);
+    const selectionSummaryResult = await getSelectionAvailabilitySummary(page, target.textNodes);
+    const availabilitySummary = selectionSummaryResult.summary;
     if (requestId !== selectionInfoRequestId) {
         return;
     }
@@ -1636,18 +2090,30 @@ async function initializePlugin() {
         loadSettings(),
         loadUiSettings(),
     ]);
+    const page = figma.currentPage;
+    pruneRemovedPageAvailabilityCaches();
+    ensurePageAvailabilityCacheSubscription(page);
     figma.ui.postMessage({
         type: "settings-loaded",
         settings,
         uiSettings,
     });
     await sendSelectionInfo();
+    if (page.selection.length > 0) {
+        void warmPageAvailabilityCache(page);
+    }
 }
 figma.on("selectionchange", () => {
     void sendSelectionInfo();
 });
 figma.on("currentpagechange", () => {
+    const page = figma.currentPage;
+    pruneRemovedPageAvailabilityCaches();
+    ensurePageAvailabilityCacheSubscription(page);
     void sendSelectionInfo();
+    if (page.selection.length > 0) {
+        void warmPageAvailabilityCache(page);
+    }
 });
 figma.ui.onmessage = async (message) => {
     if (message.type === "save-settings") {
