@@ -2,6 +2,8 @@
 
 # Typotypo
 
+[**Install Typotypo from Figma Community →**](https://www.figma.com/community/plugin/1641929552052762204)
+
 Typography cleanup for Russian and English interface text in Figma.
 
 Typotypo helps designers and writers clean up interface copy without leaving the design file. Select text layers, a frame, or a section—or run the plugin across the current page.
