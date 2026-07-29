@@ -881,7 +881,6 @@ const PAGE_AVAILABILITY_RELEVANT_PROPERTIES = new Set([
 const MAX_CACHED_PAGES = 10;
 const pageAvailabilityCache = new Map();
 const pageNodeChangeSubscriptions = new Map();
-const fontAvailabilityCache = new Map();
 async function loadSettings() {
     try {
         const storedSettings = await figma.clientStorage.getAsync(SETTINGS_STORAGE_KEY);
@@ -971,6 +970,58 @@ function getTextNodePreflightSkipReason(node) {
         return "empty";
     }
     return null;
+}
+function getAncestorLocalData(ancestor, ancestorLocalDataCache) {
+    const cached = ancestorLocalDataCache.get(ancestor);
+    if (cached) {
+        return cached;
+    }
+    const localData = {
+        parent: ancestor.parent,
+        selfHidden: "visible" in ancestor && ancestor.visible === false,
+        selfLocked: "locked" in ancestor && ancestor.locked === true,
+    };
+    ancestorLocalDataCache.set(ancestor, localData);
+    return localData;
+}
+// Combined, cached hidden/locked ancestor resolution used only by
+// analyzeTextNodeAvailability's pre-analysis pass. Both caches are created
+// fresh per analyzeTextNodeAvailability call (see there) so they never
+// outlive a single analysis and cannot serve stale values across
+// nodechange events. Keyed by node object identity, never by node.id, and
+// the TextNode being analyzed is never inserted into either cache (only its
+// ancestors are, since only ancestors can be shared between sibling text
+// layers). Semantics mirror isNodeHiddenBySelfOrParent/
+// isNodeLockedBySelfOrParent exactly (same "in" guards, same
+// OR-over-ancestors rule), just computed together in one walk instead of
+// two, with each ancestor's own properties read at most once.
+function resolveAncestorAvailabilityFlags(parent, ancestorAvailabilityCache, ancestorLocalDataCache) {
+    if (!parent) {
+        return { hidden: false, locked: false };
+    }
+    const chain = [];
+    let currentNode = parent;
+    let inherited = { hidden: false, locked: false };
+    while (currentNode) {
+        const cachedFlags = ancestorAvailabilityCache.get(currentNode);
+        if (cachedFlags) {
+            inherited = cachedFlags;
+            break;
+        }
+        const localData = getAncestorLocalData(currentNode, ancestorLocalDataCache);
+        chain.push({ node: currentNode, localData });
+        currentNode = localData.parent;
+    }
+    let effective = inherited;
+    for (let index = chain.length - 1; index >= 0; index -= 1) {
+        const { node: chainNode, localData } = chain[index];
+        effective = {
+            hidden: effective.hidden || localData.selfHidden,
+            locked: effective.locked || localData.selfLocked,
+        };
+        ancestorAvailabilityCache.set(chainNode, effective);
+    }
+    return effective;
 }
 function collectTextNodesFromSceneNodeRoots(roots) {
     const textNodes = [];
@@ -1111,55 +1162,42 @@ function adjustTextNodeAvailabilitySummary(summary, state, delta) {
     }
     summary.skippedMissingFontsNodeCount += delta;
 }
-function canLoadFontForAvailabilityAnalysis(font) {
-    const key = `${font.family}-${font.style}`;
-    const existing = fontAvailabilityCache.get(key);
-    if (existing) {
-        return existing;
-    }
-    const availability = figma
-        .loadFontAsync(font)
-        .then(() => true)
-        .catch((error) => {
-        console.warn(`Could not load font during selection analysis: ${key}`, error);
-        fontAvailabilityCache.delete(key);
-        return false;
-    });
-    fontAvailabilityCache.set(key, availability);
-    return availability;
-}
 async function analyzeTextNodeAvailability(textNodes) {
     const summary = createEmptyTextNodeAvailabilitySummary();
     const states = new Map();
-    const candidateNodes = [];
+    const documentHasMissingFont = figma.hasMissingFont;
+    const ancestorAvailabilityCache = new Map();
+    const ancestorLocalDataCache = new Map();
     for (const node of textNodes) {
-        const skipReason = getTextNodePreflightSkipReason(node);
+        const selfHidden = "visible" in node && node.visible === false;
+        const selfLocked = "locked" in node && node.locked === true;
+        const ancestorFlags = resolveAncestorAvailabilityFlags(node.parent, ancestorAvailabilityCache, ancestorLocalDataCache);
+        const isHidden = selfHidden || ancestorFlags.hidden;
+        const isLocked = selfLocked || ancestorFlags.locked;
+        let skipReason = null;
+        if (isHidden) {
+            skipReason = "hidden";
+        }
+        else if (isLocked) {
+            skipReason = "locked";
+        }
+        else if (node.characters.trim().length === 0) {
+            skipReason = "empty";
+        }
         if (skipReason) {
             states.set(node.id, skipReason);
             adjustTextNodeAvailabilitySummary(summary, skipReason, 1);
             continue;
         }
-        candidateNodes.push(node);
-    }
-    const availabilityResults = await Promise.all(candidateNodes.map(async (node) => {
-        try {
-            const fonts = getUniqueFontsForTextNode(node);
-            const loaded = await Promise.all(fonts.map(canLoadFontForAvailabilityAnalysis));
-            return loaded.every(Boolean);
-        }
-        catch (error) {
-            console.warn("Could not inspect text node fonts during selection analysis:", error);
-            return false;
-        }
-    }));
-    availabilityResults.forEach((isAvailable, index) => {
-        const node = candidateNodes[index];
-        const state = isAvailable
-            ? "available"
-            : "missingFonts";
+        const hasMissingFont = documentHasMissingFont
+            ? node.hasMissingFont
+            : false;
+        const state = hasMissingFont
+            ? "missingFonts"
+            : "available";
         states.set(node.id, state);
         adjustTextNodeAvailabilitySummary(summary, state, 1);
-    });
+    }
     return { summary, states };
 }
 async function summarizeTextNodeAvailability(textNodes) {
