@@ -861,10 +861,6 @@ var TypotypoEngine;
     }
 })(TypotypoEngine || (TypotypoEngine = {}));
 /// <reference path="./typography-engine.ts" />
-figma.showUI(__html__, {
-    width: 420,
-    height: 640,
-});
 const SETTINGS_STORAGE_KEY = "typographyFormatterSettings";
 const UI_SETTINGS_STORAGE_KEY = "typotypoInterfaceSettings";
 const PAGE_AVAILABILITY_RELEVANT_PROPERTIES = new Set([
@@ -881,6 +877,61 @@ const PAGE_AVAILABILITY_RELEVANT_PROPERTIES = new Set([
 const MAX_CACHED_PAGES = 10;
 const pageAvailabilityCache = new Map();
 const pageNodeChangeSubscriptions = new Map();
+// Temporary end-to-end diagnostics for the "selected frame -> whole page"
+// scope-switch lag investigation. Logs only counts, durations, booleans and
+// a small allow-listed set of property names — never layer/page/font names
+// or text content. Safe to delete wholesale once the investigation is done.
+const SCOPE_SWITCH_DEBUG = true;
+function scopeSwitchDebugNow() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+        return performance.now();
+    }
+    return Date.now();
+}
+function scopeSwitchCacheDirtyLog(details) {
+    if (SCOPE_SWITCH_DEBUG) {
+        console.log("[page-cache-dirty]", details);
+    }
+}
+const SCOPE_SWITCH_DIRTY_SAFE_PROPERTIES = new Set([
+    "characters",
+    "visible",
+    "locked",
+    "fontName",
+    "textStyleId",
+    "styledTextSegments",
+]);
+function summarizeScopeSwitchChangedProperties(event) {
+    const seen = new Set();
+    for (const change of event.nodeChanges) {
+        if (change.type !== "PROPERTY_CHANGE") {
+            continue;
+        }
+        for (const property of change.properties) {
+            if (SCOPE_SWITCH_DIRTY_SAFE_PROPERTIES.has(property)) {
+                seen.add(property);
+            }
+        }
+    }
+    return Array.from(seen);
+}
+function createScopeSwitchPageDebugInfo() {
+    return {
+        updateQueueWaitDurationMs: 0,
+        pageLoadDurationMs: 0,
+        collectTextNodesDurationMs: 0,
+        analyzeTextNodesDurationMs: 0,
+        backgroundPrewarm: false,
+        batchSize: 0,
+        batchCount: 0,
+        yieldCount: 0,
+        textNodeCount: 0,
+        longestBatchDurationMs: 0,
+        requestWasWaitingForPending: false,
+        resultCommitted: false,
+        resultDiscarded: false,
+    };
+}
 async function loadSettings() {
     try {
         const storedSettings = await figma.clientStorage.getAsync(SETTINGS_STORAGE_KEY);
@@ -926,6 +977,34 @@ async function loadUiSettings() {
         console.error("Could not load UI settings:", error);
         return {};
     }
+}
+function createInitialUiHtml(uiSettings) {
+    const initialTheme = uiSettings.theme || "system";
+    const initialThemeScript = `<script>
+    (() => {
+      const themeMode = ${JSON.stringify(initialTheme)};
+      const systemIsDark = Boolean(
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      );
+      const effectiveTheme = themeMode === "system"
+        ? (systemIsDark ? "dark" : "light")
+        : themeMode;
+
+      document.documentElement.dataset.theme = effectiveTheme;
+
+      try {
+        window.localStorage.setItem("typotypoTheme", themeMode);
+      } catch (error) {}
+    })();
+  </script>`;
+    const firstStyleIndex = __html__.indexOf("<style>");
+    if (firstStyleIndex < 0) {
+        return initialThemeScript + __html__;
+    }
+    return (__html__.slice(0, firstStyleIndex) +
+        initialThemeScript +
+        __html__.slice(firstStyleIndex));
 }
 async function saveUiSettings(uiSettings) {
     try {
@@ -1033,6 +1112,9 @@ function collectTextNodesFromSceneNodeRoots(roots) {
         seenNodeIds.add(node.id);
         textNodes.push(node);
     }
+    // Deep fallback for a root whose type has no findAllWithCriteria (e.g. a
+    // plain shape with no children). Never reads text/visibility/lock
+    // properties, only .type and .children, same as before.
     function walk(node) {
         if (node.type === "TEXT") {
             addTextNode(node);
@@ -1044,8 +1126,21 @@ function collectTextNodesFromSceneNodeRoots(roots) {
             }
         }
     }
-    for (const node of roots) {
-        walk(node);
+    for (const root of roots) {
+        if (root.type === "TEXT") {
+            addTextNode(root);
+            continue;
+        }
+        if ("findAllWithCriteria" in root) {
+            const descendantTextNodes = root.findAllWithCriteria({
+                types: ["TEXT"],
+            });
+            for (const textNode of descendantTextNodes) {
+                addTextNode(textNode);
+            }
+            continue;
+        }
+        walk(root);
     }
     return textNodes;
 }
@@ -1200,9 +1295,163 @@ async function analyzeTextNodeAvailability(textNodes) {
     }
     return { summary, states };
 }
+// Full-page rebuild only. Same per-node algorithm and ancestor caches as
+// analyzeTextNodeAvailability (kept untouched above for selection/
+// missingNodes/CREATE/incremental use), just chunked so a large page doesn't
+// block the single JS thread for one long synchronous stretch. The ancestor
+// caches are created once and reused across batches; a yield only hands
+// control back to the event loop, it never invalidates prior work.
+const PAGE_ANALYSIS_BATCH_SIZE = 64;
+// Minimum time between broadcast progress updates for a full-page analysis
+// (the very first and very last updates always bypass this, see call site).
+const PAGE_ANALYSIS_PROGRESS_THROTTLE_MS = 250;
+function yieldToEventLoop() {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
+const pageAnalysisProgressListeners = new Map();
+function addPageAnalysisProgressListener(pageId, listener) {
+    let listeners = pageAnalysisProgressListeners.get(pageId);
+    if (!listeners) {
+        listeners = new Set();
+        pageAnalysisProgressListeners.set(pageId, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) {
+            pageAnalysisProgressListeners.delete(pageId);
+        }
+    };
+}
+function notifyPageAnalysisProgress(pageId, progress) {
+    const listeners = pageAnalysisProgressListeners.get(pageId);
+    if (!listeners) {
+        return;
+    }
+    for (const listener of listeners) {
+        listener(progress);
+    }
+}
+async function analyzeTextNodeAvailabilityInBatches(textNodes, isStillValid, scopeSwitchDebugInfo, onBatchProgress) {
+    const summary = createEmptyTextNodeAvailabilitySummary();
+    const states = new Map();
+    const documentHasMissingFont = figma.hasMissingFont;
+    const ancestorAvailabilityCache = new Map();
+    const ancestorLocalDataCache = new Map();
+    let batchCount = 0;
+    let yieldCount = 0;
+    let longestBatchDurationMs = 0;
+    const reportBatchDebugInfo = () => {
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+            scopeSwitchDebugInfo.batchSize = PAGE_ANALYSIS_BATCH_SIZE;
+            scopeSwitchDebugInfo.batchCount = batchCount;
+            scopeSwitchDebugInfo.yieldCount = yieldCount;
+            scopeSwitchDebugInfo.longestBatchDurationMs = longestBatchDurationMs;
+        }
+    };
+    for (let batchStart = 0; batchStart < textNodes.length; batchStart += PAGE_ANALYSIS_BATCH_SIZE) {
+        if (!isStillValid()) {
+            reportBatchDebugInfo();
+            return null;
+        }
+        const batchStartedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
+        const batchEnd = Math.min(batchStart + PAGE_ANALYSIS_BATCH_SIZE, textNodes.length);
+        for (let index = batchStart; index < batchEnd; index += 1) {
+            const node = textNodes[index];
+            const selfHidden = "visible" in node && node.visible === false;
+            const selfLocked = "locked" in node && node.locked === true;
+            const ancestorFlags = resolveAncestorAvailabilityFlags(node.parent, ancestorAvailabilityCache, ancestorLocalDataCache);
+            const isHidden = selfHidden || ancestorFlags.hidden;
+            const isLocked = selfLocked || ancestorFlags.locked;
+            let skipReason = null;
+            if (isHidden) {
+                skipReason = "hidden";
+            }
+            else if (isLocked) {
+                skipReason = "locked";
+            }
+            else if (node.characters.trim().length === 0) {
+                skipReason = "empty";
+            }
+            if (skipReason) {
+                states.set(node.id, skipReason);
+                adjustTextNodeAvailabilitySummary(summary, skipReason, 1);
+                continue;
+            }
+            const hasMissingFont = documentHasMissingFont
+                ? node.hasMissingFont
+                : false;
+            const state = hasMissingFont
+                ? "missingFonts"
+                : "available";
+            states.set(node.id, state);
+            adjustTextNodeAvailabilitySummary(summary, state, 1);
+        }
+        batchCount += 1;
+        if (SCOPE_SWITCH_DEBUG) {
+            const batchDurationMs = scopeSwitchDebugNow() - batchStartedAt;
+            longestBatchDurationMs = Math.max(longestBatchDurationMs, batchDurationMs);
+        }
+        const isLastBatch = batchEnd >= textNodes.length;
+        if (onBatchProgress) {
+            onBatchProgress(batchEnd, textNodes.length, isLastBatch);
+        }
+        if (!isLastBatch) {
+            yieldCount += 1;
+            await yieldToEventLoop();
+        }
+    }
+    if (!isStillValid()) {
+        reportBatchDebugInfo();
+        return null;
+    }
+    reportBatchDebugInfo();
+    return { summary, states };
+}
 async function summarizeTextNodeAvailability(textNodes) {
     const analysis = await analyzeTextNodeAvailability(textNodes);
     return analysis.summary;
+}
+let selectionResultCache = null;
+function selectionRootIdsMatch(a, b) {
+    if (a.length !== b.length) {
+        return false;
+    }
+    for (let index = 0; index < a.length; index += 1) {
+        if (a[index] !== b[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+function readSelectionResultCache(page, selection) {
+    const cached = selectionResultCache;
+    if (!cached || cached.pageId !== page.id) {
+        return null;
+    }
+    const entry = pageAvailabilityCache.get(page.id);
+    // A cached selection remains valid while a full-page prewarm is merely
+    // pending. The page revision and summary object reference below are the
+    // actual invalidation signals: relevant document changes bump revision,
+    // and every committed page-cache update replaces the summary object.
+    // Rejecting all dirty/pending entries made selection -> currentPage -> the
+    // same selection needlessly re-scan the selection while the silent page
+    // prewarm was still running.
+    if (!entry) {
+        return null;
+    }
+    if (cached.pageRevisionAtCache !== entry.revision ||
+        cached.pageSummaryRefAtCache !== entry.summary) {
+        return null;
+    }
+    const currentSelectionRootIds = selection.map((node) => node.id);
+    if (!selectionRootIdsMatch(cached.selectionRootIds, currentSelectionRootIds)) {
+        return null;
+    }
+    return cached;
+}
+function writeSelectionResultCache(entry) {
+    selectionResultCache = entry;
 }
 async function getSelectionAvailabilitySummary(page, textNodes) {
     const entry = pageAvailabilityCache.get(page.id);
@@ -1288,21 +1537,49 @@ function getOrCreatePageAvailabilityCacheEntry(pageId) {
         dirty: true,
         revision: 0,
         pending: null,
+        pendingProgress: null,
         updateQueue: Promise.resolve(),
         lastAccessedAt: Date.now(),
     };
     pageAvailabilityCache.set(pageId, entry);
     return entry;
 }
-function markPageAvailabilityCacheDirty(pageId) {
+function markPageAvailabilityCacheDirty(pageId, scopeSwitchDebugReason, scopeSwitchDebugExtra) {
     const entry = pageAvailabilityCache.get(pageId);
     if (!entry) {
         return;
     }
+    if (SCOPE_SWITCH_DEBUG) {
+        scopeSwitchCacheDirtyLog({
+            pageId,
+            reason: scopeSwitchDebugReason !== null && scopeSwitchDebugReason !== void 0 ? scopeSwitchDebugReason : "unspecified",
+            cacheHadSummary: Boolean(entry.summary),
+            previousDirty: entry.dirty,
+            newDirty: true,
+            revisionBefore: entry.revision,
+            revisionAfter: entry.revision + 1,
+            nodeChangeCount: scopeSwitchDebugExtra === null || scopeSwitchDebugExtra === void 0 ? void 0 : scopeSwitchDebugExtra.nodeChangeCount,
+            changedProperties: scopeSwitchDebugExtra === null || scopeSwitchDebugExtra === void 0 ? void 0 : scopeSwitchDebugExtra.changedProperties,
+        });
+    }
     entry.dirty = true;
     entry.revision += 1;
 }
-function forgetPageAvailabilityCache(pageId) {
+function forgetPageAvailabilityCache(pageId, scopeSwitchDebugReason) {
+    if (SCOPE_SWITCH_DEBUG) {
+        const entry = pageAvailabilityCache.get(pageId);
+        if (entry) {
+            scopeSwitchCacheDirtyLog({
+                pageId,
+                reason: scopeSwitchDebugReason !== null && scopeSwitchDebugReason !== void 0 ? scopeSwitchDebugReason : "cache-entry-removed",
+                cacheHadSummary: Boolean(entry.summary),
+                previousDirty: entry.dirty,
+                newDirty: true,
+                revisionBefore: entry.revision,
+                revisionAfter: entry.revision,
+            });
+        }
+    }
     const subscription = pageNodeChangeSubscriptions.get(pageId);
     if (subscription) {
         subscription.page.off("nodechange", subscription.callback);
@@ -1322,7 +1599,7 @@ function evictLeastRecentlyUsedPageAvailabilityCaches(currentPageId) {
         if (excessCount <= 0) {
             break;
         }
-        forgetPageAvailabilityCache(pageId);
+        forgetPageAvailabilityCache(pageId, "lru-eviction");
         excessCount -= 1;
     }
 }
@@ -1338,7 +1615,7 @@ function pruneRemovedPageAvailabilityCaches() {
     ]);
     for (const pageId of trackedPageIds) {
         if (!existingPageIds.has(pageId)) {
-            forgetPageAvailabilityCache(pageId);
+            forgetPageAvailabilityCache(pageId, "page-removed-from-document");
         }
     }
 }
@@ -1356,8 +1633,13 @@ function collectTextNodesFromCreatedNode(node) {
     }
     return collectTextNodesFromSceneNodeRoots([node]);
 }
-async function collectTextNodesFromPage(page) {
+async function collectTextNodesFromPage(page, scopeSwitchDebugInfo) {
+    const pageLoadStartedAt = SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo ? scopeSwitchDebugNow() : 0;
     await page.loadAsync();
+    if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+        scopeSwitchDebugInfo.pageLoadDurationMs =
+            scopeSwitchDebugNow() - pageLoadStartedAt;
+    }
     return page.findAllWithCriteria({
         types: ["TEXT"],
     });
@@ -1382,6 +1664,12 @@ async function applyIncrementalPageAvailabilityChanges(page, event) {
     if (!entry) {
         return false;
     }
+    const scopeSwitchDirtyDebugExtra = SCOPE_SWITCH_DEBUG
+        ? {
+            nodeChangeCount: event.nodeChanges.length,
+            changedProperties: summarizeScopeSwitchChangedProperties(event),
+        }
+        : undefined;
     if (entry.pending) {
         try {
             await entry.pending;
@@ -1392,7 +1680,7 @@ async function applyIncrementalPageAvailabilityChanges(page, event) {
         }
     }
     if (!entry.summary || entry.dirty) {
-        markPageAvailabilityCacheDirty(page.id);
+        markPageAvailabilityCacheDirty(page.id, "no-summary-or-already-dirty", scopeSwitchDirtyDebugExtra);
         return false;
     }
     entry.lastAccessedAt = Date.now();
@@ -1460,7 +1748,7 @@ async function applyIncrementalPageAvailabilityChanges(page, event) {
         }
     }
     if (requiresFullRebuild) {
-        markPageAvailabilityCacheDirty(page.id);
+        markPageAvailabilityCacheDirty(page.id, "full-rebuild-required", scopeSwitchDirtyDebugExtra);
         return false;
     }
     for (const deletedId of deletedTextNodeIds) {
@@ -1478,7 +1766,7 @@ async function applyIncrementalPageAvailabilityChanges(page, event) {
     for (const deletedId of deletedTextNodeIds) {
         const previousState = nextNodeStates.get(deletedId);
         if (!previousState) {
-            markPageAvailabilityCacheDirty(page.id);
+            markPageAvailabilityCacheDirty(page.id, "deleted-node-missing-cached-state", scopeSwitchDirtyDebugExtra);
             return false;
         }
         adjustTextNodeAvailabilitySummary(nextSummary, previousState, -1);
@@ -1488,7 +1776,7 @@ async function applyIncrementalPageAvailabilityChanges(page, event) {
     for (const node of nodesToAnalyze) {
         const nextState = analysis.states.get(node.id);
         if (!nextState) {
-            markPageAvailabilityCacheDirty(page.id);
+            markPageAvailabilityCacheDirty(page.id, "analyzed-node-missing-result", scopeSwitchDirtyDebugExtra);
             return false;
         }
         const previousState = nextNodeStates.get(node.id);
@@ -1518,7 +1806,9 @@ function queueIncrementalPageAvailabilityChanges(page, event) {
         .then(() => applyIncrementalPageAvailabilityChanges(page, event))
         .catch((error) => {
         console.warn("Could not update the page text-layer cache:", error);
-        markPageAvailabilityCacheDirty(page.id);
+        markPageAvailabilityCacheDirty(page.id, "incremental-update-threw", SCOPE_SWITCH_DEBUG
+            ? { nodeChangeCount: event.nodeChanges.length }
+            : undefined);
         return false;
     });
     entry.updateQueue = update.then(() => undefined);
@@ -1540,29 +1830,77 @@ function ensurePageAvailabilityCacheSubscription(page) {
     page.on("nodechange", callback);
     pageNodeChangeSubscriptions.set(page.id, { page, callback });
 }
-async function getPageAvailabilitySummary(page) {
+async function getPageAvailabilitySummary(page, scopeSwitchDebugInfo) {
     ensurePageAvailabilityCacheSubscription(page);
     const entry = getOrCreatePageAvailabilityCacheEntry(page.id);
     entry.lastAccessedAt = Date.now();
     evictLeastRecentlyUsedPageAvailabilityCaches(page.id);
+    const updateQueueWaitStartedAt = SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo ? scopeSwitchDebugNow() : 0;
     await entry.updateQueue;
+    if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+        scopeSwitchDebugInfo.updateQueueWaitDurationMs =
+            scopeSwitchDebugNow() - updateQueueWaitStartedAt;
+    }
     if (entry.summary && !entry.dirty) {
         return entry.summary;
     }
     if (entry.pending) {
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+            scopeSwitchDebugInfo.requestWasWaitingForPending = true;
+        }
         return entry.pending;
     }
     const revisionAtStart = entry.revision;
     const pending = (async () => {
-        const textNodes = await collectTextNodesFromPage(page);
-        const analysis = await analyzeTextNodeAvailability(textNodes);
-        if (entry.revision === revisionAtStart) {
+        var _a;
+        const collectStartedAt = SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo ? scopeSwitchDebugNow() : 0;
+        const textNodes = await collectTextNodesFromPage(page, scopeSwitchDebugInfo);
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+            scopeSwitchDebugInfo.collectTextNodesDurationMs =
+                scopeSwitchDebugNow() - collectStartedAt;
+            scopeSwitchDebugInfo.textNodeCount = textNodes.length;
+        }
+        entry.pendingProgress = {
+            processedTextNodeCount: 0,
+            totalTextNodeCount: textNodes.length,
+        };
+        notifyPageAnalysisProgress(page.id, entry.pendingProgress);
+        let lastProgressNotifyAt = Date.now();
+        const analyzeStartedAt = SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo ? scopeSwitchDebugNow() : 0;
+        const analysis = await analyzeTextNodeAvailabilityInBatches(textNodes, () => pageAvailabilityCache.get(page.id) === entry &&
+            entry.revision === revisionAtStart, scopeSwitchDebugInfo, (processedCount, totalCount, isLastBatch) => {
+            const progress = {
+                processedTextNodeCount: processedCount,
+                totalTextNodeCount: totalCount,
+            };
+            entry.pendingProgress = progress;
+            const now = Date.now();
+            if (isLastBatch ||
+                now - lastProgressNotifyAt >= PAGE_ANALYSIS_PROGRESS_THROTTLE_MS) {
+                lastProgressNotifyAt = now;
+                notifyPageAnalysisProgress(page.id, progress);
+            }
+        });
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+            scopeSwitchDebugInfo.analyzeTextNodesDurationMs =
+                scopeSwitchDebugNow() - analyzeStartedAt;
+        }
+        if (analysis &&
+            pageAvailabilityCache.get(page.id) === entry &&
+            entry.revision === revisionAtStart) {
             entry.summary = analysis.summary;
             entry.textNodes = new Map(textNodes.map((node) => [node.id, node]));
             entry.nodeStates = analysis.states;
             entry.dirty = false;
+            if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+                scopeSwitchDebugInfo.resultCommitted = true;
+            }
+            return analysis.summary;
         }
-        return analysis.summary;
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo) {
+            scopeSwitchDebugInfo.resultDiscarded = true;
+        }
+        return (_a = entry.summary) !== null && _a !== void 0 ? _a : createEmptyTextNodeAvailabilitySummary();
     })();
     entry.pending = pending;
     let summary;
@@ -1572,34 +1910,318 @@ async function getPageAvailabilitySummary(page) {
     finally {
         if (entry.pending === pending) {
             entry.pending = null;
+            entry.pendingProgress = null;
         }
     }
     if (entry.revision !== revisionAtStart) {
-        return getPageAvailabilitySummary(page);
+        return getPageAvailabilitySummary(page, scopeSwitchDebugInfo);
     }
     return summary;
 }
-async function warmPageAvailabilityCache(page) {
+async function warmPageAvailabilityCache(page, backgroundPrewarm = false) {
+    const scopeSwitchDebugInfo = SCOPE_SWITCH_DEBUG
+        ? createScopeSwitchPageDebugInfo()
+        : undefined;
+    if (scopeSwitchDebugInfo) {
+        scopeSwitchDebugInfo.backgroundPrewarm = backgroundPrewarm;
+    }
+    const startedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
     try {
-        await getPageAvailabilitySummary(page);
+        await getPageAvailabilitySummary(page, scopeSwitchDebugInfo);
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchDebugInfo && backgroundPrewarm) {
+            console.log("[scope-switch-main] request completed", {
+                sequence: 0,
+                pageId: page.id,
+                requestedScope: "currentPage",
+                resultSource: "page-background-prewarm",
+                backgroundPrewarm: scopeSwitchDebugInfo.backgroundPrewarm,
+                batchSize: scopeSwitchDebugInfo.batchSize,
+                batchCount: scopeSwitchDebugInfo.batchCount,
+                yieldCount: scopeSwitchDebugInfo.yieldCount,
+                textNodeCount: scopeSwitchDebugInfo.textNodeCount,
+                totalAnalysisDurationMs: scopeSwitchDebugInfo.analyzeTextNodesDurationMs,
+                longestBatchDurationMs: scopeSwitchDebugInfo.longestBatchDurationMs,
+                requestWasWaitingForPending: scopeSwitchDebugInfo.requestWasWaitingForPending,
+                resultCommitted: scopeSwitchDebugInfo.resultCommitted,
+                resultDiscarded: scopeSwitchDebugInfo.resultDiscarded,
+                totalMainDurationMs: scopeSwitchDebugNow() - startedAt,
+            });
+        }
     }
     catch (error) {
         console.warn("Could not warm the page text-layer cache:", error);
-        markPageAvailabilityCacheDirty(page.id);
+        markPageAvailabilityCacheDirty(page.id, "warm-cache-failed");
     }
+}
+let initialRenderAckReceivedAt = null;
+function scopeSwitchPrewarmLog(event, pageId, trigger, details = {}) {
+    var _a, _b, _c, _d;
+    if (!SCOPE_SWITCH_DEBUG) {
+        return;
+    }
+    console.log(`[page-prewarm] ${event}`, {
+        pageId,
+        trigger,
+        elapsedSinceInitialRenderMs: initialRenderAckReceivedAt !== null
+            ? Date.now() - initialRenderAckReceivedAt
+            : null,
+        cacheHadSummary: (_a = details.cacheHadSummary) !== null && _a !== void 0 ? _a : null,
+        cacheHadPending: (_b = details.cacheHadPending) !== null && _b !== void 0 ? _b : null,
+        revisionMatched: (_c = details.revisionMatched) !== null && _c !== void 0 ? _c : null,
+        reason: (_d = details.reason) !== null && _d !== void 0 ? _d : null,
+    });
+}
+function attemptPageAvailabilityPrewarm(page, trigger, revisionAtSchedule) {
+    const entry = pageAvailabilityCache.get(page.id);
+    const cacheHadSummary = Boolean(entry && entry.summary && !entry.dirty);
+    const cacheHadPending = Boolean(entry && entry.pending);
+    const currentRevision = entry ? entry.revision : -1;
+    const revisionMatched = currentRevision === revisionAtSchedule;
+    if (figma.currentPage.id !== page.id) {
+        scopeSwitchPrewarmLog("skipped", page.id, trigger, {
+            cacheHadSummary,
+            cacheHadPending,
+            revisionMatched,
+            reason: "current-page-changed",
+        });
+        return;
+    }
+    if (cacheHadSummary) {
+        scopeSwitchPrewarmLog("skipped", page.id, trigger, {
+            cacheHadSummary,
+            cacheHadPending,
+            revisionMatched,
+            reason: "cache-already-has-summary",
+        });
+        return;
+    }
+    if (cacheHadPending) {
+        scopeSwitchPrewarmLog("skipped", page.id, trigger, {
+            cacheHadSummary,
+            cacheHadPending,
+            revisionMatched,
+            reason: "pending-already-exists",
+        });
+        return;
+    }
+    scopeSwitchPrewarmLog("started", page.id, trigger, {
+        cacheHadSummary,
+        cacheHadPending,
+        revisionMatched,
+    });
+    void warmPageAvailabilityCache(page, true);
+}
+function scheduleBackgroundPageAvailabilityPrewarm(page, trigger = "currentpagechange") {
+    const entryAtSchedule = pageAvailabilityCache.get(page.id);
+    const revisionAtSchedule = entryAtSchedule ? entryAtSchedule.revision : -1;
+    scopeSwitchPrewarmLog("scheduled", page.id, trigger, {
+        cacheHadSummary: Boolean(entryAtSchedule && entryAtSchedule.summary && !entryAtSchedule.dirty),
+        cacheHadPending: Boolean(entryAtSchedule && entryAtSchedule.pending),
+        revisionMatched: true,
+    });
+    setTimeout(() => {
+        attemptPageAvailabilityPrewarm(page, trigger, revisionAtSchedule);
+    }, 0);
+}
+let pendingInitialSelectionPrewarm = null;
+function armInitialSelectionPrewarm(page) {
+    pendingInitialSelectionPrewarm = { page };
+}
+function handleSelectionInfoRenderedMessage(message) {
+    const armed = pendingInitialSelectionPrewarm;
+    if (!armed) {
+        return;
+    }
+    if (message.initialRender !== true) {
+        return;
+    }
+    if (message.pageId !== armed.page.id) {
+        return;
+    }
+    pendingInitialSelectionPrewarm = null;
+    initialRenderAckReceivedAt = Date.now();
+    scheduleBackgroundPageAvailabilityPrewarm(armed.page, "initial-render-ack");
+}
+function sendScopeAnalysisState(details) {
+    figma.ui.postMessage({
+        type: "scope-analysis-state",
+        state: details.state,
+        scope: details.scope,
+        requestId: details.requestId,
+        pageId: details.pageId,
+        ...(details.progress
+            ? {
+                processedTextNodeCount: details.progress.processedTextNodeCount,
+                totalTextNodeCount: details.progress.totalTextNodeCount,
+            }
+            : {}),
+        ...(SCOPE_SWITCH_DEBUG
+            ? {
+                debugScopeSwitchSequence: details.debugScopeSwitchSequence,
+                debugScopeSwitchStartedAt: details.debugScopeSwitchStartedAt,
+            }
+            : {}),
+    });
 }
 let selectionInfoRequestId = 0;
 async function sendSelectionInfo() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     const requestId = ++selectionInfoRequestId;
     const page = figma.currentPage;
     const selection = page.selection;
-    if (selection.length === 0) {
-        const availabilitySummary = await getPageAvailabilitySummary(page);
-        if (requestId !== selectionInfoRequestId) {
+    const debugScopeSwitchSequence = SCOPE_SWITCH_DEBUG ? requestId : 0;
+    const debugScopeSwitchStartedAt = SCOPE_SWITCH_DEBUG ? Date.now() : 0;
+    const scopeSwitchMainStartedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
+    function logScopeSwitchMainRequestCompleted(fields) {
+        if (!SCOPE_SWITCH_DEBUG) {
             return;
         }
+        console.log("[scope-switch-main] request completed", {
+            sequence: debugScopeSwitchSequence,
+            pageId: page.id,
+            totalMainDurationMs: scopeSwitchDebugNow() - scopeSwitchMainStartedAt,
+            elapsedSinceUiRequestMs: Date.now() - debugScopeSwitchStartedAt,
+            ...fields,
+        });
+    }
+    if (selection.length === 0) {
+        const cacheEntryAtStart = pageAvailabilityCache.get(page.id);
+        const cacheExistedAtStart = Boolean(cacheEntryAtStart);
+        const cacheHadSummaryAtStart = Boolean(cacheEntryAtStart && cacheEntryAtStart.summary);
+        const cacheDirtyAtStart = cacheEntryAtStart ? cacheEntryAtStart.dirty : true;
+        const cacheHadPendingAtStart = Boolean(cacheEntryAtStart && cacheEntryAtStart.pending);
+        const hasReadySummaryAtStart = cacheHadSummaryAtStart && !cacheDirtyAtStart && !cacheHadPendingAtStart;
+        const pageDebugInfo = SCOPE_SWITCH_DEBUG
+            ? createScopeSwitchPageDebugInfo()
+            : undefined;
+        // True only if this request is both the latest one issued AND still
+        // matches live reality: the user has not since selected something (which
+        // means they want the selection scope, not currentPage) -- even if no
+        // selectionchange event fired to say so. Figma does not always emit one
+        // for a selection that already existed before this request's listeners
+        // were attached, so requestId alone cannot catch that case. Self-corrects
+        // at most once by kicking off a fresh request the first time the mismatch
+        // is observed, so a currentPage analysis nobody wants never leaves the UI
+        // stuck in loading; the cache write from the analysis itself still lands
+        // either way.
+        let staleSelectionDetected = false;
+        function isCurrentPageRequestStillActive() {
+            if (requestId !== selectionInfoRequestId) {
+                return false;
+            }
+            if (page.selection.length > 0) {
+                if (!staleSelectionDetected) {
+                    staleSelectionDetected = true;
+                    void sendSelectionInfo();
+                }
+                return false;
+            }
+            return true;
+        }
+        if (!hasReadySummaryAtStart) {
+            sendScopeAnalysisState({
+                state: "loading",
+                scope: "currentPage",
+                requestId,
+                pageId: page.id,
+                debugScopeSwitchSequence,
+                debugScopeSwitchStartedAt,
+                progress: cacheEntryAtStart ? cacheEntryAtStart.pendingProgress : null,
+            });
+        }
+        const removeProgressListener = hasReadySummaryAtStart
+            ? null
+            : addPageAnalysisProgressListener(page.id, (progress) => {
+                if (!isCurrentPageRequestStillActive()) {
+                    return;
+                }
+                sendScopeAnalysisState({
+                    state: "loading",
+                    scope: "currentPage",
+                    requestId,
+                    pageId: page.id,
+                    debugScopeSwitchSequence,
+                    debugScopeSwitchStartedAt,
+                    progress,
+                });
+            });
+        let availabilitySummary;
+        try {
+            availabilitySummary = await getPageAvailabilitySummary(page, pageDebugInfo);
+        }
+        catch (error) {
+            console.warn("Could not analyze the current page:", error);
+            if (isCurrentPageRequestStillActive()) {
+                sendScopeAnalysisState({
+                    state: "error",
+                    scope: "currentPage",
+                    requestId,
+                    pageId: page.id,
+                    debugScopeSwitchSequence,
+                    debugScopeSwitchStartedAt,
+                });
+            }
+            logScopeSwitchMainRequestCompleted({
+                requestedScope: "currentPage",
+                resultSource: "page-analysis-error",
+                cacheExistedAtStart,
+                cacheHadSummaryAtStart,
+                cacheDirtyAtStart,
+                cacheHadPendingAtStart,
+                cacheHadUpdateQueueAtStart: cacheExistedAtStart,
+                updateQueueWaitDurationMs: (_a = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.updateQueueWaitDurationMs) !== null && _a !== void 0 ? _a : 0,
+                pendingWaitDurationMs: 0,
+                pageLoadDurationMs: (_b = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.pageLoadDurationMs) !== null && _b !== void 0 ? _b : 0,
+                collectTextNodesDurationMs: (_c = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.collectTextNodesDurationMs) !== null && _c !== void 0 ? _c : 0,
+                analyzeTextNodesDurationMs: (_d = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.analyzeTextNodesDurationMs) !== null && _d !== void 0 ? _d : 0,
+                selectionCollectDurationMs: 0,
+                selectionAnalyzeDurationMs: 0,
+                postMessageCallDurationMs: 0,
+                textNodeCount: 0,
+                selectionRootCount: 0,
+                missingNodeCount: 0,
+                requestDropped: requestId !== selectionInfoRequestId,
+                cacheDirtyAtEnd: (_f = (_e = pageAvailabilityCache.get(page.id)) === null || _e === void 0 ? void 0 : _e.dirty) !== null && _f !== void 0 ? _f : true,
+            });
+            return;
+        }
+        finally {
+            removeProgressListener === null || removeProgressListener === void 0 ? void 0 : removeProgressListener();
+        }
+        if (!isCurrentPageRequestStillActive()) {
+            logScopeSwitchMainRequestCompleted({
+                requestedScope: "currentPage",
+                resultSource: "dropped",
+                cacheExistedAtStart,
+                cacheHadSummaryAtStart,
+                cacheDirtyAtStart,
+                cacheHadPendingAtStart,
+                cacheHadUpdateQueueAtStart: cacheExistedAtStart,
+                updateQueueWaitDurationMs: (_g = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.updateQueueWaitDurationMs) !== null && _g !== void 0 ? _g : 0,
+                pendingWaitDurationMs: 0,
+                pageLoadDurationMs: (_h = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.pageLoadDurationMs) !== null && _h !== void 0 ? _h : 0,
+                collectTextNodesDurationMs: (_j = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.collectTextNodesDurationMs) !== null && _j !== void 0 ? _j : 0,
+                analyzeTextNodesDurationMs: (_k = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.analyzeTextNodesDurationMs) !== null && _k !== void 0 ? _k : 0,
+                selectionCollectDurationMs: 0,
+                selectionAnalyzeDurationMs: 0,
+                postMessageCallDurationMs: 0,
+                textNodeCount: 0,
+                selectionRootCount: 0,
+                missingNodeCount: 0,
+                requestDropped: true,
+                cacheDirtyAtEnd: (_m = (_l = pageAvailabilityCache.get(page.id)) === null || _l === void 0 ? void 0 : _l.dirty) !== null && _m !== void 0 ? _m : true,
+            });
+            return;
+        }
+        const resultSource = cacheHadPendingAtStart
+            ? "page-pending-result"
+            : cacheHadSummaryAtStart && !cacheDirtyAtStart
+                ? "page-cache-hit"
+                : "page-full-recompute";
+        const postMessageStartedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
         figma.ui.postMessage({
             type: "selection-info",
+            requestId,
             targetScope: "currentPage",
             scopeType: "currentPage",
             selectionKey: `page:${page.id}`,
@@ -1610,17 +2232,165 @@ async function sendSelectionInfo() {
             skippedLockedNodeCount: availabilitySummary.skippedLockedNodeCount,
             skippedEmptyNodeCount: availabilitySummary.skippedEmptyNodeCount,
             skippedMissingFontsNodeCount: availabilitySummary.skippedMissingFontsNodeCount,
+            pageId: page.id,
+            ...(SCOPE_SWITCH_DEBUG
+                ? { debugScopeSwitchSequence, debugScopeSwitchStartedAt }
+                : {}),
+        });
+        const postMessageCallDurationMs = SCOPE_SWITCH_DEBUG
+            ? scopeSwitchDebugNow() - postMessageStartedAt
+            : 0;
+        logScopeSwitchMainRequestCompleted({
+            requestedScope: "currentPage",
+            resultSource,
+            cacheExistedAtStart,
+            cacheHadSummaryAtStart,
+            cacheDirtyAtStart,
+            cacheHadPendingAtStart,
+            cacheHadUpdateQueueAtStart: cacheExistedAtStart,
+            updateQueueWaitDurationMs: (_o = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.updateQueueWaitDurationMs) !== null && _o !== void 0 ? _o : 0,
+            pendingWaitDurationMs: resultSource === "page-pending-result"
+                ? scopeSwitchDebugNow() - scopeSwitchMainStartedAt
+                : 0,
+            pageLoadDurationMs: (_p = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.pageLoadDurationMs) !== null && _p !== void 0 ? _p : 0,
+            collectTextNodesDurationMs: (_q = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.collectTextNodesDurationMs) !== null && _q !== void 0 ? _q : 0,
+            analyzeTextNodesDurationMs: (_r = pageDebugInfo === null || pageDebugInfo === void 0 ? void 0 : pageDebugInfo.analyzeTextNodesDurationMs) !== null && _r !== void 0 ? _r : 0,
+            selectionCollectDurationMs: 0,
+            selectionAnalyzeDurationMs: 0,
+            postMessageCallDurationMs,
+            textNodeCount: availabilitySummary.totalTextNodeCount,
+            selectionRootCount: 0,
+            missingNodeCount: 0,
+            requestDropped: false,
+            cacheDirtyAtEnd: (_t = (_s = pageAvailabilityCache.get(page.id)) === null || _s === void 0 ? void 0 : _s.dirty) !== null && _t !== void 0 ? _t : true,
         });
         return;
     }
-    const target = resolveTextNodeTarget();
-    const selectionSummaryResult = await getSelectionAvailabilitySummary(page, target.textNodes);
-    const availabilitySummary = selectionSummaryResult.summary;
-    if (requestId !== selectionInfoRequestId) {
+    // Create the page entry before reading/analyzing the selection so the
+    // selection result can be cached even when the whole-page summary has not
+    // been built yet. This is what keeps returning to the same selection
+    // instant while the page is warming in the background.
+    const selectionCacheEntryAtStart = getOrCreatePageAvailabilityCacheEntry(page.id);
+    const selectionResultCacheHit = readSelectionResultCache(page, selection);
+    if (selectionResultCacheHit) {
+        const postMessageStartedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
+        figma.ui.postMessage({
+            type: "selection-info",
+            requestId,
+            targetScope: selectionResultCacheHit.targetScope,
+            scopeType: selectionResultCacheHit.scopeType,
+            selectionKey: selectionResultCacheHit.selectionKey,
+            selectedCount: selectionResultCacheHit.selectedCount,
+            textNodeCount: selectionResultCacheHit.summary.totalTextNodeCount,
+            availableTextNodeCount: selectionResultCacheHit.summary.availableTextNodeCount,
+            skippedHiddenNodeCount: selectionResultCacheHit.summary.skippedHiddenNodeCount,
+            skippedLockedNodeCount: selectionResultCacheHit.summary.skippedLockedNodeCount,
+            skippedEmptyNodeCount: selectionResultCacheHit.summary.skippedEmptyNodeCount,
+            skippedMissingFontsNodeCount: selectionResultCacheHit.summary.skippedMissingFontsNodeCount,
+            pageId: page.id,
+            ...(SCOPE_SWITCH_DEBUG
+                ? { debugScopeSwitchSequence, debugScopeSwitchStartedAt }
+                : {}),
+        });
+        const postMessageCallDurationMs = SCOPE_SWITCH_DEBUG
+            ? scopeSwitchDebugNow() - postMessageStartedAt
+            : 0;
+        logScopeSwitchMainRequestCompleted({
+            requestedScope: selectionResultCacheHit.targetScope,
+            resultSource: "selection-result-cache",
+            cacheExistedAtStart: true,
+            cacheHadSummaryAtStart: true,
+            cacheDirtyAtStart: false,
+            cacheHadPendingAtStart: false,
+            cacheHadUpdateQueueAtStart: true,
+            updateQueueWaitDurationMs: 0,
+            pendingWaitDurationMs: 0,
+            pageLoadDurationMs: 0,
+            collectTextNodesDurationMs: 0,
+            analyzeTextNodesDurationMs: 0,
+            selectionCollectDurationMs: 0,
+            selectionAnalyzeDurationMs: 0,
+            postMessageCallDurationMs,
+            textNodeCount: selectionResultCacheHit.summary.totalTextNodeCount,
+            selectionRootCount: selectionResultCacheHit.selectedCount,
+            missingNodeCount: 0,
+            requestDropped: false,
+            cacheDirtyAtEnd: (_v = (_u = pageAvailabilityCache.get(page.id)) === null || _u === void 0 ? void 0 : _u.dirty) !== null && _v !== void 0 ? _v : true,
+        });
         return;
     }
+    const selectionCollectStartedAt = SCOPE_SWITCH_DEBUG
+        ? scopeSwitchDebugNow()
+        : 0;
+    const target = resolveTextNodeTarget();
+    const selectionCollectDurationMs = SCOPE_SWITCH_DEBUG
+        ? scopeSwitchDebugNow() - selectionCollectStartedAt
+        : 0;
+    const cacheEntryAtStart = selectionCacheEntryAtStart;
+    const cacheExistedAtStart = true;
+    const cacheHadSummaryAtStart = Boolean(cacheEntryAtStart && cacheEntryAtStart.summary);
+    const cacheDirtyAtStart = cacheEntryAtStart ? cacheEntryAtStart.dirty : true;
+    const cacheHadPendingAtStart = Boolean(cacheEntryAtStart && cacheEntryAtStart.pending);
+    const selectionCacheRevisionAtStart = cacheEntryAtStart
+        ? cacheEntryAtStart.revision
+        : -1;
+    const selectionAnalyzeStartedAt = SCOPE_SWITCH_DEBUG
+        ? scopeSwitchDebugNow()
+        : 0;
+    const selectionSummaryResult = await getSelectionAvailabilitySummary(page, target.textNodes);
+    const selectionAnalyzeDurationMs = SCOPE_SWITCH_DEBUG
+        ? scopeSwitchDebugNow() - selectionAnalyzeStartedAt
+        : 0;
+    const availabilitySummary = selectionSummaryResult.summary;
+    if (requestId !== selectionInfoRequestId) {
+        logScopeSwitchMainRequestCompleted({
+            requestedScope: target.targetScope,
+            resultSource: "dropped",
+            cacheExistedAtStart,
+            cacheHadSummaryAtStart,
+            cacheDirtyAtStart,
+            cacheHadPendingAtStart,
+            cacheHadUpdateQueueAtStart: cacheExistedAtStart,
+            updateQueueWaitDurationMs: 0,
+            pendingWaitDurationMs: 0,
+            pageLoadDurationMs: 0,
+            collectTextNodesDurationMs: 0,
+            analyzeTextNodesDurationMs: 0,
+            selectionCollectDurationMs,
+            selectionAnalyzeDurationMs,
+            postMessageCallDurationMs: 0,
+            textNodeCount: 0,
+            selectionRootCount: target.selectedCount,
+            missingNodeCount: selectionSummaryResult.missingNodeCount,
+            requestDropped: true,
+            cacheDirtyAtEnd: (_x = (_w = pageAvailabilityCache.get(page.id)) === null || _w === void 0 ? void 0 : _w.dirty) !== null && _x !== void 0 ? _x : true,
+        });
+        return;
+    }
+    const resultSource = selectionSummaryResult.source === "direct"
+        ? "selection-full-analysis"
+        : selectionSummaryResult.missingNodeCount === 0
+            ? "selection-page-cache"
+            : "selection-partial-analysis";
+    const cacheEntryAfterSelectionAnalysis = pageAvailabilityCache.get(page.id);
+    if (cacheEntryAfterSelectionAnalysis &&
+        cacheEntryAfterSelectionAnalysis.revision === selectionCacheRevisionAtStart) {
+        writeSelectionResultCache({
+            pageId: page.id,
+            selectionRootIds: selection.map((node) => node.id),
+            pageRevisionAtCache: cacheEntryAfterSelectionAnalysis.revision,
+            pageSummaryRefAtCache: cacheEntryAfterSelectionAnalysis.summary,
+            targetScope: target.targetScope,
+            scopeType: target.scopeType,
+            selectionKey: target.selectionKey,
+            selectedCount: target.selectedCount,
+            summary: availabilitySummary,
+        });
+    }
+    const postMessageStartedAt = SCOPE_SWITCH_DEBUG ? scopeSwitchDebugNow() : 0;
     figma.ui.postMessage({
         type: "selection-info",
+        requestId,
         targetScope: target.targetScope,
         scopeType: target.scopeType,
         selectionKey: target.selectionKey,
@@ -1631,6 +2401,35 @@ async function sendSelectionInfo() {
         skippedLockedNodeCount: availabilitySummary.skippedLockedNodeCount,
         skippedEmptyNodeCount: availabilitySummary.skippedEmptyNodeCount,
         skippedMissingFontsNodeCount: availabilitySummary.skippedMissingFontsNodeCount,
+        pageId: page.id,
+        ...(SCOPE_SWITCH_DEBUG
+            ? { debugScopeSwitchSequence, debugScopeSwitchStartedAt }
+            : {}),
+    });
+    const postMessageCallDurationMs = SCOPE_SWITCH_DEBUG
+        ? scopeSwitchDebugNow() - postMessageStartedAt
+        : 0;
+    logScopeSwitchMainRequestCompleted({
+        requestedScope: target.targetScope,
+        resultSource,
+        cacheExistedAtStart,
+        cacheHadSummaryAtStart,
+        cacheDirtyAtStart,
+        cacheHadPendingAtStart,
+        cacheHadUpdateQueueAtStart: cacheExistedAtStart,
+        updateQueueWaitDurationMs: 0,
+        pendingWaitDurationMs: 0,
+        pageLoadDurationMs: 0,
+        collectTextNodesDurationMs: 0,
+        analyzeTextNodesDurationMs: 0,
+        selectionCollectDurationMs,
+        selectionAnalyzeDurationMs,
+        postMessageCallDurationMs,
+        textNodeCount: availabilitySummary.totalTextNodeCount,
+        selectionRootCount: target.selectedCount,
+        missingNodeCount: selectionSummaryResult.missingNodeCount,
+        requestDropped: false,
+        cacheDirtyAtEnd: (_z = (_y = pageAvailabilityCache.get(page.id)) === null || _y === void 0 ? void 0 : _y.dirty) !== null && _z !== void 0 ? _z : true,
     });
 }
 function getCharacterStyleSnapshot(node, index) {
@@ -2123,34 +2922,83 @@ async function applyTypographyRules(settings) {
         (errorNodeCount > 0 ? ` · Errors ${errorNodeCount}` : ""));
     await sendSelectionInfo();
 }
+// Selection/page events can fire while settings are still loading and before
+// the UI has painted. Starting analysis from those early events could launch
+// an unintended currentPage request which later replaced the selected scope.
+// Fold them into the one authoritative request made after ui-ready.
+let selectionInfoRequestsEnabled = false;
+function requestSelectionInfoRefresh() {
+    if (!selectionInfoRequestsEnabled) {
+        return;
+    }
+    void sendSelectionInfo();
+}
+// Lets the UI's own first paint (its default loading skeleton, shown before
+// any message from main) actually reach the screen before main starts the
+// first -- potentially heavy -- analysis request. The UI sends "ui-ready"
+// only after its own requestAnimationFrame following that first paint; see
+// ui.html. No timeout fallback, matching the existing selection-info-rendered
+// handshake this mirrors: a real browser tab always eventually paints and
+// fires rAF, so this does not add a hang risk beyond what that pattern
+// already accepted.
+let uiReadyReceived = false;
+let resolveUiReady = null;
+const uiReadyPromise = new Promise((resolve) => {
+    resolveUiReady = resolve;
+});
+function handleUiReadyMessage() {
+    if (uiReadyReceived) {
+        return;
+    }
+    uiReadyReceived = true;
+    resolveUiReady === null || resolveUiReady === void 0 ? void 0 : resolveUiReady();
+}
 async function initializePlugin() {
-    const [settings, uiSettings] = await Promise.all([
-        loadSettings(),
-        loadUiSettings(),
-    ]);
+    // Read the persisted interface theme before showing the window. This lets
+    // the injected bootstrap script set data-theme before the first stylesheet
+    // is parsed, so a light setup never flashes a dark startup frame (and vice
+    // versa). Typography settings continue loading in parallel.
+    const uiSettingsPromise = loadUiSettings();
+    const settingsPromise = loadSettings();
+    const uiSettings = await uiSettingsPromise;
+    figma.showUI(createInitialUiHtml(uiSettings), {
+        width: 420,
+        height: 640,
+    });
+    const settings = await settingsPromise;
     const page = figma.currentPage;
+    const initialTargetScope = page.selection.length > 0 ? "selection" : "currentPage";
     pruneRemovedPageAvailabilityCaches();
     ensurePageAvailabilityCacheSubscription(page);
+    // Arm before the first selection-info can be acknowledged. Previously the
+    // arm happened after sendSelectionInfo() returned, leaving a narrow race in
+    // which the UI acknowledgement arrived first and the silent page prewarm
+    // never started.
+    if (initialTargetScope === "selection") {
+        armInitialSelectionPrewarm(page);
+    }
     figma.ui.postMessage({
         type: "settings-loaded",
         settings,
         uiSettings,
+        initialTargetScope,
     });
+    await uiReadyPromise;
+    // Ignore/coalesce any startup selectionchange/currentpagechange events and
+    // analyze the live state exactly once after the first UI paint.
+    selectionInfoRequestsEnabled = true;
     await sendSelectionInfo();
-    if (page.selection.length > 0) {
-        void warmPageAvailabilityCache(page);
-    }
 }
 figma.on("selectionchange", () => {
-    void sendSelectionInfo();
+    requestSelectionInfoRefresh();
 });
 figma.on("currentpagechange", () => {
     const page = figma.currentPage;
     pruneRemovedPageAvailabilityCaches();
     ensurePageAvailabilityCacheSubscription(page);
-    void sendSelectionInfo();
+    requestSelectionInfoRefresh();
     if (page.selection.length > 0) {
-        void warmPageAvailabilityCache(page);
+        scheduleBackgroundPageAvailabilityPrewarm(page);
     }
 });
 figma.ui.onmessage = async (message) => {
@@ -2171,6 +3019,12 @@ figma.ui.onmessage = async (message) => {
     if (message.type === "close") {
         await saveUiSettings(message.uiSettings);
         figma.closePlugin();
+    }
+    if (message.type === "selection-info-rendered") {
+        handleSelectionInfoRenderedMessage(message);
+    }
+    if (message.type === "ui-ready") {
+        handleUiReadyMessage();
     }
 };
 initializePlugin();

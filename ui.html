@@ -196,6 +196,126 @@
     color: var(--disabled-number);
   }
 
+  .hero-number,
+  .compact-number {
+    transition: opacity 140ms ease-out;
+  }
+
+  /* Swap-in crossfade: JS snaps opacity to this on the frame a loading/error
+     state resolves to ready, with transitions off, then removes the class on
+     the next frame so the base transition above animates back up to full
+     opacity. The glyph and layout never move -- only opacity changes. */
+  .hero-number.is-swap-start,
+  .compact-number.is-swap-start {
+    transition: none;
+    opacity: 0.3;
+  }
+
+  /* The dash glyph stays in place (reserving the same box the ready number
+     later occupies) but is painted invisible during loading -- the activity
+     indicator is what's actually seen, positioned over the same
+     --main-number-* band as the number. Not used for error: there the dash
+     stays visible. */
+  .hero-number.is-loading {
+    color: transparent;
+  }
+
+  /* Positioning root shared by the number, the indicator and (in error) the
+     dash: .hero-number is already position:absolute against this element
+     further down (the v33 fixed-coordinate layout, top: var(--main-number-top),
+     height: var(--main-number-h)) -- the indicator below is anchored the
+     same way so both sit in the identical slot regardless of state. */
+  .hero-number-slot {
+    position: relative;
+  }
+
+  /* Three-position activity indicator: one bordered chassis (family-
+     resemblant to Typotypo's switches -- same soft-line/track vocabulary,
+     same rectangular geometry, same lack of corner radius) holding three
+     fixed, borderless marks and a single runner sliding between them --
+     one mechanism, not three buttons. Not a progress bar -- the runner just
+     keeps moving left/center/right/center/left, forever, while loading is
+     in progress. Left edge matches the big number's own (--px); vertical
+     position sits slightly above the geometric center of the number's own
+     band (--main-number-top/-h) -- never below it -- to line up with where
+     the ready-state digits (top-aligned within that same band) actually
+     read as centered. Fades in/out via opacity (see .is-active) instead of
+     the hidden attribute so the loading<->ready swap can crossfade instead
+     of snapping. */
+  .activity-indicator {
+    box-sizing: border-box;
+    position: absolute;
+    left: var(--px);
+    top: calc(var(--main-number-top) + (var(--main-number-h) - 44px) / 2 - 10px);
+    width: 140px;
+    height: 44px;
+    border: 1px solid var(--line-soft);
+    background: var(--activity-track-bg);
+    opacity: 0;
+    transition: opacity 110ms ease-out;
+    pointer-events: none;
+  }
+
+  .activity-indicator.is-active {
+    opacity: 1;
+  }
+
+  /* Three static marks show the fixed positions at low contrast; the runner
+     (below) sits exactly over one of them at rest, fully covering it. The
+     1px chassis border is included in the geometry: a 3px inset therefore
+     produces an even 4px visible gap on every outer edge. The 48px pitch
+     leaves 12px of clear air between the 36px marks. */
+  .activity-indicator-mark,
+  .activity-indicator-runner {
+    position: absolute;
+    top: 3px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .activity-indicator-mark {
+    background: var(--activity-idle);
+  }
+
+  .activity-indicator-mark:nth-of-type(1) { left: 3px; }
+  .activity-indicator-mark:nth-of-type(2) { left: 51px; }
+  .activity-indicator-mark:nth-of-type(3) { left: 99px; }
+
+  .activity-indicator-runner {
+    left: 3px;
+    background: var(--activity-active);
+    transform: translateX(0);
+    animation: activity-indicator-run 3s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+    animation-play-state: paused;
+  }
+
+  .activity-indicator.is-active .activity-indicator-runner {
+    animation-play-state: running;
+  }
+
+  /* left -> center -> right -> center -> left: four equal moves (14% of the
+     cycle each), a 9% pause at each edge position, a 13% pause at each
+     center visit (slightly longer, per spec). 0% and 100% are identical, so
+     the loop never visibly resets. Step distance = 48px, the fixed spacing
+     between position centers. */
+  @keyframes activity-indicator-run {
+    0%   { transform: translateX(0); }
+    9%   { transform: translateX(0); }
+    23%  { transform: translateX(48px); }
+    36%  { transform: translateX(48px); }
+    50%  { transform: translateX(96px); }
+    59%  { transform: translateX(96px); }
+    73%  { transform: translateX(48px); }
+    86%  { transform: translateX(48px); }
+    100% { transform: translateX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .activity-indicator-runner {
+      transform: translateX(48px);
+    }
+  }
+
   .hero-label,
   .result-label,
   .progress-label {
@@ -205,6 +325,12 @@
     line-height: 1.15;
     font-weight: 400;
     letter-spacing: 0;
+  }
+
+  /* Keeps the processed/total counters from jittering the line as their
+     digit count/width changes between updates. */
+  .hero-label {
+    font-variant-numeric: tabular-nums;
   }
 
   .hero .summary-rows,
@@ -1155,6 +1281,9 @@
     --switch-off-track: #ffffff;
     --switch-off-dot: #ffffff;
     --switch-off-dot-border: #111111;
+    --activity-track-bg: #f7f7f7;
+    --activity-idle: #cccccc;
+    --activity-active: #2e2e2e;
   }
 
   html[data-theme="dark"] {
@@ -1171,6 +1300,9 @@
     --switch-off-track: #2c2c2c;
     --switch-off-dot: #2c2c2c;
     --switch-off-dot-border: #dadada;
+    --activity-track-bg: #333333;
+    --activity-idle: #565656;
+    --activity-active: #dddddd;
   }
 
   /* Only Format owns the title/scope line. Rules and Settings begin at the top. */
@@ -1962,9 +2094,33 @@
     box-shadow: none !important;
   }
 
+  /* Until main sends the saved UI settings and the live initial scope, keep
+     the startup view language-neutral without making the window look broken.
+     Structural chrome stays visible: the side-tab borders, dividers and the
+     footer button remain fully drawn. Only locale-dependent content is hidden. */
+  .app.is-bootstrapping .side-tabs,
+  .app.is-bootstrapping .footer {
+    pointer-events: none;
+  }
+
+  .app.is-bootstrapping .side-tab > span,
+  .app.is-bootstrapping .scope,
+  .app.is-bootstrapping .hero-label,
+  .app.is-bootstrapping .summary-rows,
+  .app.is-bootstrapping .compact-summary,
+  .app.is-bootstrapping .rows {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .app.is-bootstrapping .primary-action {
+    color: transparent !important;
+    pointer-events: none;
+  }
+
 </style>
 
-<div class="app" id="app">
+<div class="app is-bootstrapping" id="app">
   <nav class="side-tabs" aria-label="Sections">
     <button class="side-tab" id="formatTab" type="button" data-side-panel="main"><span data-i18n="formatTitle">Format</span></button>
     <button class="side-tab" id="rulesTab" type="button" data-side-panel="rules"><span data-i18n="rulesTitle">Rules</span></button>
@@ -1980,7 +2136,15 @@
     <section class="format-area" id="formatArea" aria-live="polite">
       <div class="format-inner">
         <div class="hero">
-          <div class="hero-number" id="heroNumber">0</div>
+          <div class="hero-number-slot">
+            <div class="hero-number" id="heroNumber">0</div>
+            <div class="activity-indicator" id="heroActivityIndicator" aria-hidden="true">
+              <span class="activity-indicator-mark"></span>
+              <span class="activity-indicator-mark"></span>
+              <span class="activity-indicator-mark"></span>
+              <span class="activity-indicator-runner"></span>
+            </div>
+          </div>
           <div class="hero-label" id="heroLabel">text layers ready to format</div>
           <div class="summary-rows" id="mainStatusRows"></div>
         </div>
@@ -2088,6 +2252,23 @@
   const NBSP = "\u00A0";
   const UI_LANGUAGE_STORAGE_KEY = "typotypoInterfaceLanguage";
   const THEME_STORAGE_KEY = "typotypoTheme";
+  const INTEGER_GROUPING_THRESHOLD = 10000;
+  const RU_THOUSANDS_GROUP_SEPARATOR = "\u202F";
+
+  // Temporary end-to-end diagnostics for the "selected frame -> whole page"
+  // scope-switch lag investigation. Logs only counts, durations, booleans
+  // and scope identifiers, never layer/page/font names or text content.
+  // Safe to delete wholesale once the investigation is done.
+  const SCOPE_SWITCH_DEBUG = true;
+  const scopeSwitchResponseCountsBySequence = new Map();
+  let initialSelectionInfoAcknowledged = false;
+
+  function scopeSwitchDebugNow() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }
 
   const elements = {
     app: document.getElementById("app"),
@@ -2100,6 +2281,7 @@
     compactNumber: document.getElementById("compactNumber"),
     compactLabel: document.getElementById("compactLabel"),
     heroNumber: document.getElementById("heroNumber"),
+    heroActivityIndicator: document.getElementById("heroActivityIndicator"),
     heroLabel: document.getElementById("heroLabel"),
     mainStatusRows: document.getElementById("mainStatusRows"),
     progressScreen: document.getElementById("progressScreen"),
@@ -2167,7 +2349,7 @@
       nbspLength: "Space width in numbers",
       nbspRegular: "Regular",
       nbspThin: "Narrow",
-      defaultsNote: "Defaults rules depend on text language",
+      defaultsNote: "Defaults depend on text language",
       resetDefaults: "Reset to defaults",
       supportCreator: "Support the creator",
       applyFormatting: "Apply formatting",
@@ -2185,6 +2367,10 @@
       },
       main: {
         checking: "checking selection",
+        analyzingPage: "Checking text layers…",
+        analyzingSelection: "Checking selected area…",
+        analysisError: "Couldn’t check text layers",
+        checkedProgress: "Checked {processed} of {total} text layers",
         ready: "text layers ready to format",
         readyOnPage: "text layers on this page ready to format",
         noTextPage: "text layers on this page",
@@ -2290,6 +2476,10 @@
       },
       main: {
         checking: "проверяем выделение",
+        analyzingPage: "Проверяем текстовые слои…",
+        analyzingSelection: "Проверяем область…",
+        analysisError: "Не удалось проверить текстовые слои",
+        checkedProgress: "Проверено {processed} из {total} текстовых слоёв",
         ready: "текстовых слоёв готово к типографированию",
         readyOnPage: "текстовых слоёв на странице готово к типографированию",
         noTextPage: "текстовых слоёв на странице",
@@ -2382,6 +2572,11 @@
     currentTargetScope: "selection",
     currentAvailableTextNodeCount: 0,
     lastSelectionInfoMessage: null,
+    scopeAnalysisStatus: "loading",
+    scopeAnalysisScope: "selection",
+    scopeAnalysisRequestId: 0,
+    scopeAnalysisProcessedCount: null,
+    scopeAnalysisTotalCount: null,
     lastApplyResultMessage: null,
     lastApplyCompletedAt: 0,
     applySelectionSignature: "",
@@ -2397,6 +2592,12 @@
     },
   };
 
+  // Tracks the scope-analysis status as of the last render(), so the
+  // loading/error -> ready crossfade fires exactly once per transition into
+  // ready, not on every unrelated re-render (theme toggle, rules panel,
+  // etc.) that happens to run while already ready.
+  let lastRenderedScopeAnalysisStatus = state.scopeAnalysisStatus;
+
   function getCopy(path) {
     const dictionary = copy[state.uiLanguage] || copy.en;
     const fallback = copy.en;
@@ -2410,11 +2611,35 @@
   }
 
   function countLabel(count, label) {
-    return `${count}${NBSP}${label}`;
+    return `${formatIntegerCount(count)}${NBSP}${label}`;
   }
 
   function isRu() {
     return state.uiLanguage === "ru";
+  }
+
+  // Below INTEGER_GROUPING_THRESHOLD, counters stay ungrouped even at 4
+  // digits -- Intl.NumberFormat's default grouping would add a separator to
+  // e.g. 2922, which this UI never wants.
+  function formatIntegerCount(value) {
+    const safeValue = Math.max(0, Math.trunc(Number(value) || 0));
+    const digits = String(safeValue);
+
+    if (safeValue < INTEGER_GROUPING_THRESHOLD) {
+      return digits;
+    }
+
+    const separator = isRu() ? RU_THOUSANDS_GROUP_SEPARATOR : ",";
+    let grouped = "";
+
+    for (let index = 0; index < digits.length; index += 1) {
+      if (index > 0 && (digits.length - index) % 3 === 0) {
+        grouped += separator;
+      }
+      grouped += digits[index];
+    }
+
+    return grouped;
   }
 
   function ruPlural(count, one, few, many) {
@@ -2488,10 +2713,10 @@
 
     if (isRu()) {
       const changeLabel = ruPlural(changes, "изменение", "изменения", "изменений");
-      return `${changeLabel} в ${layers}${NBSP}${ruTextLayerPrepositional(layers)}`;
+      return `${changeLabel} в ${formatIntegerCount(layers)}${NBSP}${ruTextLayerPrepositional(layers)}`;
     }
 
-    return interpolate(getCopy("result.changesAppliedInLayers"), { count: layers });
+    return interpolate(getCopy("result.changesAppliedInLayers"), { count: formatIntegerCount(layers) });
   }
 
   function getSelectionSignature(message) {
@@ -2643,6 +2868,20 @@
     element.dataset.digits = String(text.replace(/\D/g, "").length || text.length);
   }
 
+  // Snaps opacity down (transitions off, so it doesn't itself animate),
+  // then releases the snap on the next frame so the base opacity
+  // transition on the element animates the rise back to full -- a
+  // fade-in "reveal" of the just-arrived ready content. Never delays the
+  // content swap itself: the caller sets real text before or after this
+  // runs, on the same tick either way.
+  function primeHeroNumberCrossfade(element) {
+    if (!element) return;
+    element.classList.add("is-swap-start");
+    requestAnimationFrame(() => {
+      element.classList.remove("is-swap-start");
+    });
+  }
+
   function createElement(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
@@ -2699,9 +2938,20 @@
 
   function getSelectionInfo() {
     const message = state.lastSelectionInfoMessage || {};
-    const targetScope = message.targetScope === "currentPage" ? "currentPage" : "selection";
+    const pendingTargetScope = state.scopeAnalysisScope === "currentPage" ? "currentPage" : "selection";
+    const savedTargetScope = state.currentTargetScope === "currentPage" ? "currentPage" : "selection";
+    const reportedTargetScope = message.targetScope === "currentPage"
+      ? "currentPage"
+      : (message.targetScope ? "selection" : null);
+
+    // While a new scope is being analyzed — including the first startup
+    // frame before selection-info exists — use the scope already reported by
+    // main instead of falling back to the previous result or to "selection".
+    const targetScope = isScopeAnalysisBusy()
+      ? pendingTargetScope
+      : (reportedTargetScope || savedTargetScope);
     const reportedScopeType = message.scopeType;
-    const scopeType = ["currentPage", "textLayer", "frame", "section", "group", "selectedLayers", "selection"].includes(reportedScopeType)
+    const scopeType = !isScopeAnalysisBusy() && ["currentPage", "textLayer", "frame", "section", "group", "selectedLayers", "selection"].includes(reportedScopeType)
       ? reportedScopeType
       : (targetScope === "currentPage" ? "currentPage" : "selectedLayers");
     const textNodeCount = Number(message.textNodeCount || 0);
@@ -3152,6 +3402,20 @@
     return !info.availableCount || !hasEnabledRules();
   }
 
+  function isScopeAnalysisBusy() {
+    return state.scopeAnalysisStatus === "loading" || state.scopeAnalysisStatus === "error";
+  }
+
+  function getScopeAnalysisLabel() {
+    // Loading is communicated by the activity indicator itself. Keeping this
+    // area empty avoids turning the internal availability scan into a second,
+    // technical-looking stage with changing counters. Errors still need an
+    // explicit explanation.
+    return state.scopeAnalysisStatus === "error"
+      ? getCopy("main.analysisError")
+      : "";
+  }
+
   function getResultViewModel() {
     const message = state.lastApplyResultMessage || {};
     const totalReplacementCount = Number(message.totalReplacementCount || message.changesAppliedCount || 0);
@@ -3199,7 +3463,7 @@
     return { message, resultType, count, label };
   }
 
-  function renderPanels(info) {
+  function renderPanels(info, scopeAnalysisJustBecameReady) {
     const isRules = state.activePanel === "rules";
     const isSettings = state.activePanel === "settings";
     const showResultCompact = state.view === "result" && (isRules || isSettings);
@@ -3221,16 +3485,47 @@
       return;
     }
 
+    if (isScopeAnalysisBusy()) {
+      elements.compactNumber.classList.remove("is-swap-start");
+      setNumberContent(elements.compactNumber, "—");
+      elements.compactNumber.classList.add("is-muted");
+      elements.compactLabel.textContent = getScopeAnalysisLabel();
+      return;
+    }
+
+    if (scopeAnalysisJustBecameReady) {
+      primeHeroNumberCrossfade(elements.compactNumber);
+    }
     setNumberContent(elements.compactNumber, getHeroCount(info));
     elements.compactNumber.classList.toggle("is-muted", shouldMuteMainNumber(info));
     elements.compactLabel.textContent = isRu() ? getHeroLabel(info) : getCopy("main.compactReady");
   }
 
-  function renderMain(info) {
+  function renderMain(info, scopeAnalysisJustBecameReady) {
     elements.scopeLabel.textContent = formatScope(info);
-    setNumberContent(elements.heroNumber, state.isLoadingSettings && !state.lastSelectionInfoMessage ? "0" : getHeroCount(info));
-    elements.heroNumber.classList.toggle("is-muted", state.isLoadingSettings && !state.lastSelectionInfoMessage ? true : shouldMuteMainNumber(info));
-    elements.heroLabel.textContent = state.isLoadingSettings && !state.lastSelectionInfoMessage ? getCopy("main.checking") : getHeroLabel(info);
+
+    if (isScopeAnalysisBusy()) {
+      const isLoading = state.scopeAnalysisStatus === "loading";
+      elements.heroNumber.classList.remove("is-swap-start");
+      setNumberContent(elements.heroNumber, "—");
+      elements.heroNumber.classList.add("is-muted");
+      elements.heroNumber.classList.toggle("is-loading", isLoading);
+      elements.heroActivityIndicator.classList.toggle("is-active", isLoading);
+      elements.heroLabel.textContent = getScopeAnalysisLabel();
+      elements.formatArea.setAttribute("aria-busy", isLoading ? "true" : "false");
+      renderStatusRows(elements.mainStatusRows, []);
+      return;
+    }
+
+    elements.heroNumber.classList.remove("is-loading");
+    elements.heroActivityIndicator.classList.remove("is-active");
+    elements.formatArea.setAttribute("aria-busy", "false");
+    if (scopeAnalysisJustBecameReady) {
+      primeHeroNumberCrossfade(elements.heroNumber);
+    }
+    setNumberContent(elements.heroNumber, getHeroCount(info));
+    elements.heroNumber.classList.toggle("is-muted", shouldMuteMainNumber(info));
+    elements.heroLabel.textContent = getHeroLabel(info);
     renderStatusRows(elements.mainStatusRows, buildMainStatusRows(info));
   }
 
@@ -3241,8 +3536,8 @@
 
     setNumberContent(elements.progressNumber, done);
     elements.progressLabel.textContent = isRu()
-      ? `из ${total}${NBSP}${ruTextLayerGenitive(total)} типографируется`
-      : interpolate(getCopy("applying.label"), { total });
+      ? `из ${formatIntegerCount(total)}${NBSP}${ruTextLayerGenitive(total)} типографируется`
+      : interpolate(getCopy("applying.label"), { total: formatIntegerCount(total) });
     elements.progressFill.style.setProperty("--progress", `${percent}%`);
   }
 
@@ -3320,7 +3615,7 @@
   }
 
   function renderPrimaryAction(info) {
-    const disabled = state.isLoadingSettings || state.isApplying || !info.availableCount || !hasEnabledRules();
+    const disabled = state.isLoadingSettings || state.isApplying || isScopeAnalysisBusy() || !info.availableCount || !hasEnabledRules();
 
     if (state.view === "result") {
       elements.primaryAction.disabled = false;
@@ -3342,9 +3637,13 @@
     renderRules();
     renderSegments();
 
+    const scopeAnalysisJustBecameReady =
+      state.scopeAnalysisStatus === "ready" && lastRenderedScopeAnalysisStatus !== "ready";
+    lastRenderedScopeAnalysisStatus = state.scopeAnalysisStatus;
+
     const info = getSelectionInfo();
-    renderMain(info);
-    renderPanels(info);
+    renderMain(info, scopeAnalysisJustBecameReady);
+    renderPanels(info, scopeAnalysisJustBecameReady);
     renderProgress();
     renderResult();
     renderPrimaryAction(info);
@@ -3497,7 +3796,7 @@
       return;
     }
 
-    if (!info.availableCount || !hasEnabledRules() || state.isApplying) return;
+    if (!info.availableCount || !hasEnabledRules() || state.isApplying || isScopeAnalysisBusy()) return;
 
     state.progressDone = 0;
     state.progressTotal = info.availableCount;
@@ -3522,20 +3821,149 @@
 
     if (message.type === "settings-loaded") {
       const uiSettings = message.uiSettings || {};
-      state.uiLanguage = readStoredUiLanguage() || normalizeUiLanguage(uiSettings.uiLanguage) || state.uiLanguage;
-      state.theme = readStoredTheme() || normalizeTheme(uiSettings.theme) || state.theme;
+      const initialTargetScope = message.initialTargetScope === "currentPage"
+        ? "currentPage"
+        : "selection";
+      // Figma clientStorage is the authoritative persisted source. Local
+      // storage is only a fast fallback for builds or sessions where main has
+      // no saved value yet; preferring it here could preserve a stale locale.
+      state.uiLanguage = normalizeUiLanguage(uiSettings.uiLanguage) || readStoredUiLanguage() || state.uiLanguage;
+      state.theme = normalizeTheme(uiSettings.theme) || readStoredTheme() || state.theme;
       applySettingsToState(message.settings);
+
+      // Main knows the live Figma selection before the first analysis result.
+      // Seed the loading state with that scope so the header/label cannot
+      // briefly claim selected layers while the plugin is actually checking
+      // the current page (or vice versa).
+      if (!state.lastSelectionInfoMessage) {
+        state.currentTargetScope = initialTargetScope;
+        state.scopeAnalysisScope = initialTargetScope;
+      }
+
       state.isLoadingSettings = false;
       saveCurrentUiSettings();
+
+      // Apply the authoritative language and scope while the startup copy is
+      // still hidden, then reveal the completed first frame atomically. DOM
+      // updates are synchronous, so the browser cannot paint the old locale
+      // or the default selection label between these two statements.
       render();
+      elements.app.classList.remove("is-bootstrapping");
       return;
     }
 
     if (message.type === "selection-info") {
+      const isFirstSelectionInfo = !initialSelectionInfoAcknowledged;
+      const scopeSwitchSequence =
+        typeof message.debugScopeSwitchSequence === "number"
+          ? message.debugScopeSwitchSequence
+          : null;
+      const scopeSwitchStartedAt =
+        typeof message.debugScopeSwitchStartedAt === "number"
+          ? message.debugScopeSwitchStartedAt
+          : null;
+      const scopeSwitchPageId =
+        typeof message.pageId === "string" ? message.pageId : null;
+      const scopeSwitchTargetScope = message.targetScope || "selection";
+      const selectionInfoRequestId = typeof message.requestId === "number" ? message.requestId : null;
+
+      if (selectionInfoRequestId !== null && selectionInfoRequestId < state.scopeAnalysisRequestId) {
+        return;
+      }
+
+      if (SCOPE_SWITCH_DEBUG && scopeSwitchSequence !== null) {
+        const previousScope = state.currentTargetScope;
+        const elapsedSinceRequestMs =
+          scopeSwitchStartedAt !== null ? Date.now() - scopeSwitchStartedAt : null;
+        const responseCountForSequence =
+          (scopeSwitchResponseCountsBySequence.get(scopeSwitchSequence) || 0) + 1;
+        scopeSwitchResponseCountsBySequence.set(scopeSwitchSequence, responseCountForSequence);
+
+        console.log("[scope-switch-ui] request", {
+          sequence: scopeSwitchSequence,
+          targetScope: scopeSwitchTargetScope,
+          startedAt: scopeSwitchStartedAt,
+          previousScope,
+        });
+
+        console.log("[scope-switch-ui] response received", {
+          sequence: scopeSwitchSequence,
+          targetScope: scopeSwitchTargetScope,
+          elapsedSinceRequestMs,
+          responseCountForSequence,
+        });
+      }
+
+      // Real behavior below (not diagnostics-only): the render-completion
+      // rAF is the one signal main relies on to know the first result has
+      // actually painted before it starts the background page-cache prewarm.
+      // It always fires, whether or not SCOPE_SWITCH_DEBUG is on.
+      const renderStartedAt = scopeSwitchDebugNow();
+
+      requestAnimationFrame(() => {
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchSequence !== null) {
+          const elapsedSinceRequestMs =
+            scopeSwitchStartedAt !== null ? Date.now() - scopeSwitchStartedAt : null;
+
+          console.log("[scope-switch-ui] render completed", {
+            sequence: scopeSwitchSequence,
+            targetScope: scopeSwitchTargetScope,
+            elapsedSinceRequestMs,
+            renderDurationMs: scopeSwitchDebugNow() - renderStartedAt,
+          });
+        }
+
+        if (!isFirstSelectionInfo) {
+          return;
+        }
+
+        initialSelectionInfoAcknowledged = true;
+
+        if (SCOPE_SWITCH_DEBUG && scopeSwitchSequence !== null) {
+          const elapsedSinceRequestMs =
+            scopeSwitchStartedAt !== null ? Date.now() - scopeSwitchStartedAt : null;
+
+          console.log("[scope-switch-ui] initial render acknowledged", {
+            sequence: scopeSwitchSequence,
+            elapsedSinceRequestMs,
+          });
+        }
+
+        parent.postMessage({
+          pluginMessage: {
+            type: "selection-info-rendered",
+            pageId: scopeSwitchPageId,
+            initialRender: true,
+            ...(scopeSwitchSequence !== null
+              ? { debugScopeSwitchSequence: scopeSwitchSequence }
+              : {}),
+          },
+        }, "*");
+      });
+
       const nextSelectionSignature = getSelectionSignature(message);
+
+      if (SCOPE_SWITCH_DEBUG && scopeSwitchSequence !== null) {
+        console.log("[scope-analysis-ui] ready", {
+          sequence: scopeSwitchSequence,
+          scope: scopeSwitchTargetScope,
+          processedTextNodeCount: null,
+          totalTextNodeCount: null,
+          elapsedSinceRequestMs:
+            scopeSwitchStartedAt !== null ? Date.now() - scopeSwitchStartedAt : null,
+        });
+      }
+
       state.lastSelectionInfoMessage = message;
       state.currentTargetScope = message.targetScope || "selection";
       state.currentAvailableTextNodeCount = Number(message.availableTextNodeCount || 0);
+      state.scopeAnalysisStatus = "ready";
+      state.scopeAnalysisScope = scopeSwitchTargetScope === "currentPage" ? "currentPage" : "selection";
+      if (selectionInfoRequestId !== null) {
+        state.scopeAnalysisRequestId = Math.max(state.scopeAnalysisRequestId, selectionInfoRequestId);
+      }
+      state.scopeAnalysisProcessedCount = null;
+      state.scopeAnalysisTotalCount = null;
 
       if (state.isApplying) {
         render();
@@ -3559,6 +3987,60 @@
       state.openRuleGroup = null;
       state.view = "main";
       render();
+      return;
+    }
+
+    if (message.type === "scope-analysis-state") {
+      const requestId = typeof message.requestId === "number" ? message.requestId : null;
+      const scope = message.scope === "currentPage" ? "currentPage" : "selection";
+      const analysisState = message.state === "error" ? "error" : "loading";
+      const processedTextNodeCount = typeof message.processedTextNodeCount === "number" ? message.processedTextNodeCount : null;
+      const totalTextNodeCount = typeof message.totalTextNodeCount === "number" ? message.totalTextNodeCount : null;
+
+      if (requestId !== null && requestId < state.scopeAnalysisRequestId) {
+        return;
+      }
+
+      if (SCOPE_SWITCH_DEBUG) {
+        const sequence = typeof message.debugScopeSwitchSequence === "number" ? message.debugScopeSwitchSequence : null;
+        const startedAt = typeof message.debugScopeSwitchStartedAt === "number" ? message.debugScopeSwitchStartedAt : null;
+        const elapsedSinceRequestMs = startedAt !== null ? Date.now() - startedAt : null;
+        const isNewLoadingRequest =
+          analysisState === "loading" &&
+          (requestId !== state.scopeAnalysisRequestId || state.scopeAnalysisStatus !== "loading");
+        const logName = analysisState === "error" ? "error" : (isNewLoadingRequest ? "loading shown" : "progress");
+
+        console.log(`[scope-analysis-ui] ${logName}`, {
+          sequence,
+          scope,
+          processedTextNodeCount,
+          totalTextNodeCount,
+          elapsedSinceRequestMs,
+        });
+      }
+
+      const isRepeatedLoadingUpdate =
+        analysisState === "loading" &&
+        state.scopeAnalysisStatus === "loading" &&
+        state.scopeAnalysisScope === scope &&
+        requestId !== null &&
+        requestId === state.scopeAnalysisRequestId;
+
+      state.scopeAnalysisStatus = analysisState;
+      state.scopeAnalysisScope = scope;
+      if (requestId !== null) {
+        state.scopeAnalysisRequestId = requestId;
+      }
+      state.scopeAnalysisProcessedCount = null;
+      state.scopeAnalysisTotalCount = null;
+
+      // Main still scans large pages in small asynchronous chunks, but the UI
+      // no longer repaints for every internal progress update. The already
+      // running indicator remains smooth until the final selection-info
+      // message swaps in the ready count.
+      if (!isRepeatedLoadingUpdate || analysisState === "error") {
+        render();
+      }
       return;
     }
 
@@ -3607,4 +4089,11 @@
   }
 
   render();
+
+  // Confirms the initial loading skeleton has actually painted before main
+  // starts the first -- potentially heavy -- analysis request. No artificial
+  // delay: this fires as soon as the browser is ready to paint a frame.
+  requestAnimationFrame(() => {
+    parent.postMessage({ pluginMessage: { type: "ui-ready" } }, "*");
+  });
 </script>
