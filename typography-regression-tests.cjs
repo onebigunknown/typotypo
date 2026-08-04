@@ -97,6 +97,42 @@ const formatCases = [
   },
   {
     group: "cleanup",
+    name: "single Figma line separator becomes a space",
+    input: "Первая строка\u2028вторая строка",
+    expected: "Первая строка вторая строка",
+  },
+  {
+    group: "cleanup",
+    name: "two Figma line separators preserve a paragraph break",
+    input: "Первый абзац\u2028\u2028Второй абзац",
+    expected: "Первый абзац\n\nВторой абзац",
+  },
+  {
+    group: "cleanup",
+    name: "Figma paragraph separator preserves a paragraph break",
+    input: "Первый абзац\u2029Второй абзац",
+    expected: "Первый абзац\n\nВторой абзац",
+  },
+  {
+    group: "cleanup",
+    name: "whitespace-only blank line stays a paragraph break",
+    input: "Первый абзац\n \t \nВторой абзац",
+    expected: "Первый абзац\n\nВторой абзац",
+  },
+  {
+    group: "list markers",
+    name: "Figma line separators preserve and normalize unordered lists",
+    input: "Первый\u2028-Второй\u2028•Третий\u2028—Четвёртый\u2028*Пятый",
+    expected: "Первый\n- Второй\n• Третий\n— Четвёртый\n* Пятый",
+  },
+  {
+    group: "list markers",
+    name: "Figma line separators preserve and normalize ordered lists",
+    input: "1.Первый\u20282. Второй\u202810)Третий\u2028a)English item\u2028b. Another item",
+    expected: "1. Первый\n2. Второй\n10) Третий\na) English item\nb. Another item",
+  },
+  {
+    group: "cleanup",
     name: "extra spaces and text edges are cleaned",
     input: "  Привет   мир  ",
     expected: "Привет мир",
@@ -235,9 +271,9 @@ const formatCases = [
   },
   {
     group: "list markers",
-    name: "hyphen markdown-like lists are not normalized",
+    name: "hyphen list markers receive one following space",
     input: "-Треки\n- Альбомы",
-    expected: "-Треки\n- Альбомы",
+    expected: "- Треки\n- Альбомы",
   },
   {
     group: "list markers",
@@ -819,12 +855,14 @@ const formatCases = [
   },
   {
     group: "currency",
-    name: "currency stress fragment stays stable after line-break normalization",
+    name: "currency stress fragment preserves numbered section boundaries",
     input: `7. CURRENCY
 Цена 100${NBSP}₽. Музыка.
 Тариф от 100${NBSP}₽ до 500${NBSP}₽
 8. RUSSIAN NON-BREAKING SPACES`,
-    expected: `7. CURRENCY Цена 100${NBSP}₽. Музыка. Тариф от 100${NBSP}₽ до 500${NBSP}₽ 8. RUSSIAN NON-BREAKING SPACES`,
+    expected: `7. CURRENCY
+Цена 100${NBSP}₽. Музыка. Тариф от 100${NBSP}₽ до 500${NBSP}₽
+8. RUSSIAN NON-BREAKING SPACES`,
   },
 ];
 
@@ -847,6 +885,8 @@ function visible(value) {
   return value
     .replace(/\u00A0/g, "⍽")
     .replace(/\u202F/g, "⏤")
+    .replace(/\u2028/g, "␤")
+    .replace(/\u2029/g, "¶")
     .replace(/\n/g, "⏎\n");
 }
 

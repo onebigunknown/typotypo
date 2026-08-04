@@ -635,10 +635,30 @@ namespace TypotypoEngine {
   function applyManualLineBreaksRule(text: string): RuleResult {
     let replacementCount = 0;
 
-    const normalizedLineEndings = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    let normalizedLineEndings = text
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\u2028/g, "\n")
+      .replace(/\u2029/g, "\n\n");
+
+    if (normalizedLineEndings !== text) {
+      replacementCount += 1;
+    }
+
+    const normalizedParagraphBreaks = normalizedLineEndings.replace(
+      /\n[ \t\u00A0\u202F]+\n/g,
+      "\n\n"
+    );
+
+    if (normalizedParagraphBreaks !== normalizedLineEndings) {
+      replacementCount += 1;
+      normalizedLineEndings = normalizedParagraphBreaks;
+    }
 
     function startsWithSupportedListMarker(line: string): boolean {
-      return /^[ \t\u00A0\u202F]*(?:[•‣▪◦—–]|-[ \t\u00A0\u202F])/.test(line);
+      return /^[ \t\u00A0\u202F]*(?:[•‣▪◦—–*](?:[ \t\u00A0\u202F]*)(?=\S)|-(?:[ \t\u00A0\u202F]+(?=\S)|(?=[A-Za-zА-Яа-яЁё«„“"']))|(?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)](?:[ \t\u00A0\u202F]+(?=\S)|(?=[A-Za-zА-Яа-яЁё«„“"'])))/.test(
+        line
+      );
     }
 
     const formattedText = normalizedLineEndings.replace(
@@ -684,10 +704,6 @@ namespace TypotypoEngine {
       }
     );
 
-    if (normalizedLineEndings !== text && formattedText === normalizedLineEndings) {
-      replacementCount += 1;
-    }
-
     return {
       formattedText,
       replacementCount,
@@ -730,10 +746,10 @@ namespace TypotypoEngine {
   }
 
   function applyExtraSpacesRule(text: string): RuleResult {
-    const matches = text.match(/[^\S\r\n]{2,}/g);
+    const matches = text.match(/[^\S\r\n\u2028\u2029]{2,}/g);
 
     return {
-      formattedText: text.replace(/[^\S\r\n]{2,}/g, " "),
+      formattedText: text.replace(/[^\S\r\n\u2028\u2029]{2,}/g, " "),
       replacementCount: matches ? matches.length : 0,
     };
   }
@@ -841,7 +857,7 @@ namespace TypotypoEngine {
     );
 
     function isSpaceLike(character: string): boolean {
-      return /[ \t\n\r\u00A0\u202F]/.test(character);
+      return /[ \t\n\r\u00A0\u2028\u2029\u202F]/.test(character);
     }
 
     function isClosingPunctuationOrOperator(character: string): boolean {
@@ -1041,30 +1057,58 @@ namespace TypotypoEngine {
 
     function applyListMarkerSpacingCleanup(input: string): RuleResult {
       let markerReplacementCount = 0;
+      let output = input;
 
-      const formattedText = input.replace(
-        /(^|\n)([ \t\u00A0\u202F]*)([•‣▪◦—–])([ \t\u00A0\u202F]*)(?=\S)/g,
-        function (
-          match: string,
-          lineStart: string,
-          indentation: string,
-          marker: string,
-          _markerSpacing: string
-        ) {
-          const normalizedMarker = marker === "–" ? "—" : marker;
-          const normalized = lineStart + indentation + normalizedMarker + " ";
+      function normalizeMarker(
+        regexp: RegExp,
+        normalizeMarkerValue: (marker: string) => string = (marker) => marker
+      ) {
+        output = output.replace(
+          regexp,
+          function (
+            match: string,
+            lineStart: string,
+            indentation: string,
+            marker: string
+          ) {
+            const normalized =
+              lineStart + indentation + normalizeMarkerValue(marker) + " ";
 
-          if (match === normalized) {
-            return match;
+            if (match === normalized) {
+              return match;
+            }
+
+            markerReplacementCount += 1;
+            return normalized;
           }
+        );
+      }
 
-          markerReplacementCount += 1;
-          return normalized;
+      normalizeMarker(
+        /(^|\n)([ \t\u00A0\u202F]*)([•‣▪◦—–*])[ \t\u00A0\u202F]*(?=\S)/g,
+        function (marker) {
+          return marker === "–" ? "—" : marker;
         }
       );
 
+      normalizeMarker(
+        /(^|\n)([ \t\u00A0\u202F]*)(-)[ \t\u00A0\u202F]+(?=\S)/g
+      );
+
+      normalizeMarker(
+        /(^|\n)([ \t\u00A0\u202F]*)(-)(?=[A-Za-zА-Яа-яЁё«„“"'])/g
+      );
+
+      normalizeMarker(
+        /(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])[ \t\u00A0\u202F]+(?=\S)/g
+      );
+
+      normalizeMarker(
+        /(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])(?=[A-Za-zА-Яа-яЁё«„“"'])/g
+      );
+
       return {
-        formattedText,
+        formattedText: output,
         replacementCount: markerReplacementCount,
       };
     }
