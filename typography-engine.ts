@@ -1340,7 +1340,7 @@ namespace TypotypoEngine {
         return true;
       }
 
-      function getCurrencyLocalContext(): string {
+      function getCurrencyLocalContext(): { text: string; start: number } {
         const contextWindow = 48;
         let contextStart = Math.max(0, offset - contextWindow);
         let contextEnd = Math.min(fullText.length, offset + contextWindow);
@@ -1359,13 +1359,45 @@ namespace TypotypoEngine {
           }
         }
 
-        return fullText.slice(contextStart, contextEnd);
+        return {
+          text: fullText.slice(contextStart, contextEnd),
+          start: contextStart,
+        };
       }
 
-      const localContext = getCurrencyLocalContext();
+      const { text: localContext, start: contextStart } = getCurrencyLocalContext();
+      const localOffset = offset - contextStart;
+      const contextWithoutCurrencyTokens = localContext.replace(
+        /\b(?:RUB|RUR|USD|EUR|руб(?:лей)?|р)\.?\b/giu,
+        function (currencyToken: string) {
+          return " ".repeat(currencyToken.length);
+        }
+      );
 
-      const cyrillicMatches = localContext.match(/[А-Яа-яЁё]/g) || [];
-      const latinMatches = localContext.match(/[A-Za-z]/g) || [];
+      let nearestCyrillicDistance = Number.POSITIVE_INFINITY;
+      let nearestLatinDistance = Number.POSITIVE_INFINITY;
+
+      for (let index = 0; index < contextWithoutCurrencyTokens.length; index += 1) {
+        const character = contextWithoutCurrencyTokens[index];
+        const distance = Math.abs(index - localOffset);
+
+        if (/[А-Яа-яЁё]/.test(character)) {
+          nearestCyrillicDistance = Math.min(nearestCyrillicDistance, distance);
+        } else if (/[A-Za-z]/.test(character)) {
+          nearestLatinDistance = Math.min(nearestLatinDistance, distance);
+        }
+      }
+
+      if (nearestCyrillicDistance < nearestLatinDistance) {
+        return "ru";
+      }
+
+      if (nearestLatinDistance < nearestCyrillicDistance) {
+        return "en";
+      }
+
+      const cyrillicMatches = contextWithoutCurrencyTokens.match(/[А-Яа-яЁё]/g) || [];
+      const latinMatches = contextWithoutCurrencyTokens.match(/[A-Za-z]/g) || [];
 
       if (cyrillicMatches.length > 0 && cyrillicMatches.length >= latinMatches.length) {
         return "ru";
@@ -1493,6 +1525,20 @@ namespace TypotypoEngine {
       );
     }
 
+    function isCurrencyPrefixAttachedToPreviousAmount(
+      prefix: string,
+      offset: number,
+      fullText: string
+    ): boolean {
+      if (!/^[ \t\u00A0\u202F]+$/.test(prefix)) {
+        return false;
+      }
+
+      const previousCharacter = offset > 0 ? fullText[offset - 1] : "";
+
+      return /\d/.test(previousCharacter);
+    }
+
     function replaceCurrencyPrefix(
       regexp: RegExp,
       symbol: "₽" | "$" | "€"
@@ -1507,6 +1553,10 @@ namespace TypotypoEngine {
           offset: number,
           fullText: string
         ) {
+          if (isCurrencyPrefixAttachedToPreviousAmount(prefix, offset, fullText)) {
+            return match;
+          }
+
           const currencyLanguage = resolveCurrencyLanguage(
             rawCurrency,
             symbol,
@@ -1545,6 +1595,10 @@ namespace TypotypoEngine {
           offset: number,
           fullText: string
         ) {
+          if (isCurrencyPrefixAttachedToPreviousAmount(prefix, offset, fullText)) {
+            return match;
+          }
+
           const currencyLanguage = resolveCurrencyLanguage(
             rawCurrency,
             symbol,
@@ -1659,8 +1713,15 @@ namespace TypotypoEngine {
     replaceAndCount(/>=/g, "≥");
     formattedText = formattedText.replace(
       /(\S)[ \t\u00A0\u202F]*!=[ \t\u00A0\u202F]*(?=\S)/g,
-      function (match: string, leftCharacter: string) {
-        const normalized = leftCharacter + " ≠ ";
+      function (
+        match: string,
+        leftCharacter: string,
+        offset: number,
+        fullText: string
+      ) {
+        const nextCharacter = fullText[offset + match.length] || "";
+        const trailingSpace = /[,.;:!?…)}\]»”’]/.test(nextCharacter) ? "" : " ";
+        const normalized = leftCharacter + " ≠" + trailingSpace;
 
         if (match === normalized) {
           return match;
@@ -2769,7 +2830,7 @@ namespace TypotypoEngine {
       new RegExp(
         "(^|[^А-Яа-яЁёA-Za-z])(" +
           legalEntityAbbreviations +
-          ")[ 	  ]+(?=[А-Яа-яЁёA-Za-z0-9«„“\"])",
+          ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9«„“\"])",
         "g"
       ),
       function (_match, prefix, abbreviation) {

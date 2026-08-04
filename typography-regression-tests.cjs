@@ -390,6 +390,12 @@ const formatCases = [
   },
   {
     group: "symbols",
+    name: "symbol replacement does not leave a space before punctuation",
+    input: "©, ™, ±, !=, <=, >=.",
+    expected: "©, ™, ±, ≠, ≤, ≥.",
+  },
+  {
+    group: "symbols",
     name: "fractions are normalized before punctuation",
     input: "1/2? 1/3! 2/3, 1/4; 3/4:",
     expected: "½? ⅓! ⅔, ¼; ¾:",
@@ -798,6 +804,27 @@ const formatCases = [
     name: "sentence dash stays an em dash with non-breaking space",
     input: "Музыка — это жизнь.",
     expected: `Музыка${NBSP}— это${NBSP}жизнь`,
+  },
+  {
+    group: "currency",
+    name: "auto mode keeps suffix ruble order near English section heading",
+    input: `7. CURRENCY Цена 100${NBSP}₽. Музыка.`,
+    expected: `7. CURRENCY Цена 100${NBSP}₽. Музыка.`,
+  },
+  {
+    group: "currency",
+    name: "currency prefix parser does not consume the next numbered heading",
+    input: `Тариф от 100${NBSP}₽ до 500${NBSP}₽ 8. RUSSIAN NON-BREAKING SPACES`,
+    expected: `Тариф от 100${NBSP}₽ до 500${NBSP}₽ 8. RUSSIAN NON-BREAKING SPACES`,
+  },
+  {
+    group: "currency",
+    name: "currency stress fragment stays stable after line-break normalization",
+    input: `7. CURRENCY
+Цена 100${NBSP}₽. Музыка.
+Тариф от 100${NBSP}₽ до 500${NBSP}₽
+8. RUSSIAN NON-BREAKING SPACES`,
+    expected: `7. CURRENCY Цена 100${NBSP}₽. Музыка. Тариф от 100${NBSP}₽ до 500${NBSP}₽ 8. RUSSIAN NON-BREAKING SPACES`,
   },
 ];
 

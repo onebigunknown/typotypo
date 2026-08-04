@@ -831,11 +831,36 @@ var TypotypoEngine;
                         break;
                     }
                 }
-                return fullText.slice(contextStart, contextEnd);
+                return {
+                    text: fullText.slice(contextStart, contextEnd),
+                    start: contextStart,
+                };
             }
-            const localContext = getCurrencyLocalContext();
-            const cyrillicMatches = localContext.match(/[А-Яа-яЁё]/g) || [];
-            const latinMatches = localContext.match(/[A-Za-z]/g) || [];
+            const { text: localContext, start: contextStart } = getCurrencyLocalContext();
+            const localOffset = offset - contextStart;
+            const contextWithoutCurrencyTokens = localContext.replace(/\b(?:RUB|RUR|USD|EUR|руб(?:лей)?|р)\.?\b/giu, function (currencyToken) {
+                return " ".repeat(currencyToken.length);
+            });
+            let nearestCyrillicDistance = Number.POSITIVE_INFINITY;
+            let nearestLatinDistance = Number.POSITIVE_INFINITY;
+            for (let index = 0; index < contextWithoutCurrencyTokens.length; index += 1) {
+                const character = contextWithoutCurrencyTokens[index];
+                const distance = Math.abs(index - localOffset);
+                if (/[А-Яа-яЁё]/.test(character)) {
+                    nearestCyrillicDistance = Math.min(nearestCyrillicDistance, distance);
+                }
+                else if (/[A-Za-z]/.test(character)) {
+                    nearestLatinDistance = Math.min(nearestLatinDistance, distance);
+                }
+            }
+            if (nearestCyrillicDistance < nearestLatinDistance) {
+                return "ru";
+            }
+            if (nearestLatinDistance < nearestCyrillicDistance) {
+                return "en";
+            }
+            const cyrillicMatches = contextWithoutCurrencyTokens.match(/[А-Яа-яЁё]/g) || [];
+            const latinMatches = contextWithoutCurrencyTokens.match(/[A-Za-z]/g) || [];
             if (cyrillicMatches.length > 0 && cyrillicMatches.length >= latinMatches.length) {
                 return "ru";
             }
@@ -896,8 +921,18 @@ var TypotypoEngine;
                 return normalized;
             });
         }
+        function isCurrencyPrefixAttachedToPreviousAmount(prefix, offset, fullText) {
+            if (!/^[ \t\u00A0\u202F]+$/.test(prefix)) {
+                return false;
+            }
+            const previousCharacter = offset > 0 ? fullText[offset - 1] : "";
+            return /\d/.test(previousCharacter);
+        }
         function replaceCurrencyPrefix(regexp, symbol) {
             formattedText = formattedText.replace(regexp, function (match, prefix, rawCurrency, number, offset, fullText) {
+                if (isCurrencyPrefixAttachedToPreviousAmount(prefix, offset, fullText)) {
+                    return match;
+                }
                 const currencyLanguage = resolveCurrencyLanguage(rawCurrency, symbol, offset, fullText);
                 if (!currencyLanguage) {
                     return match;
@@ -912,6 +947,9 @@ var TypotypoEngine;
         }
         function replaceCurrencyPrefixFractionalFirst(regexp, symbol) {
             formattedText = formattedText.replace(regexp, function (match, prefix, rawCurrency, number, offset, fullText) {
+                if (isCurrencyPrefixAttachedToPreviousAmount(prefix, offset, fullText)) {
+                    return match;
+                }
                 const currencyLanguage = resolveCurrencyLanguage(rawCurrency, symbol, offset, fullText);
                 if (!currencyLanguage) {
                     return match;
@@ -963,8 +1001,10 @@ var TypotypoEngine;
         replaceAndCount(/\+[\s\u00A0\u202F]*[-–—−]/g, "±");
         replaceAndCount(/<=/g, "≤");
         replaceAndCount(/>=/g, "≥");
-        formattedText = formattedText.replace(/(\S)[ \t\u00A0\u202F]*!=[ \t\u00A0\u202F]*(?=\S)/g, function (match, leftCharacter) {
-            const normalized = leftCharacter + " ≠ ";
+        formattedText = formattedText.replace(/(\S)[ \t\u00A0\u202F]*!=[ \t\u00A0\u202F]*(?=\S)/g, function (match, leftCharacter, offset, fullText) {
+            const nextCharacter = fullText[offset + match.length] || "";
+            const trailingSpace = /[,.;:!?…)}\]»”’]/.test(nextCharacter) ? "" : " ";
+            const normalized = leftCharacter + " ≠" + trailingSpace;
             if (match === normalized) {
                 return match;
             }
@@ -1512,7 +1552,7 @@ var TypotypoEngine;
         });
         replaceAndCount(new RegExp("(^|[^А-Яа-яЁёA-Za-z])(" +
             legalEntityAbbreviations +
-            ")[ 	  ]+(?=[А-Яа-яЁёA-Za-z0-9«„“\"])", "g"), function (_match, prefix, abbreviation) {
+            ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9«„“\"])", "g"), function (_match, prefix, abbreviation) {
             return prefix + abbreviation + regularNbsp;
         });
         replaceAndCount(new RegExp("(^|[^А-Яа-яЁёA-Za-z])(" +
