@@ -2135,7 +2135,18 @@ namespace TypotypoEngine {
       return true;
     }
 
+    const textBeforeFinalPeriod = textEndingWithPeriod.slice(0, -1);
+    const proseSentences = textBeforeFinalPeriod
+      .split(/[.!?…][ \t\u00A0\u202F]+(?=[А-ЯЁA-Z«„“"])/)
+      .map((sentence) => sentence.replace(/^[ \t\u00A0\u202F]+/, ""));
+    const finalSentence = proseSentences[proseSentences.length - 1] || "";
+    const previousSentence = proseSentences[proseSentences.length - 2] || "";
+    const endsWithTwoProseSentences =
+      getLetterCount(previousSentence) >= 30 &&
+      getLetterCount(finalSentence) >= 30;
+
     return (
+      endsWithTwoProseSentences ||
       shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
       shouldKeepEnglishFinalPeriod(textEndingWithPeriod)
     );
@@ -3151,7 +3162,7 @@ namespace TypotypoEngine {
     const space = getConfiguredNbsp(settings);
 
     const regexp =
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9](?:[0-9 \t\u00A0\u202F]*[0-9]){4,})(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
+      /(^|[^0-9A-Za-zА-Яа-яЁё])((?:[0-9]{1,3}(?:[ \t\u00A0\u202F][0-9]{3})+|[0-9]{5,}))(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
 
     let replacementCount = 0;
 
@@ -3452,6 +3463,21 @@ namespace TypotypoEngine {
       });
     }
 
+    function protectByRegexpWithLeadingBoundary(regexp: RegExp) {
+      protectedText = protectedText.replace(
+        regexp,
+        function (match: string, leadingBoundary: string) {
+          const value = match.slice(leadingBoundary.length);
+          const { protectedValue, trailingPunctuation } =
+            splitTrailingPunctuation(value);
+
+          return (
+            leadingBoundary + protectValue(protectedValue, trailingPunctuation)
+          );
+        }
+      );
+    }
+
     function isRomanNumeralRange(value: string): boolean {
       return /^[IVXLCDM]{1,8}[-–—−][IVXLCDM]{1,8}$/.test(value);
     }
@@ -3547,6 +3573,10 @@ namespace TypotypoEngine {
     }
 
     protectByRegexp(/`[^`\n]+`/g);
+    protectExactByRegexp(
+      /\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g
+    );
+    protectExactByRegexp(/\b\d+(?:[,.]\d+)?[ \t]*"/g);
     protectHtmlLikeTags();
     protectBalancedCurlyBraceFragments();
     protectExactByRegexp(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g);
@@ -3556,7 +3586,9 @@ namespace TypotypoEngine {
     protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
     protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
     protectByRegexp(/\bwww\.[^\s<>]+/gi);
-    protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>]+/g);
+    protectByRegexpWithLeadingBoundary(
+      /(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>]+/g
+    );
     protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
 
     protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>]*)?/gi);
@@ -3567,7 +3599,6 @@ namespace TypotypoEngine {
     protectCodeLikeTokensByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
     protectByRegexp(/\b(?=[A-Za-z0-9/]*[A-Za-z])[A-Za-z0-9]+(?:\/[A-Za-z0-9]+)+\b/g);
     protectByRegexp(/\b\d+\/\d+-[A-Za-z0-9_-]+\b/g);
-    protectByRegexp(/\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g);
 
     return {
       protectedText,
@@ -3703,11 +3734,34 @@ namespace TypotypoEngine {
     };
   }
 
+
+  function shouldPreserveAmbiguousMixedQuoteText(
+    text: string,
+    language: LanguageCode
+  ): boolean {
+    if (language !== "unknown" || !/["“”„«»]/.test(text)) {
+      return false;
+    }
+
+    const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
+    const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+
+    return cyrillicCount >= 3 && latinCount >= 3;
+  }
+
   export function applyRulesToText(
     text: string,
     settings: ApplySettings,
     language: LanguageCode
   ): RuleResult & { skippedRuleCount: number } {
+    if (shouldPreserveAmbiguousMixedQuoteText(text, language)) {
+      return {
+        formattedText: text,
+        replacementCount: 0,
+        skippedRuleCount: 0,
+      };
+    }
+
     const { protectedText, fragments } = protectTextFragments(text);
 
     let formattedText = protectedText;

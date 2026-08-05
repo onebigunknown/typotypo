@@ -1200,7 +1200,16 @@ var TypotypoEngine;
         if (language === "unknown") {
             return true;
         }
-        return (shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
+        const textBeforeFinalPeriod = textEndingWithPeriod.slice(0, -1);
+        const proseSentences = textBeforeFinalPeriod
+            .split(/[.!?…][ \t\u00A0\u202F]+(?=[А-ЯЁA-Z«„“"])/)
+            .map((sentence) => sentence.replace(/^[ \t\u00A0\u202F]+/, ""));
+        const finalSentence = proseSentences[proseSentences.length - 1] || "";
+        const previousSentence = proseSentences[proseSentences.length - 2] || "";
+        const endsWithTwoProseSentences = getLetterCount(previousSentence) >= 30 &&
+            getLetterCount(finalSentence) >= 30;
+        return (endsWithTwoProseSentences ||
+            shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
             shouldKeepEnglishFinalPeriod(textEndingWithPeriod));
     }
     function applyEnglishApostrophesRule(text) {
@@ -1727,7 +1736,7 @@ var TypotypoEngine;
     }
     function applyRussianLargeNumbersRule(text, settings) {
         const space = getConfiguredNbsp(settings);
-        const regexp = /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9](?:[0-9 \t\u00A0\u202F]*[0-9]){4,})(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
+        const regexp = /(^|[^0-9A-Za-zА-Яа-яЁё])((?:[0-9]{1,3}(?:[ \t\u00A0\u202F][0-9]{3})+|[0-9]{5,}))(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
         let replacementCount = 0;
         const formattedText = text.replace(regexp, function (match, prefix, numberWithPossibleSpaces) {
             const rawNumber = numberWithPossibleSpaces.replace(/[ \t\u00A0\u202F]/g, "");
@@ -1949,6 +1958,13 @@ var TypotypoEngine;
                 return protectValue(match);
             });
         }
+        function protectByRegexpWithLeadingBoundary(regexp) {
+            protectedText = protectedText.replace(regexp, function (match, leadingBoundary) {
+                const value = match.slice(leadingBoundary.length);
+                const { protectedValue, trailingPunctuation } = splitTrailingPunctuation(value);
+                return (leadingBoundary + protectValue(protectedValue, trailingPunctuation));
+            });
+        }
         function isRomanNumeralRange(value) {
             return /^[IVXLCDM]{1,8}[-–—−][IVXLCDM]{1,8}$/.test(value);
         }
@@ -2013,6 +2029,8 @@ var TypotypoEngine;
             });
         }
         protectByRegexp(/`[^`\n]+`/g);
+        protectExactByRegexp(/\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g);
+        protectExactByRegexp(/\b\d+(?:[,.]\d+)?[ \t]*"/g);
         protectHtmlLikeTags();
         protectBalancedCurlyBraceFragments();
         protectExactByRegexp(/&(?:[A-Za-z][A-Za-z0-9]{1,31}|#\d{1,7}|#x[0-9A-Fa-f]{1,6});/g);
@@ -2021,7 +2039,7 @@ var TypotypoEngine;
         protectByRegexp(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
         protectByRegexp(/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>]+/g);
         protectByRegexp(/\bwww\.[^\s<>]+/gi);
-        protectByRegexp(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>]+/g);
+        protectByRegexpWithLeadingBoundary(/(^|[\s([{])(?:\.{0,2}\/|~\/)[^\s<>]+/g);
         protectByRegexp(/\b[A-Za-z]:\\[^\s<>'"]+/g);
         protectByRegexp(/\b[A-Za-z0-9-]+\.(?:com|ru|net|org|io|dev|app|site|ai|co|me)(?:\/[^\s<>]*)?/gi);
         protectByRegexp(/\b(?:v\d+(?:\.\d+){1,}|\d+(?:\.\d+){2,})(?:[-+][A-Za-z0-9._-]+)?\b/g);
@@ -2031,7 +2049,6 @@ var TypotypoEngine;
         protectCodeLikeTokensByRegexp(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g);
         protectByRegexp(/\b(?=[A-Za-z0-9/]*[A-Za-z])[A-Za-z0-9]+(?:\/[A-Za-z0-9]+)+\b/g);
         protectByRegexp(/\b\d+\/\d+-[A-Za-z0-9_-]+\b/g);
-        protectByRegexp(/\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(['"])[^'"\n]*\1/g);
         return {
             protectedText,
             fragments,
@@ -2115,7 +2132,22 @@ var TypotypoEngine;
             replacementCount,
         };
     }
+    function shouldPreserveAmbiguousMixedQuoteText(text, language) {
+        if (language !== "unknown" || !/["“”„«»]/.test(text)) {
+            return false;
+        }
+        const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
+        const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+        return cyrillicCount >= 3 && latinCount >= 3;
+    }
     function applyRulesToText(text, settings, language) {
+        if (shouldPreserveAmbiguousMixedQuoteText(text, language)) {
+            return {
+                formattedText: text,
+                replacementCount: 0,
+                skippedRuleCount: 0,
+            };
+        }
         const { protectedText, fragments } = protectTextFragments(text);
         let formattedText = protectedText;
         let replacementCount = 0;

@@ -916,6 +916,53 @@ const formatCases = [
 Цена 100${NBSP}₽. Музыка. Тариф от 100${NBSP}₽ до 500${NBSP}₽
 8. RUSSIAN NON-BREAKING SPACES`,
   },
+  {
+    group: "number spacing",
+    name: "adjacent ranges and times are not merged into large numbers",
+    input: "2020 - 2024 2020–2024 10:00 - 18:30",
+    expected: "2020–2024 2020–2024 10:00–18:30",
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "quotes",
+    name: "ambiguous mixed-script quote stress text stays unchanged",
+    input: `"Внешняя цитата и "внутренняя цитата"." "Outer quote and 'inner quote'." Он сказал: "Это "очень" важно". She said: "It's John's album." rock 'n' roll 12" display Размер 15"`,
+    expected: `"Внешняя цитата и "внутренняя цитата"." "Outer quote and 'inner quote'." Он сказал: "Это "очень" важно". She said: "It's John's album." rock 'n' roll 12" display Размер 15"`,
+  },
+  {
+    group: "quotes",
+    name: "inch marks are protected from English quote conversion",
+    input: `12" display and 15" screen.`,
+    expected: `12" display and 15" screen`,
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "protection",
+    name: "JavaScript string assignment is protected before identifier tokens",
+    input: `const album_name = "rock - roll";`,
+    expected: `const album_name = "rock - roll";`,
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "ui final period",
+    name: "final period is preserved for a multi-sentence text block",
+    input: "Это длинное предложение с несколькими частями. Его финальную точку нужно сохранить.",
+    expected: `Это${NBSP}длинное предложение с${NBSP}несколькими частями. Его финальную точку нужно сохранить.`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "protection",
+    name: "Figma separators around protected paths become spaces",
+    input: "%s %d %1$s\u2028./src/typography-engine.ts\u2028../assets/icon.svg",
+    expected: "%s %d %1$s ./src/typography-engine.ts ../assets/icon.svg",
+  },
+  {
+    group: "ui final period",
+    name: "stress punctuation block keeps the final prose period",
+    input: "Привет, мир! Как дела? Всё хорошо; да. Hello, world! How are you? Everything is fine; yes. Что?! Правда?! Да! Версия 1.2.3, цена 10,50 и время 12:30. Точка в конце короткого UI-текста. Это длинное предложение с несколькими частями. Его финальную точку нужно сохранить.",
+    expected: `Привет, мир! Как${NBSP}дела? Всё${NBSP}хорошо; да. Hello, world! How are you? Everything is fine; yes. Что?! Правда?! Да! Версия 1.2.3, цена 10,50${NBSP}и${NBSP}время 12:30. Точка в${NBSP}конце короткого UI-текста. Это${NBSP}длинное предложение с${NBSP}несколькими частями. Его финальную точку нужно сохранить.`,
+    settings: { languageMode: "ru" },
+  },
 ];
 
 const languageCases = [
