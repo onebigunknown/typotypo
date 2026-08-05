@@ -605,14 +605,26 @@ var TypotypoEngine;
                     return normalized;
                 });
             }
-            let output = replaceAndCount(input, /([«„“‘‚"([])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingSymbol) {
+            let output = replaceAndCount(input, /([«„“‘‚([])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingSymbol) {
                 return openingSymbol;
+            });
+            output = replaceAndCount(output, /(^|[\s([{,.;:!?…—–-])"[ \t\u00A0\u202F]+(?=\S)/g, function (_match, prefix) {
+                return prefix + '"';
             });
             output = replaceAndCount(output, /(„[^„“\n]*?)[ \t\u00A0\u202F]+“/g, function (_match, quoteContentBeforeClosing) {
                 return quoteContentBeforeClosing + "“";
             });
-            output = replaceAndCount(output, /[ \t\u00A0\u202F]+([»”’"\])])/g, function (_match, closingSymbol) {
+            output = replaceAndCount(output, /[ \t\u00A0\u202F]+([»”’\])])/g, function (_match, closingSymbol) {
                 return closingSymbol;
+            });
+            output = replaceAndCount(output, /([A-Za-zА-Яа-яЁё0-9.,;:!?])[ \t\u00A0\u202F]+(")(?=$|[\s.,;:!?…)\]}—–-])/g, function (_match, beforeQuote, closingQuote) {
+                return beforeQuote + closingQuote;
+            });
+            output = replaceAndCount(output, /([»”])(?=[A-Za-zА-Яа-яЁё])/g, function (_match, closingQuote) {
+                return closingQuote + " ";
+            });
+            output = replaceAndCount(output, /([A-Za-zА-Яа-яЁё.!?])"(?=[A-Za-zА-Яа-яЁё])/g, function (_match, beforeQuote) {
+                return beforeQuote + '" ';
             });
             return {
                 formattedText: output,
@@ -928,7 +940,7 @@ var TypotypoEngine;
                 }
                 const characterAfterMatch = fullText.slice(offset + match.length);
                 const shouldKeepSentencePeriod = /^(?:р\.|руб\.)$/iu.test(rawCurrency) &&
-                    /^[ \t\u00A0\u202F]+[А-ЯЁA-Z]/.test(characterAfterMatch);
+                    /^[ \t\n\r\u00A0\u202F]+[А-ЯЁA-Z0-9]/.test(characterAfterMatch);
                 const normalized = prefix +
                     formatCurrencyAmount(number, symbol, currencyLanguage) +
                     (shouldKeepSentencePeriod ? "." : "");
@@ -1600,7 +1612,44 @@ var TypotypoEngine;
         replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([иИ])[ \t\u00A0\u202F]+([дД]р)\./g, function (_match, prefix, conjunction, abbreviation) {
             return prefix + conjunction + regularNbsp + abbreviation + ".";
         });
-        replaceAndCount(/(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=[А-Яа-яЁё])/g, function (_match, prefix, number) {
+        const numberUnitAbbreviations = new Set([
+            "°c",
+            "°f",
+            "°с",
+            "руб",
+            "рублей",
+            "р",
+            "тыс",
+            "млн",
+            "млрд",
+            "трлн",
+            "кг",
+            "г",
+            "мг",
+            "л",
+            "мл",
+            "м",
+            "см",
+            "мм",
+            "км",
+            "с",
+            "сек",
+            "мин",
+            "ч",
+            "д",
+            "дн",
+            "кб",
+            "мб",
+            "гб",
+            "тб",
+        ]);
+        replaceAndCount(/(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=([А-Яа-яЁё]+\.?))/g, function (match, prefix, number, nextWord) {
+            const normalizedNextWord = nextWord
+                .replace(/\.$/, "")
+                .toLowerCase();
+            if (numberUnitAbbreviations.has(normalizedNextWord)) {
+                return match;
+            }
             return prefix + number + regularNbsp;
         });
         replaceAndCount(new RegExp("([А-Яа-яЁёA-Za-z0-9»”’)])([ \t\u00A0\u202F]+)(" +

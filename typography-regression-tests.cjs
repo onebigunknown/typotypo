@@ -366,6 +366,58 @@ const formatCases = [
     },
   },
 
+  {
+    group: "number spacing",
+    name: "narrow NBSP remains consistent for Cyrillic units",
+    input: "100 ₽, 300 МБ, 20 кг.",
+    expected: `100${NNBSP}₽, 300${NNBSP}МБ, 20${NNBSP}кг`,
+    settings: {
+      languageMode: "ru",
+      options: { nonBreakingSpaceStyle: "narrow" },
+    },
+  },
+  {
+    group: "currency",
+    name: "ruble abbreviation period is preserved before a numeric sentence",
+    input: "Цена 100 руб. 300 МБ.",
+    expected: `Цена 100${NNBSP}₽. 300${NNBSP}МБ`,
+    settings: {
+      languageMode: "ru",
+      options: { nonBreakingSpaceStyle: "narrow" },
+    },
+  },
+  {
+    group: "currency",
+    name: "Russian smoke text preserves sentence periods and configured spacing",
+    input: `"Музыка - это жизнь". Цена 100 руб. 300 МБ. 2020 - 2024. И. И. Иванов живёт в г. Москве.`,
+    expected: `«Музыка${NBSP}— это${NBSP}жизнь». Цена 100${NNBSP}₽. 300${NNBSP}МБ. 2020–2024. И.${NBSP}И.${NBSP}Иванов живёт в${NBSP}г.${NBSP}Москве`,
+    settings: {
+      languageMode: "ru",
+      options: { nonBreakingSpaceStyle: "narrow" },
+    },
+  },
+  {
+    group: "quotes en",
+    name: "English quotes preserve following space and use configured quote style",
+    input: `"John's album" costs 20 USD. Tracks|Albums. 2020 - 2024.`,
+    expected: "“John’s album” costs $20. Tracks | Albums. 2020–2024",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes en",
+    name: "missing space after a closing English quote is restored",
+    input: `"John's album"costs 20 USD.`,
+    expected: "“John’s album” costs $20",
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes en",
+    name: "colon before a quoted English label gets a space",
+    input: `Label:"Save"`,
+    expected: "Label: “Save”",
+    settings: { languageMode: "en" },
+  },
+
   // Russian NBSP rules
   {
     group: "russian nbsp",
@@ -400,7 +452,7 @@ const formatCases = [
     group: "russian nbsp",
     name: "legal entity abbreviations are glued to names",
     input: 'ООО "Ромашка", ПАО Сбер и ИП Иванов.',
-    expected: `ООО${NBSP}"Ромашка", ПАО${NBSP}Сбер и${NBSP}ИП${NBSP}Иванов`,
+    expected: `ООО${NBSP}«Ромашка», ПАО${NBSP}Сбер и${NBSP}ИП${NBSP}Иванов`,
     settings: { languageMode: "ru" },
   },
   {
