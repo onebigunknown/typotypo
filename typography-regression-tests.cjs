@@ -950,6 +950,42 @@ const formatCases = [
 "Внешняя цитата и"внутренняя цитата".""Outer quote and 'inner quote'."Он сказал:"Это"очень"важно". She said:"It's John's album."rock 'n' roll 'cause we're ready students' choice the '90s 12"display Размер 15"и высота 20".`,
   },
   {
+    group: "quotes en",
+    name: "multiline English quote examples are formatted before line-break cleanup",
+    input: `"Outer quote and 'inner quote'."
+She said: "It's John's album."
+rock 'n' roll
+'cause we're ready
+students' choice
+the '90s
+12" display`,
+    expected: `“Outer quote and ‘inner quote’.” She said: “It’s John’s album.” rock ’n’ roll ’cause we’re ready students’ choice the ’90s 12" display`,
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes ru",
+    name: "multiline Russian nested quotes are formatted before line-break cleanup",
+    input: `"Внешняя цитата и "внутренняя цитата"."
+Он сказал: "Это "очень" важно".
+Размер 15" и высота 20".`,
+    expected: `«Внешняя цитата и „внутренняя цитата“». Он сказал: «Это „очень“ важно». Размер 15" и${NBSP}высота 20"`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "quotes en",
+    name: "formatted English quotes and leading apostrophes are idempotent",
+    input: `“Outer quote and ‘inner quote’.” She said: “It’s John’s album.” rock ’n’ roll ’cause we’re ready students’ choice the ’90s 12" display`,
+    expected: `“Outer quote and ‘inner quote’.” She said: “It’s John’s album.” rock ’n’ roll ’cause we’re ready students’ choice the ’90s 12" display`,
+    settings: { languageMode: "en" },
+  },
+  {
+    group: "quotes ru",
+    name: "formatted Russian nested quotes are idempotent",
+    input: `«Внешняя цитата и „внутренняя цитата“». Он сказал: «Это „очень“ важно». Размер 15" и${NBSP}высота 20"`,
+    expected: `«Внешняя цитата и „внутренняя цитата“». Он сказал: «Это „очень“ важно». Размер 15" и${NBSP}высота 20"`,
+    settings: { languageMode: "ru" },
+  },
+  {
     group: "quotes",
     name: "inch marks are protected from English quote conversion",
     input: `12" display and 15" screen.`,

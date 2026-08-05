@@ -471,7 +471,7 @@ var TypotypoEngine;
             replacementCount: matches ? matches.length : 0,
         };
     }
-    function applySpacingCleanupRule(text) {
+    function applySpacingCleanupRule(text, _settings, language) {
         let replacementCount = 0;
         let normalizedText = text;
         function replaceAndCount(regexp, replacement) {
@@ -512,7 +512,8 @@ var TypotypoEngine;
         });
         normalizedText = normalizedText.replace(/([А-Яа-яЁёA-Za-z0-9])\.([»”’])/g, function (match, characterBeforePeriod, closingQuote, offset, fullText) {
             const textEndingWithPeriod = fullText.slice(0, offset + 2);
-            if (shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
+            if (language !== "ru" ||
+                shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
                 shouldKeepEnglishFinalPeriod(textEndingWithPeriod)) {
                 return match;
             }
@@ -605,8 +606,11 @@ var TypotypoEngine;
                     return normalized;
                 });
             }
-            let output = replaceAndCount(input, /([«„“‘‚([])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingSymbol) {
+            let output = replaceAndCount(input, /([«„‘‚([])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingSymbol) {
                 return openingSymbol;
+            });
+            output = replaceAndCount(output, /(^|[\s([{,.;:!?…—–-])“[ \t\u00A0\u202F]+(?=\S)/g, function (_match, prefix) {
+                return prefix + "“";
             });
             output = replaceAndCount(output, /(^|[\s([{,.;:!?…—–-])"[ \t\u00A0\u202F]+(?=\S)/g, function (_match, prefix) {
                 return prefix + '"';
@@ -614,7 +618,10 @@ var TypotypoEngine;
             output = replaceAndCount(output, /(„[^„“\n]*?)[ \t\u00A0\u202F]+“/g, function (_match, quoteContentBeforeClosing) {
                 return quoteContentBeforeClosing + "“";
             });
-            output = replaceAndCount(output, /[ \t\u00A0\u202F]+([»”’\])])/g, function (_match, closingSymbol) {
+            output = replaceAndCount(output, /[ \t\u00A0\u202F]+([»”\])])/g, function (_match, closingSymbol) {
+                return closingSymbol;
+            });
+            output = replaceAndCount(output, /[ \t\u00A0\u202F]+(’)(?=$|[\s.,;:!?… )\]}»”’—–-])/g, function (_match, closingSymbol) {
                 return closingSymbol;
             });
             output = replaceAndCount(output, /([A-Za-zА-Яа-яЁё0-9.,;:!?])[ \t\u00A0\u202F]+(")(?=$|[\s.,;:!?…)\]}—–-])/g, function (_match, beforeQuote, closingQuote) {
@@ -659,13 +666,13 @@ var TypotypoEngine;
                     return normalized;
                 });
             }
-            normalizeMarker(/(^|\n)([ \t\u00A0\u202F]*)([•‣▪◦—–*])[ \t\u00A0\u202F]*(?=\S)/g, function (marker) {
+            normalizeMarker(/(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)([•‣▪◦—–*])[ \t\u00A0\u202F]*(?=\S)/g, function (marker) {
                 return marker === "–" ? "—" : marker;
             });
-            normalizeMarker(/(^|\n)([ \t\u00A0\u202F]*)(-)[ \t\u00A0\u202F]+(?=\S)/g);
-            normalizeMarker(/(^|\n)([ \t\u00A0\u202F]*)(-)(?=[A-Za-zА-Яа-яЁё«„“"'])/g);
-            normalizeMarker(/(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])[ \t\u00A0\u202F]+(?=\S)/g);
-            normalizeMarker(/(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])(?=[A-Za-zА-Яа-яЁё«„“"'])/g);
+            normalizeMarker(/(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)(-)[ \t\u00A0\u202F]+(?=\S)/g);
+            normalizeMarker(/(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)(-)(?=[A-Za-zА-Яа-яЁё«„“"'])/g);
+            normalizeMarker(/(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])[ \t\u00A0\u202F]+(?=\S)/g);
+            normalizeMarker(/(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])(?=[A-Za-zА-Яа-яЁё«„“"'])/g);
             return {
                 formattedText: output,
                 replacementCount: markerReplacementCount,
@@ -1239,6 +1246,9 @@ var TypotypoEngine;
         replaceAndCount(/([A-Za-z])'(?=\s+[A-Za-z])/g, function (_match, beforeApostrophe) {
             return beforeApostrophe + "’";
         });
+        replaceAndCount(/(^|[\s([{—–-])'(cause|til|em|round|bout|nuff|twas|tween|cept|gainst)\b/gi, function (_match, prefix, elision) {
+            return prefix + "’" + elision;
+        });
         return {
             formattedText,
             replacementCount,
@@ -1268,6 +1278,37 @@ var TypotypoEngine;
                 return normalized;
             });
         }
+        function normalizeBalancedStraightQuotesByLine(input) {
+            return input
+                .split("\n")
+                .map(function (line) {
+                const quoteIndexes = [];
+                for (let index = 0; index < line.length; index += 1) {
+                    if (line[index] !== '"') {
+                        continue;
+                    }
+                    const previousCharacter = index > 0 ? line[index - 1] : "";
+                    if (/\d/.test(previousCharacter)) {
+                        continue;
+                    }
+                    quoteIndexes.push(index);
+                }
+                if (quoteIndexes.length !== 4) {
+                    return line;
+                }
+                const quoteCharacters = ["«", "„", "“", "»"];
+                let result = "";
+                let lastIndex = 0;
+                quoteIndexes.forEach(function (quoteIndex, quotePosition) {
+                    result += line.slice(lastIndex, quoteIndex);
+                    result += quoteCharacters[quotePosition];
+                    lastIndex = quoteIndex + 1;
+                });
+                return result + line.slice(lastIndex);
+            })
+                .join("\n");
+        }
+        formattedText = normalizeBalancedStraightQuotesByLine(formattedText);
         function protectExistingSecondLevelQuotesInsideGuillemets(input) {
             return input.replace(/«([^«»\n]*?)»/g, function (_match, quoteContent) {
                 const protectedQuoteContent = quoteContent.replace(/„([^„“\n]+)“/g, function (innerQuoteMatch) {
@@ -1810,11 +1851,6 @@ var TypotypoEngine;
             apply: applyTabsRule,
         },
         {
-            id: "manualLineBreaks",
-            supportedLanguages: "all",
-            apply: applyManualLineBreaksRule,
-        },
-        {
             id: "ellipsis",
             supportedLanguages: "all",
             apply: applyEllipsisRule,
@@ -1868,6 +1904,11 @@ var TypotypoEngine;
             id: "russianQuotes",
             supportedLanguages: ["ru"],
             apply: applyRussianQuotesRule,
+        },
+        {
+            id: "manualLineBreaks",
+            supportedLanguages: "all",
+            apply: applyManualLineBreaksRule,
         },
         {
             id: "numberRangeDash",
