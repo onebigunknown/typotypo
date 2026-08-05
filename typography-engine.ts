@@ -764,7 +764,11 @@ namespace TypotypoEngine {
     };
   }
 
-  function applySpacingCleanupRule(text: string): RuleResult {
+  function applySpacingCleanupRule(
+    text: string,
+    _settings: ApplySettings,
+    language: LanguageCode
+  ): RuleResult {
     let replacementCount = 0;
     let normalizedText = text;
 
@@ -839,6 +843,7 @@ namespace TypotypoEngine {
         const textEndingWithPeriod = fullText.slice(0, offset + 2);
 
         if (
+          language !== "ru" ||
           shouldKeepRussianFinalPeriod(textEndingWithPeriod) ||
           shouldKeepEnglishFinalPeriod(textEndingWithPeriod)
         ) {
@@ -997,9 +1002,17 @@ namespace TypotypoEngine {
 
       let output = replaceAndCount(
         input,
-        /([«„“‘‚([])[ \t\u00A0\u202F]+(?=\S)/g,
+        /([«„‘‚([])[ \t\u00A0\u202F]+(?=\S)/g,
         function (_match: string, openingSymbol: string) {
           return openingSymbol;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /(^|[\s([{,.;:!?…—–-])“[ \t\u00A0\u202F]+(?=\S)/g,
+        function (_match: string, prefix: string) {
+          return prefix + "“";
         }
       );
 
@@ -1021,7 +1034,15 @@ namespace TypotypoEngine {
 
       output = replaceAndCount(
         output,
-        /[ \t\u00A0\u202F]+([»”’\])])/g,
+        /[ \t\u00A0\u202F]+([»”\])])/g,
+        function (_match: string, closingSymbol: string) {
+          return closingSymbol;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /[ \t\u00A0\u202F]+(’)(?=$|[\s.,;:!?… )\]}»”’—–-])/g,
         function (_match: string, closingSymbol: string) {
           return closingSymbol;
         }
@@ -1121,26 +1142,26 @@ namespace TypotypoEngine {
       }
 
       normalizeMarker(
-        /(^|\n)([ \t\u00A0\u202F]*)([•‣▪◦—–*])[ \t\u00A0\u202F]*(?=\S)/g,
+        /(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)([•‣▪◦—–*])[ \t\u00A0\u202F]*(?=\S)/g,
         function (marker) {
           return marker === "–" ? "—" : marker;
         }
       );
 
       normalizeMarker(
-        /(^|\n)([ \t\u00A0\u202F]*)(-)[ \t\u00A0\u202F]+(?=\S)/g
+        /(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)(-)[ \t\u00A0\u202F]+(?=\S)/g
       );
 
       normalizeMarker(
-        /(^|\n)([ \t\u00A0\u202F]*)(-)(?=[A-Za-zА-Яа-яЁё«„“"'])/g
+        /(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)(-)(?=[A-Za-zА-Яа-яЁё«„“"'])/g
       );
 
       normalizeMarker(
-        /(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])[ \t\u00A0\u202F]+(?=\S)/g
+        /(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])[ \t\u00A0\u202F]+(?=\S)/g
       );
 
       normalizeMarker(
-        /(^|\n)([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])(?=[A-Za-zА-Яа-яЁё«„“"'])/g
+        /(^|[\n\u2028\u2029])([ \t\u00A0\u202F]*)((?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)])(?=[A-Za-zА-Яа-яЁё«„“"'])/g
       );
 
       return {
@@ -2208,6 +2229,13 @@ namespace TypotypoEngine {
       }
     );
 
+    replaceAndCount(
+      /(^|[\s([{—–-])'(cause|til|em|round|bout|nuff|twas|tween|cept|gainst)\b/gi,
+      function (_match, prefix, elision) {
+        return prefix + "’" + elision;
+      }
+    );
+
     return {
       formattedText,
       replacementCount,
@@ -2257,6 +2285,47 @@ namespace TypotypoEngine {
         }
       );
     }
+
+    function normalizeBalancedStraightQuotesByLine(input: string): string {
+      return input
+        .split("\n")
+        .map(function (line) {
+          const quoteIndexes: number[] = [];
+
+          for (let index = 0; index < line.length; index += 1) {
+            if (line[index] !== '"') {
+              continue;
+            }
+
+            const previousCharacter = index > 0 ? line[index - 1] : "";
+
+            if (/\d/.test(previousCharacter)) {
+              continue;
+            }
+
+            quoteIndexes.push(index);
+          }
+
+          if (quoteIndexes.length !== 4) {
+            return line;
+          }
+
+          const quoteCharacters = ["«", "„", "“", "»"];
+          let result = "";
+          let lastIndex = 0;
+
+          quoteIndexes.forEach(function (quoteIndex, quotePosition) {
+            result += line.slice(lastIndex, quoteIndex);
+            result += quoteCharacters[quotePosition];
+            lastIndex = quoteIndex + 1;
+          });
+
+          return result + line.slice(lastIndex);
+        })
+        .join("\n");
+    }
+
+    formattedText = normalizeBalancedStraightQuotesByLine(formattedText);
 
     function protectExistingSecondLevelQuotesInsideGuillemets(
       input: string
@@ -3279,11 +3348,6 @@ namespace TypotypoEngine {
       apply: applyTabsRule,
     },
     {
-      id: "manualLineBreaks",
-      supportedLanguages: "all",
-      apply: applyManualLineBreaksRule,
-    },
-    {
       id: "ellipsis",
       supportedLanguages: "all",
       apply: applyEllipsisRule,
@@ -3337,6 +3401,11 @@ namespace TypotypoEngine {
       id: "russianQuotes",
       supportedLanguages: ["ru"],
       apply: applyRussianQuotesRule,
+    },
+    {
+      id: "manualLineBreaks",
+      supportedLanguages: "all",
+      apply: applyManualLineBreaksRule,
     },
     {
       id: "numberRangeDash",
@@ -3737,16 +3806,34 @@ namespace TypotypoEngine {
 
   function shouldPreserveAmbiguousMixedQuoteText(
     text: string,
+    settings: ApplySettings,
     language: LanguageCode
   ): boolean {
-    if (language !== "unknown" || !/["“”„«»]/.test(text)) {
+    if (settings.languageMode !== "auto" || !/["“”„«»]/.test(text)) {
       return false;
     }
 
     const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
     const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+    const totalLetterCount = cyrillicCount + latinCount;
+    const quoteMarkCount = (text.match(/["“”„«»]/g) || []).length;
 
-    return cyrillicCount >= 3 && latinCount >= 3;
+    if (cyrillicCount < 3 || latinCount < 3) {
+      return false;
+    }
+
+    if (language === "unknown") {
+      return true;
+    }
+
+    if (totalLetterCount === 0 || quoteMarkCount < 4) {
+      return false;
+    }
+
+    const minorityScriptRatio =
+      Math.min(cyrillicCount, latinCount) / totalLetterCount;
+
+    return minorityScriptRatio >= 0.25;
   }
 
   export function applyRulesToText(
@@ -3754,7 +3841,7 @@ namespace TypotypoEngine {
     settings: ApplySettings,
     language: LanguageCode
   ): RuleResult & { skippedRuleCount: number } {
-    if (shouldPreserveAmbiguousMixedQuoteText(text, language)) {
+    if (shouldPreserveAmbiguousMixedQuoteText(text, settings, language)) {
       return {
         formattedText: text,
         replacementCount: 0,
