@@ -997,9 +997,17 @@ namespace TypotypoEngine {
 
       let output = replaceAndCount(
         input,
-        /([«„“‘‚"([])[ \t\u00A0\u202F]+(?=\S)/g,
+        /([«„“‘‚([])[ \t\u00A0\u202F]+(?=\S)/g,
         function (_match: string, openingSymbol: string) {
           return openingSymbol;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /(^|[\s([{,.;:!?…—–-])"[ \t\u00A0\u202F]+(?=\S)/g,
+        function (_match: string, prefix: string) {
+          return prefix + '"';
         }
       );
 
@@ -1013,9 +1021,37 @@ namespace TypotypoEngine {
 
       output = replaceAndCount(
         output,
-        /[ \t\u00A0\u202F]+([»”’"\])])/g,
+        /[ \t\u00A0\u202F]+([»”’\])])/g,
         function (_match: string, closingSymbol: string) {
           return closingSymbol;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /([A-Za-zА-Яа-яЁё0-9.,;:!?])[ \t\u00A0\u202F]+(")(?=$|[\s.,;:!?…)\]}—–-])/g,
+        function (
+          _match: string,
+          beforeQuote: string,
+          closingQuote: string
+        ) {
+          return beforeQuote + closingQuote;
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /([»”])(?=[A-Za-zА-Яа-яЁё])/g,
+        function (_match: string, closingQuote: string) {
+          return closingQuote + " ";
+        }
+      );
+
+      output = replaceAndCount(
+        output,
+        /([A-Za-zА-Яа-яЁё.!?])"(?=[A-Za-zА-Яа-яЁё])/g,
+        function (_match: string, beforeQuote: string) {
+          return beforeQuote + '" ';
         }
       );
 
@@ -1552,7 +1588,9 @@ namespace TypotypoEngine {
           const characterAfterMatch = fullText.slice(offset + match.length);
           const shouldKeepSentencePeriod =
             /^(?:р\.|руб\.)$/iu.test(rawCurrency) &&
-            /^[ \t\u00A0\u202F]+[А-ЯЁA-Z]/.test(characterAfterMatch);
+            /^[ \t\n\r\u00A0\u202F]+[А-ЯЁA-Z0-9]/.test(
+              characterAfterMatch
+            );
 
           const normalized =
             prefix +
@@ -2937,9 +2975,49 @@ namespace TypotypoEngine {
       }
     );
 
+    const numberUnitAbbreviations = new Set([
+      "°c",
+      "°f",
+      "°с",
+      "руб",
+      "рублей",
+      "р",
+      "тыс",
+      "млн",
+      "млрд",
+      "трлн",
+      "кг",
+      "г",
+      "мг",
+      "л",
+      "мл",
+      "м",
+      "см",
+      "мм",
+      "км",
+      "с",
+      "сек",
+      "мин",
+      "ч",
+      "д",
+      "дн",
+      "кб",
+      "мб",
+      "гб",
+      "тб",
+    ]);
+
     replaceAndCount(
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=[А-Яа-яЁё])/g,
-      function (_match, prefix, number) {
+      /(^|[^0-9A-Za-zА-Яа-яЁё])([0-9]+(?:[,.][0-9]+)?)[ \t\u00A0\u202F]+(?=([А-Яа-яЁё]+\.?))/g,
+      function (match, prefix, number, nextWord) {
+        const normalizedNextWord = nextWord
+          .replace(/\.$/, "")
+          .toLowerCase();
+
+        if (numberUnitAbbreviations.has(normalizedNextWord)) {
+          return match;
+        }
+
         return prefix + number + regularNbsp;
       }
     );
