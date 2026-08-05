@@ -2132,16 +2132,28 @@ var TypotypoEngine;
             replacementCount,
         };
     }
-    function shouldPreserveAmbiguousMixedQuoteText(text, language) {
-        if (language !== "unknown" || !/["“”„«»]/.test(text)) {
+    function shouldPreserveAmbiguousMixedQuoteText(text, settings, language) {
+        if (settings.languageMode !== "auto" || !/["“”„«»]/.test(text)) {
             return false;
         }
         const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
         const latinCount = (text.match(/[A-Za-z]/g) || []).length;
-        return cyrillicCount >= 3 && latinCount >= 3;
+        const totalLetterCount = cyrillicCount + latinCount;
+        const quoteMarkCount = (text.match(/["“”„«»]/g) || []).length;
+        if (cyrillicCount < 3 || latinCount < 3) {
+            return false;
+        }
+        if (language === "unknown") {
+            return true;
+        }
+        if (totalLetterCount === 0 || quoteMarkCount < 4) {
+            return false;
+        }
+        const minorityScriptRatio = Math.min(cyrillicCount, latinCount) / totalLetterCount;
+        return minorityScriptRatio >= 0.25;
     }
     function applyRulesToText(text, settings, language) {
-        if (shouldPreserveAmbiguousMixedQuoteText(text, language)) {
+        if (shouldPreserveAmbiguousMixedQuoteText(text, settings, language)) {
             return {
                 formattedText: text,
                 replacementCount: 0,

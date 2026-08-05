@@ -931,6 +931,26 @@ const formatCases = [
   },
   {
     group: "quotes",
+    name: "English section heading does not force conversion of mixed quote-heavy text",
+    input: `4. QUOTES AND APOSTROPHES
+
+"Внешняя цитата и "внутренняя цитата"." "Outer quote and 'inner quote'." Он сказал: "Это "очень" важно". She said: "It's John's album." rock 'n' roll 'cause we're ready students' choice the '90s 12" display Размер 15" и высота 20".`,
+    expected: `4. QUOTES AND APOSTROPHES
+
+"Внешняя цитата и "внутренняя цитата"." "Outer quote and 'inner quote'." Он сказал: "Это "очень" важно". She said: "It's John's album." rock 'n' roll 'cause we're ready students' choice the '90s 12" display Размер 15" и высота 20".`,
+  },
+  {
+    group: "quotes",
+    name: "exact mixed quote stress layer remains unchanged in auto mode",
+    input: `4. QUOTES AND APOSTROPHES
+
+"Внешняя цитата и"внутренняя цитата".""Outer quote and 'inner quote'."Он сказал:"Это"очень"важно". She said:"It's John's album."rock 'n' roll 'cause we're ready students' choice the '90s 12"display Размер 15"и высота 20".`,
+    expected: `4. QUOTES AND APOSTROPHES
+
+"Внешняя цитата и"внутренняя цитата".""Outer quote and 'inner quote'."Он сказал:"Это"очень"важно". She said:"It's John's album."rock 'n' roll 'cause we're ready students' choice the '90s 12"display Размер 15"и высота 20".`,
+  },
+  {
+    group: "quotes",
     name: "inch marks are protected from English quote conversion",
     input: `12" display and 15" screen.`,
     expected: `12" display and 15" screen`,

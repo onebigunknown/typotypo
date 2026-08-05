@@ -3737,16 +3737,34 @@ namespace TypotypoEngine {
 
   function shouldPreserveAmbiguousMixedQuoteText(
     text: string,
+    settings: ApplySettings,
     language: LanguageCode
   ): boolean {
-    if (language !== "unknown" || !/["“”„«»]/.test(text)) {
+    if (settings.languageMode !== "auto" || !/["“”„«»]/.test(text)) {
       return false;
     }
 
     const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
     const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+    const totalLetterCount = cyrillicCount + latinCount;
+    const quoteMarkCount = (text.match(/["“”„«»]/g) || []).length;
 
-    return cyrillicCount >= 3 && latinCount >= 3;
+    if (cyrillicCount < 3 || latinCount < 3) {
+      return false;
+    }
+
+    if (language === "unknown") {
+      return true;
+    }
+
+    if (totalLetterCount === 0 || quoteMarkCount < 4) {
+      return false;
+    }
+
+    const minorityScriptRatio =
+      Math.min(cyrillicCount, latinCount) / totalLetterCount;
+
+    return minorityScriptRatio >= 0.25;
   }
 
   export function applyRulesToText(
@@ -3754,7 +3772,7 @@ namespace TypotypoEngine {
     settings: ApplySettings,
     language: LanguageCode
   ): RuleResult & { skippedRuleCount: number } {
-    if (shouldPreserveAmbiguousMixedQuoteText(text, language)) {
+    if (shouldPreserveAmbiguousMixedQuoteText(text, settings, language)) {
       return {
         formattedText: text,
         replacementCount: 0,
