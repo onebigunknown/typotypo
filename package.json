@@ -1,6 +1,6 @@
 {
   "name": "typotypo",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Typography cleanup for Russian and English text in Figma.",
   "main": "code.js",
   "scripts": {
