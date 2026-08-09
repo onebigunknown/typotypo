@@ -402,28 +402,33 @@ var TypotypoEngine;
         function startsWithSupportedListMarker(line) {
             return /^[ \t\u00A0\u202F]*(?:[•‣▪◦—–*](?:[ \t\u00A0\u202F]*)(?=\S)|-(?:[ \t\u00A0\u202F]+(?=\S)|(?=[A-Za-zА-Яа-яЁё«„“"']))|(?:\d{1,3}|[A-Za-zА-Яа-яЁё])[.)](?:[ \t\u00A0\u202F]+(?=\S)|(?=[A-Za-zА-Яа-яЁё«„“"'])))/.test(line);
         }
-        const formattedText = normalizedLineEndings.replace(/([^\n])[ \t\u00A0\u202F]*\n[ \t\u00A0\u202F]*([^\n])/g, function (match, beforeBreak, afterBreak, offset, fullText) {
-            const newlineIndex = offset + match.indexOf("\n");
-            const currentLineStart = fullText.lastIndexOf("\n", offset) + 1;
-            const currentLine = fullText.slice(currentLineStart, newlineIndex);
-            const nextLineEnd = fullText.indexOf("\n", newlineIndex + 1);
-            const nextLine = fullText.slice(newlineIndex + 1, nextLineEnd === -1 ? fullText.length : nextLineEnd);
-            if (startsWithSupportedListMarker(currentLine) ||
-                startsWithSupportedListMarker(nextLine)) {
-                const normalized = beforeBreak + "\n" + afterBreak;
+        let formattedText = normalizedLineEndings;
+        let previousText = "";
+        while (previousText !== formattedText) {
+            previousText = formattedText;
+            formattedText = formattedText.replace(/([^\n])[ \t\u00A0\u202F]*\n[ \t\u00A0\u202F]*([^\n])/g, function (match, beforeBreak, afterBreak, offset, fullText) {
+                const newlineIndex = offset + match.indexOf("\n");
+                const currentLineStart = fullText.lastIndexOf("\n", offset) + 1;
+                const currentLine = fullText.slice(currentLineStart, newlineIndex);
+                const nextLineEnd = fullText.indexOf("\n", newlineIndex + 1);
+                const nextLine = fullText.slice(newlineIndex + 1, nextLineEnd === -1 ? fullText.length : nextLineEnd);
+                if (startsWithSupportedListMarker(currentLine) ||
+                    startsWithSupportedListMarker(nextLine)) {
+                    const normalized = beforeBreak + "\n" + afterBreak;
+                    if (match === normalized) {
+                        return match;
+                    }
+                    replacementCount += 1;
+                    return normalized;
+                }
+                const normalized = beforeBreak + " " + afterBreak;
                 if (match === normalized) {
                     return match;
                 }
                 replacementCount += 1;
                 return normalized;
-            }
-            const normalized = beforeBreak + " " + afterBreak;
-            if (match === normalized) {
-                return match;
-            }
-            replacementCount += 1;
-            return normalized;
-        });
+            });
+        }
         return {
             formattedText,
             replacementCount,
@@ -464,11 +469,28 @@ var TypotypoEngine;
         };
     }
     function applyTrimTextEdgesRule(text) {
-        const regexp = /^[ \t\u00A0\u202F]+|[ \t\u00A0\u202F]+$/g;
-        const matches = text.match(regexp);
+        let formattedText = text;
+        let replacementCount = 0;
+        function replaceAndCount(regexp, replacement) {
+            formattedText = formattedText.replace(regexp, function (match) {
+                if (match === replacement) {
+                    return match;
+                }
+                replacementCount += 1;
+                return replacement;
+            });
+        }
+        replaceAndCount(/^[ \t\u00A0\u202F]+|[ \t\u00A0\u202F]+$/g, "");
+        formattedText = formattedText.replace(/((?:\r\n|\r|\n|\u2028){2,}|\u2029)[ \t\u00A0\u202F]+/g, function (match, paragraphBreak) {
+            if (match === paragraphBreak) {
+                return match;
+            }
+            replacementCount += 1;
+            return paragraphBreak;
+        });
         return {
-            formattedText: text.replace(regexp, ""),
-            replacementCount: matches ? matches.length : 0,
+            formattedText,
+            replacementCount,
         };
     }
     function applySpacingCleanupRule(text, _settings, language) {
@@ -914,8 +936,24 @@ var TypotypoEngine;
         }
         function normalizeCurrencyDecimalSeparator(number, currencyLanguage) {
             const normalizedNumber = normalizeSignedNumber(number);
+            const sign = /^[+−]/.test(normalizedNumber)
+                ? normalizedNumber.charAt(0)
+                : "";
+            const unsignedNumber = sign ? normalizedNumber.slice(1) : normalizedNumber;
+            const decimalMatch = unsignedNumber.match(/([,.])(\d{1,2})$/);
+            const integerPart = decimalMatch
+                ? unsignedNumber.slice(0, -decimalMatch[0].length)
+                : unsignedNumber;
+            const hadGroupedThousands = /[ \t\u00A0\u202F]/.test(integerPart);
+            const integerDigits = integerPart.replace(/[ \t\u00A0\u202F]/g, "");
+            const normalizedInteger = hadGroupedThousands
+                ? integerDigits.replace(/\B(?=(\d{3})+(?!\d))/g, space)
+                : integerDigits;
             const decimalSeparator = currencyLanguage === "ru" ? "," : ".";
-            return normalizedNumber.replace(/([,.])(\d{1,2})$/, decimalSeparator + "$2");
+            const decimalPart = decimalMatch
+                ? decimalSeparator + decimalMatch[2]
+                : "";
+            return sign + normalizedInteger + decimalPart;
         }
         function splitSignedNumber(number) {
             const sign = /^[+−]/.test(number) ? number.charAt(0) : "";
@@ -1057,16 +1095,16 @@ var TypotypoEngine;
             "1/4": "¼",
             "3/4": "¾",
         };
-        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’\uE100])/g, function (match, prefix, fraction) {
-            const replacement = fractionReplacements[fraction];
-            const normalized = prefix + replacement;
-            if (match === normalized) {
+        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё./\\])(1\/2|1\/3|2\/3|1\/4|3\/4)(?=$|[ \t\u00A0\u202F\n\r,.;:!?…)\]}»”’\uE100])/g, function (match, prefix, fraction, offset, fullText) {
+            const textBeforeMatch = fullText.slice(0, offset);
+            const textAfterMatch = fullText.slice(offset + match.length);
+            const previousNonSpace = (textBeforeMatch.match(/[^ \t\n\r\u00A0\u2028\u2029\u202F]$/) || [""])[0];
+            const nextNonSpace = (textAfterMatch.match(/^[ \t\n\r\u00A0\u2028\u2029\u202F]*([^ \t\n\r\u00A0\u2028\u2029\u202F])/) || ["", ""])[1];
+            const isBetweenProtectedTechnicalTokens = previousNonSpace === PROTECTED_TEXT_TOKEN_END &&
+                nextNonSpace === PROTECTED_TEXT_TOKEN_START;
+            if (isBetweenProtectedTechnicalTokens) {
                 return match;
             }
-            replacementCount += 1;
-            return normalized;
-        });
-        formattedText = formattedText.replace(/(\uE101)(1\/2|1\/3|2\/3|1\/4|3\/4)(?=\uE100)/g, function (match, prefix, fraction) {
             const replacement = fractionReplacements[fraction];
             const normalized = prefix + replacement;
             if (match === normalized) {
@@ -1077,18 +1115,19 @@ var TypotypoEngine;
         });
         const currencyPrefixBoundary = `(^|[ \t\u00A0\u202F([{«„“"'\uE101])`;
         const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
-        const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*\\d+(?:[,.]\\d+)?)`;
+        const currencyInteger = `(?:\\d{1,3}(?:[ \t\u00A0\u202F]\\d{3})+|\\d+)`;
+        const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "₽");
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(\\$|USD)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "$");
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(€|EUR)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*\\d+[,.]\\d{1,2})` +
+            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "€");
         repairSplitRubleFractionalAmounts(new RegExp(currencyPrefixBoundary +
             `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
@@ -1194,7 +1233,7 @@ var TypotypoEngine;
         };
     }
     function shouldKeepRussianFinalPeriod(textEndingWithPeriod) {
-        const protectedAbbreviations = /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|р\.|тыс\.|г\.|ул\.|д\.|стр\.))$/iu;
+        const protectedAbbreviations = /(^|[^А-Яа-яЁёA-Za-z])((?:т\.[ \t\u00A0\u202F]*[екдпчно]\.)|(?:и[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*[дп]\.)|(?:в[ \t\u00A0\u202F]+т\.[ \t\u00A0\u202F]*ч\.)|(?:руб\.|р\.|тыс\.|г\.|ул\.|д\.|стр\.)|(?:[А-ЯЁ]\.))$/iu;
         return protectedAbbreviations.test(textEndingWithPeriod);
     }
     function shouldKeepEnglishFinalPeriod(textEndingWithPeriod) {
@@ -1618,12 +1657,15 @@ var TypotypoEngine;
         const shortWords = "а|б|без|безо|будто|бы|в|ведь|во|вне|вот|всё|где|да|даже|для|до|если|есть|ещё|же|за|и|из|изо|из-за|из-под|или|иль|к|ко|как|ли|ль|либо|между|на|над|надо|не|ни|но|о|об|обо|около|оно|от|ото|перед|по|по-за|по-над|под|подо|после|при|про|ради|с|со|сквозь|так|также|там|тем|то|тогда|того|тоже|у|хоть|хотя|чего|через|что|чтобы|это";
         const trailingShortWords = "в|во|к|ко|о|об|обо|от|ото|по|с|со|у|до|за|из|на|над|под|при|про|для";
         const particles = "б|бы|ж|же|ли|ль";
-        const addressAbbreviations = "г|обл|кр|ст|пос|с|ул|пер|пр|пр-т|просп|пл|бул|б-р|наб|ш|туп|оф|кв|комн|под|мкр|уч|вл|влад|стр|корп|литер|эт|пгт|пт|гл|рис|илл";
+        const addressAbbreviations = "г|обл|кр|ст|пос|с|ул|пер|пр|пр-т|просп|пл|бул|б-р|наб|ш|туп|оф|кв|комн|под|мкр|уч|вл|влад|стр|корп|литер|эт|пгт|пт|гл|рис|илл|табл";
         const legalEntityAbbreviations = "АО|ОАО|ЗАО|ООО|ПАО|ИП";
         replaceAndCount(new RegExp("(^|[ \t\u00A0\u202F(«„“])(" +
             shortWords +
             ")[ \t\u00A0\u202F]+(?=[А-Яа-яЁёA-Za-z0-9\uE100])", "giu"), function (_match, prefix, word) {
             return prefix + word + regularNbsp;
+        });
+        replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([сС]м)\.[ \t\u00A0\u202F]+(?=(?:гл|рис|табл|стр)\.)/g, function (_match, prefix, abbreviation) {
+            return prefix + abbreviation + "." + regularNbsp;
         });
         replaceAndCount(new RegExp("(^|[^А-Яа-яЁёA-Za-z])(" +
             addressAbbreviations +
@@ -1744,6 +1786,21 @@ var TypotypoEngine;
             replacementCount += 1;
             return normalized;
         });
+        formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])([А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]+)[ \t\u00A0\u202F]+([А-ЯЁA-Z])\.[ \t\u00A0\u202F]*([А-ЯЁA-Z])\./g, function (match, prefix, surname, firstInitial, secondInitial) {
+            const normalized = prefix +
+                surname +
+                space +
+                firstInitial +
+                "." +
+                space +
+                secondInitial +
+                ".";
+            if (match === normalized) {
+                return match;
+            }
+            replacementCount += 1;
+            return normalized;
+        });
         return {
             formattedText,
             replacementCount,
@@ -1764,8 +1821,19 @@ var TypotypoEngine;
                 return normalized;
             });
         }
-        replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])((?:млн|млрд|трлн))\.(?=$|[ \t\u00A0\u202F\n\r,.;:!?…),])/giu, function (_match, prefix, abbreviation) {
-            return prefix + abbreviation;
+        formattedText = formattedText.replace(/(^|[^А-Яа-яЁёA-Za-z])((?:млн|млрд|трлн))\.(?=$|[ \t\u00A0\u202F\n\r,.;:!?…),])/giu, function (match, prefix, abbreviation, offset, fullText) {
+            const textAfterMatch = fullText.slice(offset + match.length);
+            const nextNumberMatch = textAfterMatch.match(/^[ \t\u00A0\u202F]+(\d+)[ \t\u00A0\u202F]+([А-Яа-яЁёA-Za-z]+)/);
+            const nextWord = nextNumberMatch ? nextNumberMatch[2].toLowerCase() : "";
+            const continuesNumericExpression = /^(?:тыс|млн|млрд|трлн|руб|рублей|р|коп|копеек|копейки|копейка)$/u.test(nextWord);
+            const startsNewSentence = /^[ \t\u00A0\u202F]+[А-ЯЁA-Z]/.test(textAfterMatch) ||
+                (Boolean(nextNumberMatch) && !continuesNumericExpression);
+            const normalized = prefix + abbreviation + (startsNewSentence ? "." : "");
+            if (match === normalized) {
+                return match;
+            }
+            replacementCount += 1;
+            return normalized;
         });
         replaceAndCount(/(^|[^А-Яа-яЁёA-Za-z])([тТ]ыс)(?!\.)(?=$|[ \t\u00A0\u202F\n\r,;:!?…),])/g, function (_match, prefix, abbreviation) {
             return prefix + abbreviation + ".";
@@ -1777,7 +1845,7 @@ var TypotypoEngine;
     }
     function applyRussianLargeNumbersRule(text, settings) {
         const space = getConfiguredNbsp(settings);
-        const regexp = /(^|[^0-9A-Za-zА-Яа-яЁё])((?:[0-9]{1,3}(?:[ \t\u00A0\u202F][0-9]{3})+|[0-9]{5,}))(?=$|[^0-9A-Za-zА-Яа-яЁё,.-])/g;
+        const regexp = /(^|[^0-9A-Za-zА-Яа-яЁё])((?:[0-9]{1,3}(?:[ \t\u00A0\u202F][0-9]{3})+|[0-9]{5,}))(?![,.]\d)(?=$|[^0-9A-Za-zА-Яа-яЁё-])/g;
         let replacementCount = 0;
         const formattedText = text.replace(regexp, function (match, prefix, numberWithPossibleSpaces) {
             const rawNumber = numberWithPossibleSpaces.replace(/[ \t\u00A0\u202F]/g, "");
@@ -2173,6 +2241,41 @@ var TypotypoEngine;
             replacementCount,
         };
     }
+    function applySafeAmbiguousMixedSpacingCleanup(text) {
+        let formattedText = text;
+        let replacementCount = 0;
+        function replaceWithCallback(regexp, replacer) {
+            formattedText = formattedText.replace(regexp, function (...args) {
+                const stringArgs = args.map((arg) => typeof arg === "string" ? arg : "");
+                const match = stringArgs[0];
+                const normalized = replacer(...stringArgs);
+                if (match === normalized) {
+                    return match;
+                }
+                replacementCount += 1;
+                return normalized;
+            });
+        }
+        replaceWithCallback(/([^ \t\n\r\u00A0\u202F|·])([ \t\u00A0\u202F]*)([|·])([ \t\u00A0\u202F]*)([^ \t\n\r\u00A0\u202F|·])/g, function (_match, left, _leftSpace, separator, _rightSpace, right) {
+            return left + " " + separator + " " + right;
+        });
+        replaceWithCallback(/([([])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingBracket) {
+            return openingBracket;
+        });
+        replaceWithCallback(/[ \t\u00A0\u202F]+([)\]])/g, function (_match, closingBracket) {
+            return closingBracket;
+        });
+        replaceWithCallback(/([«„“‘‚])[ \t\u00A0\u202F]+(?=\S)/g, function (_match, openingQuote) {
+            return openingQuote;
+        });
+        replaceWithCallback(/[ \t\u00A0\u202F]+([»”’])/g, function (_match, closingQuote) {
+            return closingQuote;
+        });
+        replaceWithCallback(/:([ \t\u00A0\u202F]*)(?=[«„“"'])/g, function () {
+            return ": ";
+        });
+        return { formattedText, replacementCount };
+    }
     function shouldPreserveAmbiguousMixedQuoteText(text, settings, language) {
         if (settings.languageMode !== "auto" || !/["“”„«»]/.test(text)) {
             return false;
@@ -2195,9 +2298,12 @@ var TypotypoEngine;
     }
     function applyRulesToText(text, settings, language) {
         if (shouldPreserveAmbiguousMixedQuoteText(text, settings, language)) {
+            const safeSpacingResult = settings.enabledRules.spacingCleanup && /[|·]/.test(text)
+                ? applySafeAmbiguousMixedSpacingCleanup(text)
+                : { formattedText: text, replacementCount: 0 };
             return {
-                formattedText: text,
-                replacementCount: 0,
+                formattedText: safeSpacingResult.formattedText,
+                replacementCount: safeSpacingResult.replacementCount,
                 skippedRuleCount: 0,
             };
         }
@@ -2209,7 +2315,12 @@ var TypotypoEngine;
             if (!settings.enabledRules[rule.id]) {
                 continue;
             }
-            if (!isRuleSupportedForLanguage(rule, language)) {
+            const shouldApplyLargeNumbersInMixedAutoText = rule.id === "russianLargeNumbers" &&
+                settings.languageMode === "auto" &&
+                /[А-Яа-яЁё]/.test(text) &&
+                /[A-Za-z]/.test(text);
+            if (!isRuleSupportedForLanguage(rule, language) &&
+                !shouldApplyLargeNumbersInMixedAutoText) {
                 skippedRuleCount += 1;
                 continue;
             }

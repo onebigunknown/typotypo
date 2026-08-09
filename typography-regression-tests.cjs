@@ -1019,6 +1019,66 @@ the '90s
     expected: `Привет, мир! Как${NBSP}дела? Всё${NBSP}хорошо; да. Hello, world! How are you? Everything is fine; yes. Что?! Правда?! Да! Версия 1.2.3, цена 10,50${NBSP}и${NBSP}время 12:30. Точка в${NBSP}конце короткого UI-текста. Это${NBSP}длинное предложение с${NBSP}несколькими частями. Его финальную точку нужно сохранить.`,
     settings: { languageMode: "ru" },
   },
+  {
+    group: "cleanup",
+    name: "trims leading whitespace after a paragraph break",
+    input: "1. CLEANUP AND SPACING\n\n   Лишние пробелы",
+    expected: "1. CLEANUP AND SPACING\n\nЛишние пробелы",
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "ui separators",
+    name: "ambiguous mixed quote layer still normalizes safe UI spacing",
+    input: `Треки|альбомы. Tracks|Albums.\n( текст ) [ text ]\n« текст »\nКнопка:«Сохранить»\nLabel:"Save"`,
+    expected: `Треки | альбомы. Tracks | Albums.\n(текст) [text]\n«текст»\nКнопка: «Сохранить»\nLabel: "Save"`,
+  },
+  {
+    group: "number spacing",
+    name: "large numbers normalize in mixed-script auto text",
+    input: "МБ 12000, 1234567, 1 234 567 px",
+    expected: `МБ 12${NBSP}000, 1${NBSP}234${NBSP}567, 1${NBSP}234${NBSP}567${NBSP}px`,
+  },
+  {
+    group: "currency",
+    name: "normalizes grouped thousands inside fractional currency amount",
+    input: "Цена 1 234,56 ₽",
+    expected: `Цена 1${NBSP}234,56${NBSP}₽`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "keeps sentence period after large-number abbreviation before numeric sentence start",
+    input: "5 трлн. 100 человек",
+    expected: `5${NBSP}трлн. 100${NBSP}человек`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "binds reference abbreviations including см and табл",
+    input: "См. гл. 5, рис. 2, табл. 3, стр. 10",
+    expected: `См.${NBSP}гл.${NBSP}5, рис.${NBSP}2, табл.${NBSP}3, стр.${NBSP}10`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "russian nbsp",
+    name: "binds surname to following initials and preserves final initial period",
+    input: "Иванов И. И.",
+    expected: `Иванов${NBSP}И.${NBSP}И.`,
+    settings: { languageMode: "ru" },
+  },
+  {
+    group: "protection",
+    name: "fraction between technical slash tokens remains unchanged on repeat pass",
+    input: "16/9-preview 1/2 12/24-format",
+    expected: "16/9-preview 1/2 12/24-format",
+  },
+  {
+    group: "protection",
+    name: "technical slash-token lines collapse in one pass without converting fraction",
+    input: "16/9-preview\n1/2\n12/24-format",
+    expected: "16/9-preview 1/2 12/24-format",
+  },
+
 ];
 
 const languageCases = [
@@ -1095,4 +1155,13 @@ function run() {
   process.exitCode = 1;
 }
 
-run();
+if (require.main === module) {
+  run();
+}
+
+module.exports = {
+  loadFormatter,
+  NBSP,
+  NNBSP,
+  visible,
+};

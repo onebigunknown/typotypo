@@ -1,6 +1,6 @@
 {
   "name": "typotypo",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Typography cleanup for Russian and English text in Figma.",
   "main": "code.js",
   "scripts": {
@@ -8,9 +8,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "watch": "npm run build -- --watch",
-    "test": "npm run test:typography",
+    "test": "npm run test:typography && npm run test:stress",
     "test:typography": "node typography-regression-tests.cjs",
-    "check": "npm run build && npm run lint"
+    "check": "npm run build && npm run lint",
+    "test:stress": "node typography-stress-tests.cjs"
   },
   "author": "Anton Abramovich",
   "license": "MIT",
