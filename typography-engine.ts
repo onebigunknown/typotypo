@@ -1928,13 +1928,13 @@ namespace TypotypoEngine {
     const currencyPrefixBoundary = `(^|[ \t\u00A0\u202F([{«„“"'\uE101])`;
     const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
     const currencyInteger = `(?:\\d{1,3}(?:[ \t\u00A0\u202F]\\d{3})+|\\d+)`;
-    const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
+    const currencyNumber = `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
 
     replaceCurrencyPrefixFractionalFirst(
       new RegExp(
         currencyPrefixBoundary +
           `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
-          `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+          `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
           currencySuffixBoundary,
         "giu"
       ),
@@ -1945,7 +1945,7 @@ namespace TypotypoEngine {
       new RegExp(
         currencyPrefixBoundary +
           `(\\$|USD)[ \t\u00A0\u202F]*` +
-          `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+          `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
           currencySuffixBoundary,
         "giu"
       ),
@@ -1956,7 +1956,7 @@ namespace TypotypoEngine {
       new RegExp(
         currencyPrefixBoundary +
           `(€|EUR)[ \t\u00A0\u202F]*` +
-          `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+          `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
           currencySuffixBoundary,
         "giu"
       ),
@@ -1966,7 +1966,7 @@ namespace TypotypoEngine {
     repairSplitRubleFractionalAmounts(
       new RegExp(
         currencyPrefixBoundary +
-          `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+          `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
           currencySuffixBoundary,
         "giu"
       )
@@ -2051,7 +2051,7 @@ namespace TypotypoEngine {
     repairSplitRubleFractionalAmounts(
       new RegExp(
         currencyPrefixBoundary +
-          `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+          `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
           currencySuffixBoundary,
         "giu"
       )
@@ -2095,6 +2095,18 @@ namespace TypotypoEngine {
           return match;
         }
 
+        // A spaced em/en dash is punctuation, not a mathematical minus.
+        // Keep it intact so the sentence-dash rule can normalize the spacing.
+        const currentDash = fullText[dashIndex];
+        if (
+          (currentDash === "—" || currentDash === "–") &&
+          (/^[ \t\u00A0\u202F]/.test(fullText[dashIndex + 1] || "") ||
+            (previousNonSpaceCharacter !== "" &&
+              !/[([{]/.test(previousNonSpaceCharacter)))
+        ) {
+          return match;
+        }
+
         const normalized = prefix + "−";
 
         if (match === normalized) {
@@ -2107,7 +2119,7 @@ namespace TypotypoEngine {
     );
 
     formattedText = formattedText.replace(
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g,
+      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g,
       function (match: string, prefix: string, number: string, unit: string) {
         const normalizedUnit = unit === "F" ? "°F" : "°C";
         const normalizedNumber = normalizeSignedNumber(number);
@@ -2123,7 +2135,7 @@ namespace TypotypoEngine {
     );
 
     formattedText = formattedText.replace(
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi,
+      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi,
       function (match: string, prefix: string, number: string) {
         const normalizedNumber = normalizeSignedNumber(number);
         const normalized = prefix + normalizedNumber + "°";
