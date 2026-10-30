@@ -1116,21 +1116,21 @@ var TypotypoEngine;
         const currencyPrefixBoundary = `(^|[ \t\u00A0\u202F([{«„“"'\uE101])`;
         const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
         const currencyInteger = `(?:\\d{1,3}(?:[ \t\u00A0\u202F]\\d{3})+|\\d+)`;
-        const currencyNumber = `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
+        const currencyNumber = `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+            `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "₽");
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(\\$|USD)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+            `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "$");
         replaceCurrencyPrefixFractionalFirst(new RegExp(currencyPrefixBoundary +
             `(€|EUR)[ \t\u00A0\u202F]*` +
-            `([+−–—-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
+            `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
             currencySuffixBoundary, "giu"), "€");
         repairSplitRubleFractionalAmounts(new RegExp(currencyPrefixBoundary +
-            `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+            `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
             currencySuffixBoundary, "giu"));
         replaceRubleKopecks(new RegExp(currencyPrefixBoundary +
             currencyNumber +
@@ -1161,7 +1161,7 @@ var TypotypoEngine;
             currencyNumber +
             currencySuffixBoundary, "giu"), "€");
         repairSplitRubleFractionalAmounts(new RegExp(currencyPrefixBoundary +
-            `([+−–—-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
+            `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
             currencySuffixBoundary, "giu"));
         formattedText = formattedText.replace(/<->|<[-–—−]|[-–—−]>/g, function (match) {
             const normalized = match === "<->"
@@ -1184,6 +1184,15 @@ var TypotypoEngine;
             if (/\d/.test(previousNonSpaceCharacter)) {
                 return match;
             }
+            // A spaced em/en dash is punctuation, not a mathematical minus.
+            // Keep it intact so the sentence-dash rule can normalize the spacing.
+            const currentDash = fullText[dashIndex];
+            if ((currentDash === "—" || currentDash === "–") &&
+                (/^[ \t\u00A0\u202F]/.test(fullText[dashIndex + 1] || "") ||
+                    (previousNonSpaceCharacter !== "" &&
+                        !/[([{]/.test(previousNonSpaceCharacter)))) {
+                return match;
+            }
             const normalized = prefix + "−";
             if (match === normalized) {
                 return match;
@@ -1191,7 +1200,7 @@ var TypotypoEngine;
             replacementCount += 1;
             return normalized;
         });
-        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g, function (match, prefix, number, unit) {
+        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g, function (match, prefix, number, unit) {
             const normalizedUnit = unit === "F" ? "°F" : "°C";
             const normalizedNumber = normalizeSignedNumber(number);
             const normalized = prefix + normalizedNumber + space + normalizedUnit;
@@ -1201,7 +1210,7 @@ var TypotypoEngine;
             replacementCount += 1;
             return normalized;
         });
-        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−–—-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi, function (match, prefix, number) {
+        formattedText = formattedText.replace(/(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi, function (match, prefix, number) {
             const normalizedNumber = normalizeSignedNumber(number);
             const normalized = prefix + normalizedNumber + "°";
             if (match === normalized) {
