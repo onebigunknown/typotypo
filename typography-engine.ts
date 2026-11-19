@@ -1359,17 +1359,14 @@ namespace TypotypoEngine {
     const units =
       "°[CFС]|₽|руб\\.?|рублей|р\\.?|тыс\\.?|млн\\.?|млрд\\.?|трлн\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB|px|dp|pt|rem|em|vw|vh";
 
-    const regexp = new RegExp(
-      "(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
-        units +
-        ")(?=$|[ \\t\\n\\r,.;:!?\\)])",
-      "giu"
-    );
-
+    // Only units that are safe in a price/rate-style expression. CSS units
+    // like px/rem are intentionally not normalized before a slash.
+    const slashUnits =
+      "°[CFС]|₽|руб\\.?|рублей|р\\.?|кг|г|мг|л|мл|м|см|мм|км|с|сек|мин|ч|д|дн|КБ|МБ|ГБ|ТБ|KB|MB|GB|TB";
     const space = getConfiguredNbsp(settings);
     let replacementCount = 0;
 
-    const formattedText = text.replace(regexp, function (match, number, unit) {
+    function normalizeNumberUnit(match: string, number: string, unit: string): string {
       const normalized = number + space + unit;
 
       if (match === normalized) {
@@ -1378,6 +1375,40 @@ namespace TypotypoEngine {
 
       replacementCount += 1;
       return normalized;
+    }
+
+    function normalizeSpacedUnits(unitPattern: string, suffixBoundary: string): void {
+      const regexp = new RegExp(
+        "(\\d+(?:[,.]\\d+)?)[ \\t\\u00A0\\u202F]+(" +
+          unitPattern +
+          ")" + suffixBoundary,
+        "giu"
+      );
+      formattedText = formattedText.replace(regexp, normalizeNumberUnit);
+    }
+
+    let formattedText = text;
+    normalizeSpacedUnits(units, "(?=$|[ \\t\\n\\r,.;:!?\\)])");
+    normalizeSpacedUnits(slashUnits, "(?=/)");
+
+    // Unlike short/ambiguous units (г, м, с, ч) and CSS-style dimensions,
+    // these longer Cyrillic units can safely be detached from a number in RU.
+    // Require a word boundary on both sides to avoid touching identifiers.
+    if (settings.languageMode !== "en") {
+      const attachedRegexp = /(^|[ \t\u00A0\u202F([{«„“"'])([+−-]?\d+(?:[,.]\d+)?)(кг|мг|мл|л|см|мм|км|КБ|МБ|ГБ|ТБ|сек|мин|дн)(?=$|[ \t\n\r,.;:!?…)\]\/])/giu;
+      formattedText = formattedText.replace(
+        attachedRegexp,
+        function (match: string, prefix: string, number: string, unit: string) {
+          return prefix + normalizeNumberUnit(match.slice(prefix.length), number, unit);
+        }
+      );
+    }
+
+    // The currency symbol may be attached to its amount or followed by a slash
+    // (e.g. 199₽/мес). Keep other units' spacing requirements unchanged.
+    const rubleRegexp = /(^|[ \t\u00A0\u202F([{«„“"'])(\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*₽(?=$|[ \t\n\r,.;:!?…)\]\/])/gu;
+    formattedText = formattedText.replace(rubleRegexp, function (match, prefix, number) {
+      return prefix + normalizeNumberUnit(match.slice(prefix.length), number, "₽");
     });
 
     return {
@@ -1926,7 +1957,8 @@ namespace TypotypoEngine {
     );
 
     const currencyPrefixBoundary = `(^|[ \t\u00A0\u202F([{«„“"'\uE101])`;
-    const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…)\\]}»”’\uE100])`;
+    const currencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…/)\\]}»”’\uE100])`;
+    const rubleCurrencySuffixBoundary = `(?=$|[ \t\n\r,.;:!?…/)\\]}»”’\uE100])`;
     const currencyInteger = `(?:\\d{1,3}(?:[ \t\u00A0\u202F]\\d{3})+|\\d+)`;
     const currencyNumber = `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}(?:[,.]\\d+)?)`;
 
@@ -1935,7 +1967,7 @@ namespace TypotypoEngine {
         currencyPrefixBoundary +
           `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
           `([+−-]?[ \t\u00A0\u202F]*${currencyInteger}[,.]\\d{1,2})` +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       ),
       "₽"
@@ -1967,7 +1999,7 @@ namespace TypotypoEngine {
       new RegExp(
         currencyPrefixBoundary +
           `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       )
     );
@@ -1977,7 +2009,7 @@ namespace TypotypoEngine {
         currencyPrefixBoundary +
           currencyNumber +
           `[ \t\u00A0\u202F]*(₽|р\\.?|руб\\.?|рублей|RUB|RUR)[ \t\u00A0\u202F]+(\\d{1,2})[ \t\u00A0\u202F]*(?:коп|копеек|копейки|копейка)(\\.)?` +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       )
     );
@@ -1987,7 +2019,7 @@ namespace TypotypoEngine {
         currencyPrefixBoundary +
           currencyNumber +
           `[ \t\u00A0\u202F]*(₽|р\\.?|руб\\.?|рублей|RUB|RUR)` +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       ),
       "₽"
@@ -1998,7 +2030,7 @@ namespace TypotypoEngine {
         currencyPrefixBoundary +
           `(₽|RUB|RUR)[ \t\u00A0\u202F]*` +
           currencyNumber +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       ),
       "₽"
@@ -2052,7 +2084,7 @@ namespace TypotypoEngine {
       new RegExp(
         currencyPrefixBoundary +
           `([+−-]?[ \t\u00A0\u202F]*\\d+)[ \t\u00A0\u202F]*₽[ \t\u00A0\u202F]*[,.](\\d{1,2})` +
-          currencySuffixBoundary,
+          rubleCurrencySuffixBoundary,
         "giu"
       )
     );
@@ -2119,7 +2151,7 @@ namespace TypotypoEngine {
     );
 
     formattedText = formattedText.replace(
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]])/g,
+      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*°?[ \t\u00A0\u202F]*([CFС])(?=$|[ \t\n\r,.;:!?)\]\/])/g,
       function (match: string, prefix: string, number: string, unit: string) {
         const normalizedUnit = unit === "F" ? "°F" : "°C";
         const normalizedNumber = normalizeSignedNumber(number);
@@ -2135,7 +2167,7 @@ namespace TypotypoEngine {
     );
 
     formattedText = formattedText.replace(
-      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]])/gi,
+      /(^|[^0-9A-Za-zА-Яа-яЁё])([+−-]?[ \t\u00A0\u202F]*\d+(?:[,.]\d+)?)[ \t\u00A0\u202F]*(?:°|deg(?:rees?)?)(?=$|[ \t\n\r,.;:!?)\]\/])/gi,
       function (match: string, prefix: string, number: string) {
         const normalizedNumber = normalizeSignedNumber(number);
         const normalized = prefix + normalizedNumber + "°";
